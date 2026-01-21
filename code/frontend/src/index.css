@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap');
+
+:root {
+  color-scheme: dark;
+
+  --bg: #040306;
+  --bg-2: #040306;
+  --bg-rgb: 4, 3, 6;
+  --surface: rgba(var(--bg-rgb), 0.78);
+  --surface-2: rgba(var(--bg-rgb), 0.9);
+
+  --text: #f5f3ff;
+  --text-muted: rgba(221, 214, 254, 0.84);
+  --text-subtle: rgba(196, 181, 253, 0.82);
+  --text-faint: rgba(167, 139, 250, 0.75);
+
+  --accent: #e5e7eb;
+  --accent-rgb: 229, 231, 235;
+  --accent-2: #9ca3af;
+  --accent-2-rgb: 156, 163, 175;
+  --on-accent: #000000;
+
+  --button-accent: #a855f7;
+  --button-accent-rgb: 168, 85, 247;
+  --button-accent-2: #7c3aed;
+  --button-accent-2-rgb: 124, 58, 237;
+  --on-button-accent: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+code {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--text);
+}

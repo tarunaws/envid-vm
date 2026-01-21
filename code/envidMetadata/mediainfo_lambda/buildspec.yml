@@ -1,0 +1,32 @@
+version: 0.2
+
+env:
+  variables:
+    REPO_NAME: "envid-mediainfo-lambda"
+
+phases:
+  pre_build:
+    commands:
+      - 'echo "Region: $AWS_REGION"'
+      - 'ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)'
+      - 'ECR_HOST="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"'
+      - 'ECR_URI="$ECR_HOST/$REPO_NAME"'
+      - 'aws ecr describe-repositories --region "$AWS_REGION" --repository-names "$REPO_NAME" >/dev/null 2>&1 || aws ecr create-repository --region "$AWS_REGION" --repository-name "$REPO_NAME" >/dev/null'
+      - 'aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_HOST" >/dev/null'
+  build:
+    commands:
+      - 'docker build -t "$REPO_NAME:latest" .'
+      - 'ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)'
+      - 'ECR_URI="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_NAME"'
+      - 'docker tag "$REPO_NAME:latest" "$ECR_URI:latest"'
+  post_build:
+    commands:
+      - 'ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)'
+      - 'ECR_URI="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_NAME"'
+      - 'docker push "$ECR_URI:latest"'
+      - 'echo "IMAGE_URI=$ECR_URI:latest"'
+
+artifacts:
+  files:
+    - '**/*'
+  discard-paths: no

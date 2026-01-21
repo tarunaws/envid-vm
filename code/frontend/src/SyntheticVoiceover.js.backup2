@@ -1,0 +1,1732 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import styled from 'styled-components';
+import axios from 'axios';
+
+const resolveVoiceApiBase = () => {
+  const envValue = process.env.REACT_APP_VOICE_API_BASE;
+  if (envValue) {
+    return envValue.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    const localHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
+    const isLanHost = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1]))/.test(hostname) || hostname.endsWith('.local');
+    if (localHosts.has(hostname) || isLanHost) {
+      return `${protocol}//${hostname}:5003`;
+    }
+  }
+  return '';
+};
+
+const VOICE_API_BASE = resolveVoiceApiBase();
+
+const personaPresets = [
+  {
+    id: 'warm-guide',
+    label: 'Warm guide',
+    description: 'Friendly mentor tone with reassuring pacing.',
+  },
+  {
+    id: 'energetic-launch',
+    label: 'Energetic launch',
+    description: 'Dynamic announcer energy for product reveals.',
+  },
+  {
+    id: 'news-brief',
+    label: 'News brief',
+    description: 'Confident newsroom cadence with crisp emphasis.',
+  },
+  {
+    id: 'storyteller',
+    label: 'Storyteller',
+    description: 'Narrative flow with deliberate pauses for drama.',
+  },
+];
+
+const outputOptions = [
+  { value: 'mp3', label: 'MP3 (default)' },
+  { value: 'ogg_vorbis', label: 'OGG Vorbis' },
+  { value: 'pcm', label: 'PCM (16-bit WAV)' },
+];
+
+const Page = styled.section`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2.75rem 1.5rem 3.5rem;
+  color: #dce7ff;
+`;
+
+const Title = styled.h1`
+  color: #ffffff;
+  font-weight: 800;
+  margin: 0 0 0.75rem 0;
+  font-size: clamp(1.85rem, 3.6vw, 2.6rem);
+  text-align: center;
+`;
+
+const Lead = styled.p`
+  text-align: center;
+  margin: 0 auto 2.5rem;
+  max-width: 860px;
+  line-height: 1.85;
+  color: #b6c5ef;
+`;
+
+const InputOptionsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+`;
+
+const InputOptionCard = styled.button.attrs(({ $active }) => ({ type: 'button', 'aria-pressed': $active }))`
+  border-radius: 16px;
+  border: 1px solid ${({ $active }) => ($active ? 'rgba(59, 130, 246, 0.6)' : 'rgba(99, 102, 241, 0.24)')};
+  background: ${({ $active }) => ($active ? 'rgba(15, 30, 58, 0.92)' : 'rgba(10, 20, 38, 0.78)')};
+  color: #e2e9ff;
+  padding: 1.15rem 1.1rem;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: ${({ $active }) => ($active ? '0 18px 34px rgba(56, 189, 248, 0.18)' : '0 14px 28px rgba(7, 15, 30, 0.45)')};
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(59, 130, 246, 0.55);
+  }
+`;
+
+const InputOptionTitle = styled.span`
+  display: block;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #f8fafc;
+`;
+
+const InputOptionCopy = styled.span`
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: rgba(203, 213, 225, 0.82);
+`;
+
+
+const ArtistSection = styled.div`
+  margin-top: 1.5rem;
+  background: rgba(8, 18, 34, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+`;
+
+const ArtistHeading = styled.h3`
+  margin: 0 0 1rem 0;
+  font-size: 1.05rem;
+  color: #f8fafc;
+  font-weight: 700;
+`;
+
+const ArtistGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+`;
+
+const ArtistChip = styled.button.attrs(({ $active }) => ({ 'aria-pressed': $active }))`
+  border-radius: 14px;
+  border: 1px solid ${({ $active }) => ($active ? 'rgba(96, 165, 250, 0.85)' : 'rgba(96, 165, 250, 0.3)')};
+  background: ${({ $active }) => ($active ? 'rgba(37, 99, 235, 0.2)' : 'rgba(11, 22, 40, 0.7)')};
+  color: #dbeafe;
+  min-width: 160px;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(96, 165, 250, 0.85);
+    transform: translateY(-1px);
+  }
+`;
+
+const ArtistName = styled.div`
+  font-weight: 700;
+  font-size: 0.95rem;
+`;
+
+const ArtistMeta = styled.div`
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: rgba(203, 213, 225, 0.75);
+`;
+
+const ArtistHint = styled.span`
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.85);
+`;
+
+const Layout = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+`;
+
+const Panel = styled.div`
+  background: linear-gradient(160deg, rgba(14, 26, 48, 0.92), rgba(22, 36, 63, 0.88));
+  border-radius: 18px;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  padding: 1.75rem;
+  box-shadow: 0 24px 54px rgba(7, 15, 30, 0.55);
+`;
+
+const RecordingControls = styled.div`
+  margin-top: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+`;
+
+const RecordButton = styled.button.attrs(({ $recording }) => ({ type: 'button', 'aria-pressed': $recording }))`
+  border-radius: 999px;
+  border: 1px solid ${({ $recording }) => ($recording ? 'rgba(248, 113, 113, 0.55)' : 'rgba(74, 222, 128, 0.45)')};
+  background: ${({ $recording }) => ($recording ? 'rgba(248, 113, 113, 0.18)' : 'rgba(34, 197, 94, 0.18)')};
+  color: ${({ $recording }) => ($recording ? '#fecaca' : '#bbf7d0')};
+  padding: 0.65rem 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+`;
+
+const RecordingStatus = styled.span`
+  font-size: 0.9rem;
+  color: rgba(148, 163, 184, 0.85);
+`;
+
+const RecordingError = styled.span`
+  font-size: 0.85rem;
+  color: #fda4af;
+`;
+
+const PanelTitle = styled.h2`
+  margin: 0 0 1rem 0;
+  color: #f8fafc;
+  font-size: 1.35rem;
+  font-weight: 800;
+`;
+
+const Label = styled.label`
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+  color: #cbd5f5;
+  margin-bottom: 0.5rem;
+`;
+
+const TextArea = styled.textarea`
+  width: 100%;
+  min-height: 160px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(8, 18, 34, 0.88);
+  color: #f8fafc;
+  padding: 1rem 1.1rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  resize: vertical;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: rgba(56, 189, 248, 0.6);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+  }
+`;
+
+const PersonaGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+`;
+
+const PersonaChip = styled.button`
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid ${props => (props.active ? 'rgba(56, 189, 248, 0.65)' : 'rgba(99, 102, 241, 0.24)')};
+  background: ${props => (props.active ? 'rgba(18, 32, 58, 0.95)' : 'rgba(10, 20, 38, 0.85)')};
+  color: #e2e9ff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: ${props => (props.active ? '0 18px 36px rgba(56, 189, 248, 0.18)' : '0 12px 28px rgba(7, 15, 30, 0.4)')};
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(56, 189, 248, 0.55);
+  }
+`;
+
+const PersonaName = styled.span`
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #f8fafc;
+`;
+
+const PersonaCopy = styled.span`
+  font-size: 0.85rem;
+  color: #a6b4da;
+  line-height: 1.5;
+`;
+
+const ButtonRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+`;
+
+const PrimaryButton = styled.button`
+  padding: 0.9rem 1.6rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  border: none;
+  color: #041427;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 36px rgba(56, 189, 248, 0.35);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+`;
+
+const SecondaryButton = styled.button`
+  padding: 0.9rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 255, 0.35);
+  background: rgba(18, 30, 52, 0.9);
+  color: #dce7ff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, border 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(56, 189, 248, 0.45);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+`;
+
+const StepsBar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0 0 2rem 0;
+`;
+
+const StepCard = styled.div`
+  flex: 1 1 220px;
+  min-width: 200px;
+  background: ${({ $completed, $active }) => {
+    if ($completed) return 'rgba(34, 197, 94, 0.12)';
+    if ($active) return 'rgba(59, 130, 246, 0.15)';
+    return 'rgba(15, 23, 42, 0.75)';
+  }};
+  border: 1px solid ${({ $completed, $active }) => {
+    if ($completed) return 'rgba(34, 197, 94, 0.45)';
+    if ($active) return 'rgba(59, 130, 246, 0.45)';
+    return 'rgba(148, 163, 184, 0.25)';
+  }};
+  border-radius: 18px;
+  padding: 1rem 1.2rem;
+  box-shadow: ${({ $active }) => ($active ? '0 18px 36px rgba(59, 130, 246, 0.15)' : '0 10px 24px rgba(7, 15, 30, 0.35)')};
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+`;
+
+const StepCardInner = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+`;
+
+const StepBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: ${({ $completed }) => ($completed ? '#0f172a' : '#f8fafc')};
+  background: ${({ $completed, $active }) => {
+    if ($completed) return 'rgba(34, 197, 94, 0.85)';
+    if ($active) return 'rgba(59, 130, 246, 0.9)';
+    return 'rgba(148, 163, 184, 0.25)';
+  }};
+  border: 1px solid ${({ $completed, $active }) => {
+    if ($completed) return 'rgba(34, 197, 94, 0.85)';
+    if ($active) return 'rgba(59, 130, 246, 0.75)';
+    return 'rgba(148, 163, 184, 0.35)';
+  }};
+`;
+
+const StepText = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+`;
+
+const StepTitle = styled.span`
+  font-weight: 700;
+  font-size: 1rem;
+  color: #f8fafc;
+`;
+
+const StepCaption = styled.span`
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: rgba(203, 213, 225, 0.75);
+`;
+
+const WizardNav = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.6rem;
+`;
+
+const SsmlSection = styled.section`
+  margin-top: 2.5rem;
+  background: linear-gradient(160deg, rgba(12, 23, 42, 0.92), rgba(20, 32, 56, 0.88));
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  padding: 1.6rem 1.8rem;
+  box-shadow: 0 24px 48px rgba(7, 15, 30, 0.45);
+`;
+
+const SsmlHeader = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+`;
+
+const SsmlTitle = styled.h2`
+  margin: 0;
+  font-size: 1.3rem;
+  color: #f8fafc;
+  font-weight: 800;
+`;
+
+const SsmlActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+`;
+
+const SsmlActionButton = styled.button`
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 255, 0.4);
+  background: rgba(15, 23, 42, 0.9);
+  color: #dbeafe;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(56, 189, 248, 0.45);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.35);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+`;
+
+const SsmlPre = styled.pre`
+  margin: 0;
+  padding: 1.5rem;
+  border-radius: 16px;
+  background: rgba(8, 18, 34, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  color: #e0ecff;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
+  font-family: 'Source Code Pro', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  max-height: ${({ $expanded }) => ($expanded ? 'none' : '540px')};
+  min-height: ${({ $expanded }) => ($expanded ? '420px' : '280px')};
+  overflow-y: ${({ $expanded }) => ($expanded ? 'visible' : 'auto')};
+`;
+
+const Status = styled.div`
+  margin-top: 1.2rem;
+  font-size: 0.9rem;
+  color: ${props => (props.error ? '#fda4af' : '#94a3e6')};
+  line-height: 1.6;
+`;
+
+const VoiceList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const VoiceSelect = styled.select`
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(10, 22, 40, 0.92);
+  color: #f8fafc;
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  appearance: none;
+`;
+
+const AudioCard = styled.div`
+  margin-top: 1.5rem;
+  background: rgba(8, 18, 34, 0.9);
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  padding: 1.25rem;
+`;
+
+const AudioPlayer = styled.audio`
+  width: 100%;
+  margin-top: 0.75rem;
+`;
+
+const OptionRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+`;
+
+const Select = styled.select`
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(10, 22, 40, 0.92);
+  color: #f8fafc;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+`;
+
+const HiddenDownloadLink = styled.a`
+  display: none;
+`;
+
+const EmptyState = styled.div`
+  margin-top: 1rem;
+  color: #8ea2d6;
+  font-size: 0.95rem;
+  line-height: 1.7;
+`;
+
+const VoiceBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+`;
+
+const SectionNotice = styled.p`
+  margin: 1.2rem 0 0 0;
+  font-size: 0.85rem;
+  color: #8ea2d6;
+  line-height: 1.6;
+`;
+
+const personaMetaMap = personaPresets.reduce((acc, preset) => {
+  acc[preset.id] = preset;
+  return acc;
+}, {});
+
+const decodeBase64 = (input) => {
+  if (typeof window !== 'undefined' && window.atob) {
+    return window.atob(input);
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(input, 'base64').toString('binary');
+  }
+  throw new Error('Base64 decoding not supported in this environment');
+};
+
+export default function SyntheticVoiceover() {
+  const [prompt, setPrompt] = useState('');
+  const [inputMode, setInputMode] = useState('genai');
+  const [persona, setPersona] = useState('');
+  const [ssml, setSsml] = useState('');
+  const [ssmlExpanded, setSsmlExpanded] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [status, setStatus] = useState('');
+  const [statusError, setStatusError] = useState(false);
+  const [loadingSsml, setLoadingSsml] = useState(false);
+
+  const [voices, setVoices] = useState([]);
+  const [voicesLoading, setVoicesLoading] = useState(true);
+  const [selectedVoice, setSelectedVoice] = useState('');
+
+  const [audioFormat, setAudioFormat] = useState(outputOptions[0].value);
+  const [sampleRate, setSampleRate] = useState('');
+  const [synthLoading, setSynthLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState('');
+  const [engineUsed, setEngineUsed] = useState('neural');
+  const [isRecording, setIsRecording] = useState(false);
+  const [canRecord, setCanRecord] = useState(false);
+  const [recordingError, setRecordingError] = useState('');
+  const [videoFile, setVideoFile] = useState(null);
+  const [analyzingSpeakers, setAnalyzingSpeakers] = useState(false);
+  const [speakers, setSpeakers] = useState([]);
+  const [speakerVoiceMappings, setSpeakerVoiceMappings] = useState({});
+  const [replacingAudio, setReplacingAudio] = useState(false);
+  const [processedVideoUrl, setProcessedVideoUrl] = useState('');
+  const downloadRef = useRef(null);
+  const scriptSectionRef = useRef(null);
+  const ssmlSectionRef = useRef(null);
+  const voiceSectionRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const recordedTextRef = useRef('');
+  const preRecordPromptRef = useRef('');
+  const videoInputRef = useRef(null);
+
+  const normalizeSsmlValue = useCallback((value) => {
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (value === undefined || value === null) {
+      return '';
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => (typeof item === 'string' ? item : normalizeSsmlValue(item)))
+        .filter(Boolean)
+        .join('\n');
+    }
+    if (typeof value === 'object') {
+      if (typeof value.ssml === 'string') {
+        return value.ssml;
+      }
+      return '';
+    }
+    try {
+      return String(value);
+    } catch (error) {
+      return '';
+    }
+  }, []);
+
+  const persistSsml = useCallback((value) => {
+    const normalized = normalizeSsmlValue(value);
+    if (normalized.trim()) {
+      setSsml(normalized);
+      return normalized;
+    }
+    return normalized;
+  }, [normalizeSsmlValue]);
+
+  const stopRecording = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        // ignore stop errors
+      }
+    }
+    recordedTextRef.current = '';
+    setIsRecording(false);
+  }, []);
+
+  const startRecording = useCallback(() => {
+    if (!recognitionRef.current) {
+      setRecordingError('Speech recognition is not available in this browser.');
+      return;
+    }
+    try {
+      preRecordPromptRef.current = prompt.trim();
+      recordedTextRef.current = '';
+      setRecordingError('');
+      recognitionRef.current.start();
+      setIsRecording(true);
+    } catch (error) {
+      setRecordingError('Unable to start recording. Confirm microphone permissions and try again.');
+    }
+  }, [prompt]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setCanRecord(false);
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setCanRecord(false);
+      return;
+    }
+
+    setCanRecord(true);
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = recordedTextRef.current;
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript = `${interimTranscript}${transcript}`;
+        }
+      }
+      recordedTextRef.current = finalTranscript;
+      const combined = [preRecordPromptRef.current, finalTranscript, interimTranscript]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      setPrompt(combined);
+    };
+
+    recognition.onerror = (event) => {
+      const errorMessage = event?.error === 'not-allowed'
+        ? 'Microphone permission denied.'
+        : `Recording error: ${event?.error || 'unknown'}.`;
+      setRecordingError(errorMessage);
+      stopRecording();
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      try {
+        recognition.stop();
+      } catch (error) {
+        // ignore stop errors on unmount
+      }
+      recognitionRef.current = null;
+    };
+  }, [setPrompt, stopRecording]);
+
+  useEffect(() => {
+    if (inputMode !== 'audio' && isRecording) {
+      stopRecording();
+    }
+  }, [inputMode, isRecording, stopRecording]);
+
+  // Video upload handlers
+  const handleVideoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setVideoFile(file);
+    setAnalyzingSpeakers(true);
+    setStatus('Analyzing video speakers...');
+    setStatusError(false);
+    setSpeakers([]);
+    setSpeakerVoiceMappings({});
+
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const response = await axios.post(`${VOICE_API_BASE}/analyze-video-speakers`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const speakersList = response?.data?.speakers || [];
+      setSpeakers(speakersList);
+
+      // Initialize voice mappings with first suggested voice
+      const initialMappings = {};
+      speakersList.forEach((speaker) => {
+        const suggestedVoice = speaker.suggested_voices?.[0]?.voice_id || 'Joanna';
+        initialMappings[speaker.id] = suggestedVoice;
+      });
+      setSpeakerVoiceMappings(initialMappings);
+
+      // Display speaker info in prompt area
+      const speakerSummary = speakersList
+        .map((s) => {
+          const char = s.characteristics || {};
+          return `${s.label}: ${s.segment_count} segments, ${s.total_duration.toFixed(1)}s total\nSample: "${s.sample_text || 'N/A'}"`;
+        })
+        .join('\n\n');
+
+      setPrompt(speakerSummary);
+      setStatus(`Found ${speakersList.length} speaker(s). Assign voices below and generate.`);
+    } catch (error) {
+      console.error('Speaker analysis failed', error);
+      setStatusError(true);
+      const message = error?.response?.data?.error || error.message || 'Analysis failed.';
+      setStatus(`Speaker analysis failed: ${message}`);
+    } finally {
+      setAnalyzingSpeakers(false);
+    }
+  };
+
+  const handleSpeakerVoiceChange = (speakerId, voiceId) => {
+    setSpeakerVoiceMappings((prev) => ({
+      ...prev,
+      [speakerId]: voiceId,
+    }));
+  };
+
+  const handleGenerateMultiSpeakerVideo = async () => {
+    if (!videoFile || speakers.length === 0) {
+      setStatusError(true);
+      setStatus('No video or speakers to process.');
+      return;
+    }
+
+    setReplacingAudio(true);
+    setStatus('Generating synthetic audio for all speakers...');
+    setStatusError(false);
+
+    try {
+      const formData = new FormData();
+      formData.append('video', videoFile);
+
+      // Build speaker mappings with segments
+      const mappings = speakers.map((speaker) => ({
+        speaker_id: speaker.id,
+        voice_id: speakerVoiceMappings[speaker.id] || 'Joanna',
+        segments: speaker.segments,
+      }));
+
+      formData.append('speaker_mappings', JSON.stringify(mappings));
+
+      const response = await axios.post(
+        `${VOICE_API_BASE}/replace-multi-speaker-audio`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 300000, // 5 minutes
+        }
+      );
+
+      const videoBase64 = response?.data?.video;
+      if (videoBase64) {
+        const byteCharacters = decodeBase64(videoBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i += 1) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'video/mp4' });
+
+        if (processedVideoUrl) {
+          URL.revokeObjectURL(processedVideoUrl);
+        }
+
+        const url = URL.createObjectURL(blob);
+        setProcessedVideoUrl(url);
+        setStatus('Multi-speaker video generated successfully! Download below.');
+      } else {
+        setStatusError(true);
+        setStatus('No video returned from service.');
+      }
+    } catch (error) {
+      console.error('Multi-speaker generation failed', error);
+      setStatusError(true);
+      const message = error?.response?.data?.error || error.message || 'Generation failed.';
+      setStatus(`Multi-speaker video generation failed: ${message}`);
+    } finally {
+      setReplacingAudio(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const loadVoices = async () => {
+      try {
+        const response = await axios.get(`${VOICE_API_BASE}/voices`);
+        if (!active) return;
+        const voiceList = response?.data?.voices || [];
+        setVoices(voiceList);
+        if (voiceList.length) {
+          setSelectedVoice(voiceList[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch voices', error);
+        if (!active) return;
+        setStatusError(true);
+  setStatus('Unable to load voice catalog. Verify service credentials and regional access.');
+      } finally {
+        if (active) setVoicesLoading(false);
+      }
+    };
+
+    loadVoices();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
+
+  const activePersona = personaMetaMap[persona];
+  const activePersonaHint = activePersona?.description || '';
+
+  const inputOptions = [
+    {
+      id: 'genai',
+      title: 'Generate content via GenAI',
+      copy: 'Describe the audience, product, and vibe. GenAI will transform it into narration-ready text.',
+    },
+    {
+      id: 'paste',
+      title: 'Paste finished script',
+      copy: 'Already have copy? Paste it directly and we’ll convert it into SSML in the next step.',
+    },
+    {
+      id: 'audio',
+      title: 'Record and transcribe',
+      copy: 'Speak the script aloud. We’ll transcribe it into the editor using on-device speech to text.',
+    },
+  ];
+
+  const modeSummaries = {
+    genai: 'Provide context and goals. This works best for brainstorming new scripts or adapting bullet points.',
+    paste: 'Paste any existing script or marketing copy. You can still tweak the text before generating SSML.',
+    audio: 'Use your microphone to capture narration ideas on the fly. You can edit the text after transcription.',
+    video: 'Upload a video file. We\'ll analyze speakers and let you assign synthetic voices to each one.',
+  };
+
+  const promptPlaceholders = {
+    genai: 'Describe the scenario, target audience, and key beats for the narration you want to generate.',
+    paste: 'Paste your completed script or copy here. You can revise before converting to SSML.',
+    audio: 'Use the recorder below or type as you speak. The captured transcript will appear here.',
+    video: 'Video analysis results will appear here after upload.',
+  };
+
+  const promptPlaceholder = promptPlaceholders[inputMode] || promptPlaceholders.genai;
+  const recordingStatusMessage = isRecording
+    ? 'Listening… speak clearly and tap stop when the narration is ready.'
+    : canRecord
+      ? 'Ready to capture narration from your microphone.'
+      : 'Speech recognition is not supported in this browser.';
+
+  const ssmlText = normalizeSsmlValue(ssml);
+  const hasPrompt = prompt.trim().length > 0;
+  const hasSsml = ssmlText.trim().length > 0;
+  const hasAudio = Boolean(audioUrl);
+
+  useEffect(() => {
+    const refMap = {
+      1: scriptSectionRef,
+      2: ssmlSectionRef,
+      3: voiceSectionRef,
+    };
+    const targetRef = refMap[currentStep];
+    if (targetRef?.current) {
+      targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (!hasPrompt && currentStep > 1) {
+      setCurrentStep(1);
+    }
+  }, [hasPrompt, currentStep]);
+
+  useEffect(() => {
+    if (!hasSsml && currentStep === 3) {
+      setCurrentStep(hasPrompt ? 2 : 1);
+    }
+  }, [hasSsml, currentStep, hasPrompt]);
+
+  const stepItems = [
+    {
+      number: 1,
+      title: 'Provide content',
+      caption: 'Choose a capture method and prepare your base script.',
+      completed: hasPrompt || currentStep > 1 || hasSsml || hasAudio,
+      active: currentStep === 1,
+    },
+    {
+      number: 2,
+      title: 'Generate SSML',
+      caption: 'Apply tone guidance and convert the text into an SSML blueprint.',
+      completed: hasSsml || currentStep === 3 || hasAudio,
+      active: currentStep === 2,
+    },
+    {
+      number: 3,
+      title: 'Render narration',
+      caption: 'Select a voice artist and synthesize the final audio.',
+      completed: hasAudio,
+      active: currentStep === 3,
+    },
+  ];
+
+  const goToStep = (stepNumber) => {
+    const clamped = Math.max(1, Math.min(stepNumber, 3));
+    setCurrentStep(clamped);
+  };
+
+  const handleNextStep = () => {
+    if (currentStep === 1) {
+      if (!hasPrompt) {
+        setStatusError(true);
+        setStatus('Add some script content or record narration before continuing.');
+        return;
+      }
+      setStatus('');
+      setStatusError(false);
+      setCurrentStep(2);
+      return;
+    }
+
+    if (currentStep === 2) {
+      if (loadingSsml) {
+        return;
+      }
+      if (!hasSsml) {
+        setStatusError(true);
+        setStatus('Generate SSML in Step 2 before moving to voice selection.');
+        return;
+      }
+      setStatus('');
+      setStatusError(false);
+      setCurrentStep(3);
+    }
+  };
+
+  const handlePreviousStep = () => {
+    if (currentStep === 2) {
+      goToStep(1);
+      return;
+    }
+
+    if (currentStep === 3) {
+      goToStep(hasSsml ? 2 : 1);
+    }
+  };
+
+  const handleInputModeChange = (mode) => {
+    if (mode === inputMode) return;
+    if (isRecording) {
+      stopRecording();
+    }
+    setInputMode(mode);
+    setRecordingError('');
+  };
+
+  const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      setStatusError(true);
+      setStatus('Please provide a narrative or script idea for SSML generation.');
+      return;
+    }
+
+    setLoadingSsml(true);
+  setStatus('Generating SSML output...');
+    setStatusError(false);
+
+    try {
+      const requestPayload = {
+        prompt,
+        persona: activePersonaHint,
+        personaLabel: activePersona?.label || '',
+        personaDescription: activePersona?.description || '',
+      };
+      const response = await axios.post(`${VOICE_API_BASE}/generate-ssml`, requestPayload);
+      const ssmlContent = response?.data?.ssml;
+      const meta = response?.data?.meta || {};
+      const nextSsml = persistSsml(ssmlContent);
+
+      if (nextSsml.trim()) {
+        setSsmlExpanded(false);
+        if (meta.fallback) {
+          setStatusError(false);
+          setStatus('Model response was empty, so a basic SSML template was generated. Feel free to edit before synthesis.');
+        } else {
+          setStatus('SSML ready. Review, edit if needed, then synthesize the audio.');
+        }
+      } else {
+        setStatusError(true);
+  setStatus('Unable to craft valid SSML from the current prompt. Try adjusting the inputs.');
+      }
+    } catch (error) {
+      console.error('SSML generation failed', error);
+      setStatusError(true);
+      const isNetworkError = error?.message === 'Network Error';
+      if (isNetworkError) {
+        setStatus('Cannot reach the Synthetic Voiceover service. Ensure it is running (http://localhost:5003) or set REACT_APP_VOICE_API_BASE.');
+      } else {
+        const message = error?.response?.data?.error || error.message || 'Generation request failed.';
+        setStatus(`SSML generation failed: ${message}`);
+      }
+    } finally {
+      setLoadingSsml(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    const currentSsml = ssmlText.trim();
+    if (!currentSsml) return;
+    try {
+      await navigator.clipboard.writeText(currentSsml);
+      setStatusError(false);
+      setStatus('Copied SSML to clipboard.');
+    } catch (error) {
+      setStatusError(true);
+      setStatus('Unable to copy to clipboard in this browser.');
+    }
+  };
+
+  const handleDownloadSsml = () => {
+  const trimmed = ssmlText.trim();
+    if (!trimmed) {
+      setStatusError(true);
+      setStatus('No SSML available to download yet. Generate it in Step 2 first.');
+      return;
+    }
+
+    try {
+      const blob = new Blob([trimmed], { type: 'application/ssml+xml' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'voiceover-blueprint.ssml';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setStatusError(false);
+      setStatus('Downloaded SSML as voiceover-blueprint.ssml.');
+    } catch (error) {
+      setStatusError(true);
+      setStatus('Unable to download SSML. Please try again.');
+    }
+  };
+
+  const handleClear = () => {
+    if (isRecording) {
+      stopRecording();
+    }
+    recordedTextRef.current = '';
+    preRecordPromptRef.current = '';
+    setPrompt('');
+    setPersona('');
+    setSsml('');
+    setSsmlExpanded(false);
+    setStatus('');
+    setStatusError(false);
+    setRecordingError('');
+    setLoadingSsml(false);
+    setSynthLoading(false);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl('');
+    }
+    setEngineUsed('neural');
+    setAudioFormat(outputOptions[0].value);
+    setSampleRate('');
+    setSelectedVoice(voices[0]?.id || '');
+    setCurrentStep(1);
+  };
+
+  const handleRegenerateWorkflow = () => {
+    if (loadingSsml || synthLoading) {
+      return;
+    }
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl('');
+    }
+    setEngineUsed('neural');
+    setSsmlExpanded(false);
+    setCurrentStep(2);
+    handleGenerate();
+  };
+
+  const handleSynthesize = async () => {
+    if (!ssmlText.trim()) {
+      setStatusError(true);
+      setStatus('Generate SSML first before requesting audio.');
+      return;
+    }
+    if (!selectedVoice) {
+      setStatusError(true);
+      setStatus('Select a neural voice to proceed.');
+      return;
+    }
+
+    setSynthLoading(true);
+    setStatusError(false);
+    setStatus('Requesting voice synthesis from the speech service...');
+
+    try {
+      const response = await axios.post(`${VOICE_API_BASE}/synthesize`, {
+        voiceId: selectedVoice,
+        ssml: ssmlText,
+        outputFormat: audioFormat,
+        sampleRate: sampleRate || undefined,
+      });
+
+      const audioBase64 = response?.data?.audio;
+      const meta = response?.data?.meta || {};
+      const engine = meta?.engineUsed || 'neural';
+      const sanitizedUsed = Boolean(meta?.ssmlSanitized);
+      const sanitizedContent = meta?.sanitizedSsml;
+      const plainRetryUsed = Boolean(meta?.plainRetryUsed);
+      const plainRetryContent = meta?.plainRetrySsml;
+      const normalizedContent = meta?.ssmlNormalized;
+      const textFallbackUsed = Boolean(meta?.textFallbackUsed);
+      const safeMinimalUsed = Boolean(meta?.safeMinimalUsed);
+      const safeMinimalContent = meta?.safeMinimalSsml;
+      const safeMinimalMode = meta?.safeMinimalMode;
+
+      if (audioBase64) {
+        let resultingSsml = ssmlText;
+        if (safeMinimalUsed && safeMinimalContent) {
+          resultingSsml = safeMinimalContent;
+        } else if (sanitizedUsed && sanitizedContent) {
+          resultingSsml = sanitizedContent;
+        } else if (plainRetryUsed && plainRetryContent) {
+          resultingSsml = plainRetryContent;
+        } else if (normalizedContent) {
+          resultingSsml = normalizedContent;
+        }
+
+        const updatedSsml = persistSsml(resultingSsml);
+        setEngineUsed(engine);
+        const byteCharacters = decodeBase64(audioBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i += 1) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: response?.data?.contentType || 'audio/mpeg' });
+        if (audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+        }
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+        const notices = [];
+        if (safeMinimalUsed) {
+          notices.push(
+            safeMinimalMode === 'text'
+              ? 'We delivered a safety narration using plain-text phrasing to ensure smooth playback.'
+              : 'We delivered a simplified safety SSML narration to ensure smooth playback.'
+          );
+        } else {
+          if (textFallbackUsed) {
+            notices.push('We switched to a plain-text rendition to finish the narration.');
+          }
+          if (sanitizedUsed) {
+            notices.push('We refined the speech markup so it remains voice-ready.');
+          }
+          if (plainRetryUsed) {
+            notices.push('We refreshed the speech structure to keep the narration valid.');
+          }
+        }
+
+        const noticeText = notices.length ? ` ${notices.join(' ')}` : '';
+    setStatus(`Voiceover is ready.${noticeText} Download or preview the file.`);
+
+        if (downloadRef.current) {
+          const fileExt = response?.data?.fileExtension || 'mp3';
+          downloadRef.current.href = url;
+          downloadRef.current.download = `voiceover-${selectedVoice}.${fileExt}`;
+        }
+      } else {
+        setStatusError(true);
+        setStatus('The speech service returned no audio stream. Confirm SSML validity.');
+      }
+    } catch (error) {
+      console.error('Synthesis failed', error);
+      setStatusError(true);
+      if (error?.message === 'Network Error') {
+        setStatus('Cannot reach the Synthetic Voiceover service. Confirm it is accessible and not blocked by CORS or firewall.');
+      } else {
+        const message = error?.response?.data?.error || error.message || 'Synthesis request failed.';
+        setStatus(`Voice synthesis failed: ${message}`);
+      }
+    } finally {
+      setSynthLoading(false);
+    }
+  };
+
+  return (
+    <Page>
+      <Title>Synthetic voiceover lab</Title>
+      <Lead>
+        Shape your script, tailor the delivery, and render voiceovers with one seamless workflow.
+      </Lead>
+
+      <StepsBar>
+        {stepItems.map((step) => (
+          <StepCard key={step.number} $active={step.active} $completed={step.completed}>
+            <StepCardInner>
+              <StepBadge $active={step.active} $completed={step.completed}>
+                {step.completed && !step.active ? '✓' : step.number}
+              </StepBadge>
+              <StepText>
+                <StepTitle>{`Step ${step.number} · ${step.title}`}</StepTitle>
+                <StepCaption>{step.caption}</StepCaption>
+              </StepText>
+            </StepCardInner>
+          </StepCard>
+        ))}
+      </StepsBar>
+
+      <Layout>
+        {currentStep === 1 && (
+          <Panel ref={scriptSectionRef}>
+            <PanelTitle>1. Choose how to provide your content</PanelTitle>
+            <InputOptionsGrid>
+              {inputOptions.map((option) => {
+                const isActive = inputMode === option.id;
+                return (
+                  <InputOptionCard
+                    key={option.id}
+                    $active={isActive}
+                    onClick={() => handleInputModeChange(option.id)}
+                  >
+                    <InputOptionTitle>{option.title}</InputOptionTitle>
+                    <InputOptionCopy>{option.copy}</InputOptionCopy>
+                  </InputOptionCard>
+                );
+              })}
+            </InputOptionsGrid>
+
+            <SectionNotice>{modeSummaries[inputMode]}</SectionNotice>
+
+            <Label htmlFor="prompt">Script workspace</Label>
+            <TextArea
+              id="prompt"
+              placeholder={promptPlaceholder}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+            />
+
+            {inputMode === 'audio' && (
+              <RecordingControls>
+                <RecordButton
+                  onClick={isRecording ? stopRecording : startRecording}
+                  $recording={isRecording}
+                  disabled={!canRecord || loadingSsml}
+                >
+                  {isRecording ? 'Stop recording' : 'Start recording'}
+                </RecordButton>
+                <RecordingStatus>{recordingStatusMessage}</RecordingStatus>
+                {recordingError && <RecordingError>{recordingError}</RecordingError>}
+              </RecordingControls>
+            )}
+
+            {inputMode === 'video' && (
+              <div style={{ marginTop: '1rem' }}>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  disabled={analyzingSpeakers}
+                  style={{ display: 'none' }}
+                />
+                <PrimaryButton
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={analyzingSpeakers}
+                >
+                  {analyzingSpeakers ? 'Analyzing...' : 'Upload Video'}
+                </PrimaryButton>
+                
+                {speakers.length > 0 && (
+                  <div style={{ marginTop: '1.5rem' }}>
+                    <Label>Assign voices to speakers:</Label>
+                    {speakers.map((speaker) => (
+                      <div
+                        key={speaker.id}
+                        style={{
+                          background: 'rgba(10, 20, 38, 0.6)',
+                          padding: '1rem',
+                          borderRadius: '8px',
+                          marginBottom: '0.75rem',
+                          border: '1px solid rgba(99, 102, 241, 0.2)',
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#e2e9ff' }}>
+                          {speaker.label} ({speaker.segment_count} segments, {speaker.total_duration.toFixed(1)}s)
+                        </div>
+                        <div style={{ fontSize: '0.85rem', marginBottom: '0.75rem', color: '#b6c5ef', fontStyle: 'italic' }}>
+                          "{speaker.sample_text || 'No text sample'}"
+                        </div>
+                        <select
+                          value={speakerVoiceMappings[speaker.id] || 'Joanna'}
+                          onChange={(e) => handleSpeakerVoiceChange(speaker.id, e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(99, 102, 241, 0.3)',
+                            background: 'rgba(15, 30, 58, 0.8)',
+                            color: '#e2e9ff',
+                            fontSize: '0.9rem',
+                          }}
+                        >
+                          {speaker.suggested_voices?.map((voice) => (
+                            <option key={voice.voice_id} value={voice.voice_id}>
+                              {voice.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                    <PrimaryButton
+                      type="button"
+                      onClick={handleGenerateMultiSpeakerVideo}
+                      disabled={replacingAudio}
+                      style={{ marginTop: '1rem' }}
+                    >
+                      {replacingAudio ? 'Generating...' : 'Generate Multi-Speaker Video'}
+                    </PrimaryButton>
+                  </div>
+                )}
+
+                {processedVideoUrl && (
+                  <div style={{ marginTop: '1.5rem' }}>
+                    <Label>Processed Video:</Label>
+                    <video
+                      src={processedVideoUrl}
+                      controls
+                      style={{
+                        width: '100%',
+                        maxWidth: '600px',
+                        borderRadius: '8px',
+                        marginTop: '0.5rem',
+                      }}
+                    />
+                    <br />
+                    <a
+                      href={processedVideoUrl}
+                      download="multi-speaker-synthetic-voice.mp4"
+                      style={{
+                        display: 'inline-block',
+                        marginTop: '0.75rem',
+                        padding: '0.5rem 1rem',
+                        background: 'rgba(59, 130, 246, 0.8)',
+                        color: '#fff',
+                        borderRadius: '6px',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Download Video
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {inputMode !== 'audio' && recordingError && (
+              <RecordingError>{recordingError}</RecordingError>
+            )}
+
+            <WizardNav>
+              <SecondaryButton
+                type="button"
+                onClick={handleClear}
+                disabled={loadingSsml || synthLoading}
+              >
+                Reset workspace
+              </SecondaryButton>
+              <PrimaryButton
+                type="button"
+                onClick={handleNextStep}
+                disabled={!hasPrompt}
+              >
+                Continue to SSML
+              </PrimaryButton>
+            </WizardNav>
+          </Panel>
+        )}
+
+        {currentStep === 2 && (
+          <Panel ref={ssmlSectionRef}>
+            <PanelTitle>2. Generate the SSML blueprint</PanelTitle>
+            <SectionNotice>Pick a tone preset before generating, or leave it blank for a neutral narration style.</SectionNotice>
+
+            <PersonaGrid>
+              {personaPresets.map((preset) => {
+                const isActive = persona === preset.id;
+                return (
+                  <PersonaChip
+                    key={preset.id}
+                    type="button"
+                    active={isActive}
+                    onClick={() => setPersona(isActive ? '' : preset.id)}
+                  >
+                    <PersonaName>{preset.label}</PersonaName>
+                    <PersonaCopy>{preset.description}</PersonaCopy>
+                  </PersonaChip>
+                );
+              })}
+            </PersonaGrid>
+
+            <ButtonRow>
+              <PrimaryButton type="button" onClick={handleGenerate} disabled={loadingSsml || !prompt.trim()}>
+                {loadingSsml ? 'Generating SSML…' : 'Generate SSML'}
+              </PrimaryButton>
+              <SecondaryButton type="button" onClick={handleClear} disabled={loadingSsml}>
+                Clear
+              </SecondaryButton>
+            </ButtonRow>
+
+            <WizardNav>
+              <SecondaryButton type="button" onClick={handlePreviousStep} disabled={loadingSsml}>
+                Back to script
+              </SecondaryButton>
+              <PrimaryButton
+                type="button"
+                onClick={handleNextStep}
+                disabled={loadingSsml || !hasSsml}
+              >
+                Continue to voices
+              </PrimaryButton>
+            </WizardNav>
+          </Panel>
+        )}
+
+        {currentStep === 3 && (
+          <Panel ref={voiceSectionRef}>
+            <PanelTitle>3. Select the artist & render the narration</PanelTitle>
+            {hasSsml ? (
+              <SectionNotice>SSML is ready. Choose your artist, tweak the mix, and render the narration.</SectionNotice>
+            ) : (
+              <SectionNotice>Complete Step 2 to generate SSML before rendering audio. You can still explore voices in the meantime.</SectionNotice>
+            )}
+
+            {!voicesLoading && voices.length > 0 && (
+              <ArtistSection>
+                <ArtistHeading>Featured neural artists</ArtistHeading>
+                <ArtistGrid>
+                  {voices.slice(0, 8).map((voice) => {
+                    const isActive = selectedVoice === voice.id;
+                    return (
+                      <ArtistChip
+                        key={voice.id}
+                        type="button"
+                        $active={isActive}
+                        onClick={() => setSelectedVoice(voice.id)}
+                      >
+                        <ArtistName>{voice.name}</ArtistName>
+                        <ArtistMeta>
+                          {voice.language_name} · {voice.gender || 'Voice'}
+                        </ArtistMeta>
+                      </ArtistChip>
+                    );
+                  })}
+                </ArtistGrid>
+                <ArtistHint>Select a featured artist or browse the full catalog below.</ArtistHint>
+              </ArtistSection>
+            )}
+            <VoiceList>
+              <div>
+                <Label htmlFor="voice-select">Available neural voices</Label>
+                {voicesLoading ? (
+                  <EmptyState>Loading voice catalog…</EmptyState>
+                ) : voices.length ? (
+                  <VoiceSelect
+                    id="voice-select"
+                    value={selectedVoice}
+                    onChange={(event) => setSelectedVoice(event.target.value)}
+                  >
+                    {voices.map((voice) => (
+                      <option key={voice.id} value={voice.id}>
+                        {voice.name} · {voice.language_name} ({voice.language_code})
+                      </option>
+                    ))}
+                  </VoiceSelect>
+                ) : (
+                  <EmptyState>No voices are available. Verify speech service access.</EmptyState>
+                )}
+              </div>
+
+              {selectedVoice && (
+                <VoiceBadge>
+                  Active voice: {selectedVoice}
+                </VoiceBadge>
+              )}
+
+              <OptionRow>
+                <div>
+                  <Label htmlFor="audio-format">Output format</Label>
+                  <Select
+                    id="audio-format"
+                    value={audioFormat}
+                    onChange={(event) => setAudioFormat(event.target.value)}
+                  >
+                    {outputOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="sample-rate">Sample rate (Hz)</Label>
+                  <Select
+                    id="sample-rate"
+                    value={sampleRate}
+                    onChange={(event) => setSampleRate(event.target.value)}
+                  >
+                    <option value="">Default</option>
+                    <option value="16000">16,000 Hz</option>
+                    <option value="22050">22,050 Hz</option>
+                    <option value="24000">24,000 Hz</option>
+                  </Select>
+                </div>
+              </OptionRow>
+
+              <ButtonRow>
+                <PrimaryButton
+                  type="button"
+                  onClick={handleSynthesize}
+                  disabled={synthLoading || !selectedVoice || !hasSsml}
+                >
+                  {synthLoading ? 'Rendering audio…' : 'Render voiceover'}
+                </PrimaryButton>
+                <SecondaryButton
+                  type="button"
+                  disabled={!audioUrl}
+                  onClick={() => {
+                    if (downloadRef.current && audioUrl) {
+                      downloadRef.current.click();
+                    }
+                  }}
+                >
+                  Download audio
+                </SecondaryButton>
+                <HiddenDownloadLink ref={downloadRef} href={audioUrl}>Download voiceover</HiddenDownloadLink>
+              </ButtonRow>
+
+              {audioUrl && (
+                <AudioCard>
+                  <Label>Preview</Label>
+                  <AudioPlayer controls src={audioUrl} />
+                  <SectionNotice>
+                    Your voiceover is ready. Preview it here or download a copy to keep working offline.
+                  </SectionNotice>
+                </AudioCard>
+              )}
+            </VoiceList>
+
+            <WizardNav>
+              <SecondaryButton type="button" onClick={handlePreviousStep} disabled={synthLoading}>
+                Back to SSML
+              </SecondaryButton>
+              <SecondaryButton type="button" onClick={handleClear} disabled={synthLoading || loadingSsml}>
+                Start over
+              </SecondaryButton>
+            </WizardNav>
+          </Panel>
+        )}
+      </Layout>
+      {currentStep >= 2 && hasSsml && !audioUrl && (
+        <SsmlSection>
+          <SsmlHeader>
+            <SsmlTitle>SSML Output</SsmlTitle>
+            <SsmlActions>
+              <SsmlActionButton type="button" onClick={() => setSsmlExpanded((prev) => !prev)}>
+                {ssmlExpanded ? 'Collapse view' : 'Expand view'}
+              </SsmlActionButton>
+              <SsmlActionButton type="button" onClick={handleCopy}>
+                Copy SSML
+              </SsmlActionButton>
+              <SsmlActionButton
+                type="button"
+                onClick={handleRegenerateWorkflow}
+                disabled={loadingSsml || synthLoading}
+              >
+                Regenerate SSML
+              </SsmlActionButton>
+              <SsmlActionButton
+                type="button"
+                onClick={handleClear}
+                disabled={loadingSsml || synthLoading}
+              >
+                Refresh workflow
+              </SsmlActionButton>
+              <SsmlActionButton type="button" onClick={handleDownloadSsml}>
+                Download SSML
+              </SsmlActionButton>
+            </SsmlActions>
+          </SsmlHeader>
+          <SsmlPre $expanded={ssmlExpanded}>{ssmlText}</SsmlPre>
+        </SsmlSection>
+      )}
+
+      {status && <Status error={statusError}>{status}</Status>}
+    </Page>
+  );
+}

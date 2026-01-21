@@ -1,0 +1,18 @@
+{
+  "name": "local-moderation-nsfwjs",
+  "version": "0.1.0",
+  "private": true,
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "express": "^4.19.2",
+    "jpeg-js": "^0.4.4",
+    "nsfwjs": "^4.2.1",
+    "pngjs": "^7.0.0"
+  }
+}

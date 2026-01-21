@@ -1,0 +1,25 @@
+{
+  "short_name": "Envid",
+  "name": "Envid AI Studio",
+  "icons": [
+    {
+      "src": "envid.png?v=1",
+      "sizes": "any",
+      "type": "image/png"
+    },
+    {
+      "src": "envid.png?v=1",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "envid.png?v=1",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}

@@ -1,0 +1,235 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1">
+      <stop offset="0" stop-color="#0f0f0f"/>
+      <stop offset="1" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0 H0 V24" fill="none" stroke="#191919" stroke-width="1"/>
+    </pattern>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e50914"/>
+    </marker>
+    <style>
+      .title{font:700 28px Inter, Arial, sans-serif; fill:#fff}
+      .lane{fill:rgba(255,255,255,0.02); stroke:#242424}
+      .laneTitle{font:700 16px Inter, Arial, sans-serif; fill:#bdbdbd}
+      .box{fill:#151515; stroke:#2a2a2a}
+      .boxTitle{font:800 20px Inter, Arial, sans-serif; fill:#ffffff}
+      .muted{font:600 14px Inter, Arial, sans-serif; fill:#b3b3b3}
+      .arrow{stroke:#e50914; stroke-width:3; fill:none; marker-end:url(#arrow)}
+      .dashed{stroke-dasharray:6 6}
+      .badge{fill:#e50914}
+      .badgeText{fill:#fff; font:700 14px Inter, Arial, sans-serif}
+  .hint{fill:#f2f2f2; font:600 12px Inter, Arial, sans-serif}
+      .connector{fill:#e50914}
+      .guide{stroke:#2a2a2a; stroke-width:1; opacity:0.35; stroke-dasharray:4 6}
+    </style>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="680" fill="url(#grid)" opacity="0.35"/>
+
+  <!-- Header -->
+  <text x="40" y="46" class="title">Envid AI Studio — Architecture</text>
+
+  <!-- Swimlanes -->
+  <g>
+    <rect x="40" y="70" width="320" height="540" rx="12" class="lane" fill="#0e1524" fill-opacity="0.18"/>
+    <text x="52" y="88" class="laneTitle">Frontend</text>
+    <rect x="440" y="70" width="320" height="540" rx="12" class="lane" fill="#101010" fill-opacity="0.14"/>
+  <text x="452" y="88" class="laneTitle" font-size="18px">Backend</text>
+    <rect x="840" y="70" width="320" height="540" rx="12" class="lane" fill="#1a0f1f" fill-opacity="0.18"/>
+  <text x="852" y="88" class="laneTitle" font-size="18px">External Services</text>
+  </g>
+
+  <!-- Alignment guides (subtle, within Backend and External lanes) -->
+  <g>
+    <!-- y = 180 -->
+    <line x1="450" y1="180" x2="750" y2="180" class="guide"/>
+    <line x1="870" y1="180" x2="1160" y2="180" class="guide"/>
+    <!-- y = 220 -->
+    <line x1="450" y1="220" x2="750" y2="220" class="guide"/>
+    <line x1="870" y1="220" x2="1160" y2="220" class="guide"/>
+    <!-- y = 320 -->
+    <line x1="450" y1="320" x2="750" y2="320" class="guide"/>
+    <line x1="870" y1="320" x2="1160" y2="320" class="guide"/>
+    <!-- y = 460 -->
+    <line x1="450" y1="460" x2="750" y2="460" class="guide"/>
+    <line x1="870" y1="460" x2="1160" y2="460" class="guide"/>
+  </g>
+
+  <!-- Blocks (with drop shadows) -->
+  <g filter="url(#ds)">
+    <!-- Client (wider/taller and wrapped description) -->
+  <rect x="40" y="124" width="310" height="200" rx="14" class="box"/>
+    <text x="60" y="152" class="boxTitle">Client</text>
+  <foreignObject x="60" y="176" width="270" height="130">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="color:#b3b3b3;font:600 14px Inter, Arial, sans-serif;line-height:1.4;word-wrap:break-word;overflow-wrap:anywhere;">
+        React SPA (Axios, Router, styled-components)
+      </div>
+    </foreignObject>
+    <!-- React icon -->
+  <g transform="translate(320,146) scale(0.85)">
+      <circle cx="0" cy="0" r="5.5" fill="none" stroke="#e5e5e5" stroke-width="2.2"/>
+      <ellipse cx="0" cy="0" rx="13" ry="5.5" fill="none" stroke="#e5e5e5" stroke-width="2.2"/>
+      <ellipse cx="0" cy="0" rx="13" ry="5.5" fill="none" stroke="#e5e5e5" stroke-width="2.2" transform="rotate(60)"/>
+      <ellipse cx="0" cy="0" rx="13" ry="5.5" fill="none" stroke="#e5e5e5" stroke-width="2.2" transform="rotate(-60)"/>
+    </g>
+
+  <!-- Flask API (wider/taller, left edge moved to 450 to keep right edge at 750) -->
+  <rect x="450" y="130" width="300" height="410" rx="14" class="box"/>
+  <text x="470" y="158" class="boxTitle">Flask API</text>
+  <text x="470" y="182" class="muted">/send_prompt, /history_list, /history/&lt;path&gt;</text>
+  <text x="470" y="202" class="muted">/contact, /health</text>
+    <!-- Flask icon (beaker) -->
+    <g transform="translate(730,150)">
+      <path d="M -12 -18 L 0 -18 L 0 -10 L 10 8 C 12 12 10 16 6 16 L -18 16 C -22 16 -24 12 -22 8 L -12 -10 Z" fill="none" stroke="#e5e5e5" stroke-width="2.2"/>
+      <circle cx="-4" cy="-4" r="1.6" fill="#e5e5e5"/>
+      <circle cx="3" cy="0" r="1.6" fill="#e5e5e5"/>
+    </g>
+
+    <!-- GenAI Poster API -->
+  <rect x="870" y="120" width="280" height="160" rx="14" class="box"/>
+    <text x="890" y="148" class="boxTitle">GenAI Poster API</text>
+    <text x="890" y="172" class="muted">AWS API Gateway → Lambda</text>
+    <!-- Cloud icon -->
+    <g transform="translate(1110,152)">
+      <path d="M -20 8 C -24 8 -27 5 -27 1 C -27 -3 -24 -6 -20 -6 C -19 -12 -14 -16 -8 -16 C -2 -16 3 -12 4 -7 C 9 -7 12 -3 12 2 C 12 7 9 10 4 10 L -20 10 Z" fill="none" stroke="#e5e5e5" stroke-width="2.2"/>
+    </g>
+
+    <!-- SMTP Server -->
+  <rect x="870" y="250" width="280" height="140" rx="14" class="box"/>
+    <text x="890" y="278" class="boxTitle">SMTP Server</text>
+    <text x="890" y="302" class="muted">TLS/SSL (smtplib)</text>
+    <!-- Envelope icon -->
+    <g transform="translate(1120,284)">
+      <rect x="-18" y="-10" width="36" height="20" rx="2" fill="none" stroke="#e5e5e5" stroke-width="2.2"/>
+      <path d="M -18 -10 L 0 2 L 18 -10" fill="none" stroke="#e5e5e5" stroke-width="2.2"/>
+    </g>
+
+    <!-- Local Storage -->
+  <rect x="870" y="380" width="280" height="160" rx="14" class="box"/>
+    <text x="890" y="408" class="boxTitle">Local Storage</text>
+    <text x="890" y="432" class="muted">history/ thumbnails &amp; originals</text>
+    <text x="890" y="452" class="muted">contact_logs/ (dev mode)</text>
+    <!-- Folder icon -->
+    <g transform="translate(1120,430)">
+      <path d="M -20 6 L -20 -6 L -6 -6 L -2 -2 L 20 -2 L 20 6 Z" fill="none" stroke="#e5e5e5" stroke-width="2.2"/>
+    </g>
+  </g>
+
+  <!-- Connections: curved arrows with numbered badges -->
+  <!-- 1. Client → Flask (POST /send_prompt) -->
+  <path d="M350 168 C 400 168, 440 168, 450 168" class="arrow"/>
+  <circle cx="350" cy="168" r="3" class="connector"/>
+  <circle cx="450" cy="168" r="3" class="connector"/>
+  <circle cx="370" cy="156" r="12" class="badge"/>
+  <text x="366" y="160" class="badgeText">1</text>
+  
+  <g>
+  <rect x="390" y="159" rx="6" ry="6" width="46" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="395" y="172" class="hint">POST</text>
+  </g>
+
+  <!-- 2. Flask → GenAI API -->
+  <path d="M750 180 C 810 180, 840 180, 870 180" class="arrow"/>
+  <circle cx="750" cy="180" r="3" class="connector"/>
+  <circle cx="870" cy="180" r="3" class="connector"/>
+  <circle cx="770" cy="146" r="12" class="badge"/>
+  <text x="766" y="150" class="badgeText">2</text>
+  
+  <g>
+  <rect x="788" y="171" rx="6" ry="6" width="40" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="793" y="184" class="hint">GET</text>
+  </g>
+
+  <!-- 3. GenAI API → Flask (image_url) -->
+  <path d="M870 220 C 840 220, 810 220, 750 220" class="arrow"/>
+  <circle cx="870" cy="220" r="3" class="connector"/>
+  <circle cx="750" cy="220" r="3" class="connector"/>
+  <circle cx="820" cy="196" r="12" class="badge"/>
+  <text x="816" y="200" class="badgeText">3</text>
+  
+  <g>
+  <rect x="836" y="211" rx="6" ry="6" width="50" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="841" y="224" class="hint">RESP</text>
+  </g>
+
+  <!-- 4. Flask → Local Storage (download & thumbnail) -->
+  <path d="M750 420 C 800 420, 830 420, 870 420" class="arrow"/>
+  <circle cx="750" cy="420" r="3" class="connector"/>
+  <circle cx="870" cy="420" r="3" class="connector"/>
+  <circle cx="770" cy="404" r="12" class="badge"/>
+  <text x="766" y="408" class="badgeText">4</text>
+  
+  <g>
+  <rect x="786" y="411" rx="6" ry="6" width="36" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="791" y="424" class="hint">FS</text>
+  </g>
+
+  <!-- 5. Flask → Client (image_url) -->
+  <path d="M450 210 C 420 210, 385 210, 350 210" class="arrow"/>
+  <circle cx="450" cy="210" r="3" class="connector"/>
+  <circle cx="350" cy="210" r="3" class="connector"/>
+  <circle cx="420" cy="220" r="12" class="badge"/>
+  <text x="416" y="224" class="badgeText">5</text>
+  
+  <g>
+  <rect x="436" y="201" rx="6" ry="6" width="50" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="441" y="214" class="hint">RESP</text>
+  </g>
+
+  <!-- 6. Client → Flask (GET /history_list) -->
+  <path d="M350 240 C 400 240, 440 240, 450 240" class="arrow"/>
+  <circle cx="350" cy="240" r="3" class="connector"/>
+  <circle cx="450" cy="240" r="3" class="connector"/>
+  <circle cx="370" cy="228" r="12" class="badge"/>
+  <text x="366" y="232" class="badgeText">6</text>
+  
+  <g>
+  <rect x="390" y="231" rx="6" ry="6" width="40" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="395" y="244" class="hint">GET</text>
+  </g>
+
+  <!-- 7. Client → Flask (POST /contact) -->
+  <path d="M350 272 C 400 272, 440 272, 450 270" class="arrow"/>
+  <circle cx="350" cy="272" r="3" class="connector"/>
+  <circle cx="450" cy="270" r="3" class="connector"/>
+  <circle cx="370" cy="260" r="12" class="badge"/>
+  <text x="366" y="264" class="badgeText">7</text>
+  
+  <g>
+  <rect x="390" y="261" rx="6" ry="6" width="46" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="395" y="274" class="hint">POST</text>
+  </g>
+
+  <!-- 8. Flask → SMTP (emails) -->
+  <path d="M750 320 C 800 320, 820 320, 870 320" class="arrow"/>
+  <circle cx="750" cy="320" r="3" class="connector"/>
+  <circle cx="870" cy="320" r="3" class="connector"/>
+  <circle cx="770" cy="260" r="12" class="badge"/>
+  <text x="766" y="264" class="badgeText">8</text>
+  
+  <g>
+  <rect x="786" y="311" rx="6" ry="6" width="56" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="791" y="324" class="hint">SMTP</text>
+  </g>
+
+  <!-- 9. Flask → contact_logs (dev mode) dashed -->
+  <path d="M750 460 C 800 460, 830 460, 870 460" class="arrow dashed"/>
+  <circle cx="750" cy="460" r="3" class="connector"/>
+  <circle cx="870" cy="460" r="3" class="connector"/>
+  <circle cx="770" cy="304" r="12" class="badge"/>
+  <text x="766" y="308" class="badgeText">9</text>
+  
+  <g>
+  <rect x="786" y="451" rx="6" ry="6" width="44" height="18" fill="#232323" stroke="#3a3a3a"/>
+  <text x="791" y="464" class="hint">LOG</text>
+  </g>
+
+  <!-- Footer note -->
+  <text x="40" y="650" class="muted">Dashed arrow indicates dev-only flow. Red arrows show data movement.</text>
+</svg>

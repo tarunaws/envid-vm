@@ -1,0 +1,18 @@
+services:
+  local-label-detection:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: envid/local-label-detection:latest
+    ports:
+      - "${ENVID_LOCAL_LABEL_DETECTION_PORT:-5083}:5083"
+    environment:
+      PORT: "5083"
+      LABEL_SERVICE_SCORE_THRESH: "0.5"
+      # MMDetection inferencer default model (override if desired)
+      MMDET_MODEL: "rtmdet_tiny_8xb32-300e_coco"
+      MMDET_DEVICE: "cpu"
+      # Detectron2 defaults to CPU as well
+      DETECTRON2_DEVICE: "cpu"
+    restart: unless-stopped
