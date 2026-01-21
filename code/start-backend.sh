@@ -60,13 +60,11 @@ fi
 # Derive default local-service URLs for the backend/UI.
 # These must be set even when using default ports, because the backend expects the URL env vars.
 export ENVID_LOCAL_MODERATION_PORT="${ENVID_LOCAL_MODERATION_PORT:-5081}"
-export ENVID_LOCAL_MODERATION_NSFWJS_PORT="${ENVID_LOCAL_MODERATION_NSFWJS_PORT:-5082}"
 export ENVID_LOCAL_LABEL_DETECTION_PORT="${ENVID_LOCAL_LABEL_DETECTION_PORT:-5083}"
 export ENVID_LOCAL_OCR_PADDLE_PORT="${ENVID_LOCAL_OCR_PADDLE_PORT:-5084}"
 export ENVID_LOCAL_KEYSCENE_PORT="${ENVID_LOCAL_KEYSCENE_PORT:-5085}"
 
 export ENVID_METADATA_LOCAL_MODERATION_URL="${ENVID_METADATA_LOCAL_MODERATION_URL:-http://localhost:${ENVID_LOCAL_MODERATION_PORT}}"
-export ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL="${ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL:-http://localhost:${ENVID_LOCAL_MODERATION_NSFWJS_PORT}}"
 export ENVID_METADATA_LOCAL_LABEL_DETECTION_URL="${ENVID_METADATA_LOCAL_LABEL_DETECTION_URL:-http://localhost:${ENVID_LOCAL_LABEL_DETECTION_PORT}}"
 export ENVID_METADATA_LOCAL_OCR_PADDLE_URL="${ENVID_METADATA_LOCAL_OCR_PADDLE_URL:-http://localhost:${ENVID_LOCAL_OCR_PADDLE_PORT}}"
 export ENVID_METADATA_LOCAL_KEYSCENE_URL="${ENVID_METADATA_LOCAL_KEYSCENE_URL:-http://localhost:${ENVID_LOCAL_KEYSCENE_PORT}}"
@@ -234,84 +232,6 @@ start_local_moderation_service() {
   echo "✅ $service_name started with PID $(cat "$pid_file" 2>/dev/null || echo "?")"
 
   wait_for_health "$service_name" "$url/health" "$log_file" 60 || true
-}
-
-start_local_moderation_nsfwjs_service() {
-  local service_name="local-moderation-nsfwjs"
-  local node_runner="$PROJECT_ROOT/localModerationNSFWJS/run_local_node.sh"
-  local port="${ENVID_LOCAL_MODERATION_NSFWJS_PORT:-5082}"
-  local url="${ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL:-http://localhost:${port}}"
-  local pid_file="$PROJECT_ROOT/${service_name}.pid"
-  local log_file="$PROJECT_ROOT/${service_name}.log"
-
-  if [[ "${ENVID_LOCAL_MODERATION_NSFWJS_AUTOSTART:-1}" == "0" ]]; then
-    echo "ℹ️  Local moderation nsfwjs autostart disabled (ENVID_LOCAL_MODERATION_NSFWJS_AUTOSTART=0)"
-    return 0
-  fi
-
-  if [[ "$url" != http://localhost:${port}* && "$url" != http://127.0.0.1:${port}* ]]; then
-    echo "ℹ️  Local moderation nsfwjs URL is non-local ($url); skipping autostart"
-    return 0
-  fi
-
-  if curl -fsS "$url/health" >/dev/null 2>&1; then
-    echo "✅ $service_name already healthy ($url)"
-    return 0
-  fi
-
-  # Prefer Docker for NSFWJS because tfjs-node is not compatible with very new Node releases
-  # (e.g. Node 25 removed util.isNullOrUndefined which older tfjs-node bundles reference).
-  if ensure_docker_ready; then
-    echo "🐳 Starting $service_name via Docker on port $port..."
-
-    (
-      cd "$PROJECT_ROOT/localModerationNSFWJS" || exit 0
-
-      # Clean up any previous container.
-      docker rm -f "$service_name" >/dev/null 2>&1 || true
-
-      # Build a local image pinned to Node 20 LTS.
-      docker build -t "$service_name:dev" .
-
-      # Run detached and record container id.
-      container_id="$(docker run -d --name "$service_name" -p "${port}:5082" -e PORT=5082 "$service_name:dev")"
-      echo "$container_id" > "$pid_file"
-      echo "✅ $service_name started (container: $container_id)"
-    ) > "$log_file" 2>&1 || true
-
-    wait_for_health "$service_name" "$url/health" "$log_file" 120 || true
-    return 0
-  fi
-
-  if command -v docker >/dev/null 2>&1; then
-    echo "⚠️  Docker is installed but the daemon is not reachable; skipping docker start for $service_name"
-  fi
-
-  # Fall back to running locally via node when Docker isn't available.
-  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-    echo "⚠️  docker and node/npm not found; skipping $service_name autostart"
-    return 0
-  fi
-
-  # Reject known-incompatible host Node versions.
-  local node_major
-  node_major="$(node -p 'parseInt(process.versions.node.split(".")[0], 10)' 2>/dev/null || echo "")"
-  if [[ -n "$node_major" && "$node_major" -ge 24 ]]; then
-    echo "⚠️  Host Node v${node_major} is not supported for tfjs-node; install Docker or use Node 20 LTS"
-    return 0
-  fi
-
-  if [[ ! -x "$node_runner" ]]; then
-    echo "⚠️  Local moderation nsfwjs runner not found/executable: $node_runner"
-    return 0
-  fi
-
-  echo "🔄 Starting $service_name on port $port (host node)..."
-  nohup env PORT="$port" "$node_runner" > "$log_file" 2>&1 &
-  echo $! > "$pid_file"
-  echo "✅ $service_name started with PID $(cat "$pid_file" 2>/dev/null || echo "?")"
-
-  wait_for_health "$service_name" "$url/health" "$log_file" 120 || true
 }
 
 start_local_label_detection_service() {
@@ -576,32 +496,5 @@ PY
 
 #  Envid Metadata (Multimodal only)
 start_local_moderation_service
-start_local_moderation_nsfwjs_service
 start_local_label_detection_service
 start_local_ocr_paddle_service
-start_local_keyscene_best_service
-start_service "envid-metadata-multimodal" "envidMetadataGCP" "app.py" "5016" "$ENV_MULTIMODAL_LOCAL_FILE,$ENV_MULTIMODAL_SECRETS_FILE"
-
-# Other services intentionally disabled.
-# Uncomment as needed.
-# start_service "ai-subtitle" "aiSubtitle" "aiSubtitle.py" "5001"
-# start_service "image-creation" "imageCreation" "app.py" "5002"
-# start_service "synthetic-voiceover" "syntheticVoiceover" "app.py" "5003"
-# start_service "scene-summarization" "sceneSummarization" "app.py" "5004"
-# start_service "movie-script" "movieScriptCreation" "app.py" "5005"
-# start_service "content-moderation" "contentModeration" "app.py" "5006"
-# export PERSONALIZED_TRAILER_PIPELINE_MODE=mock
-# start_service "personalized-trailer" "personalizedTrailer" "app.py" "5007"
-# start_service "semantic-search" "semanticSearch" "app.py" "5008"
-# start_service "video-generation" "videoGeneration" "app.py" "5009"
-# start_service "dynamic-ad-insertion" "dynamicAdInsertion" "app.py" "5010"
-# start_service "media-supply-chain" "mediaSupplyChain" "app.py" "5011"
-# start_service "usecase-visibility" "useCaseVisibility" "app.py" "5012"
-# start_service "highlight-trailer" "highlightTrailer" "app.py" "5013"
-
-echo "🎉 Backend services started!"
-echo
-
-wait_for_health "envid-metadata-multimodal" "http://localhost:5016/health" "$PROJECT_ROOT/envid-metadata-multimodal.log" 90
-
-echo "\n✅ Backend is ok"

@@ -103,8 +103,6 @@ stop_service() {
 # ✅ Local moderation service (NudeNet)
 stop_service "local-moderation-nudenet"
 
-# ✅ Local moderation service (nsfwjs)
-stop_service "local-moderation-nsfwjs"
 
 # ✅ Local label detection service (Detectron2/MMDetection)
 stop_service "local-label-detection"
@@ -136,10 +134,8 @@ stop_service "envid-metadata-multimodal"
 
 echo "🧹 Cleaning up any remaining processes on ports..."
 LOCAL_MOD_PORT="${ENVID_LOCAL_MODERATION_PORT:-5081}"
-LOCAL_MOD_NSFWJS_PORT="${ENVID_LOCAL_MODERATION_NSFWJS_PORT:-5082}"
 LOCAL_OCR_PADDLE_PORT="${ENVID_LOCAL_OCR_PADDLE_PORT:-5084}"
 lsof -ti:"$LOCAL_MOD_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
-lsof -ti:"$LOCAL_MOD_NSFWJS_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
 lsof -ti:"$LOCAL_OCR_PADDLE_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
 if [[ "$LOCAL_LABEL_RUNTIME" != "docker" ]]; then
   lsof -ti:"$LOCAL_LABEL_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true

@@ -157,7 +157,7 @@ def _translate_provider() -> str:
     pref = (os.getenv("ENVID_METADATA_TRANSLATE_PROVIDER") or "auto").strip().lower()
     libre_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
     has_libre = bool(libre_url)
-    allow_gcp = _env_truthy(os.getenv("ENVID_METADATA_TRANSLATE_ALLOW_GCP"), default=True)
+    allow_gcp = _env_truthy(os.getenv("ENVID_METADATA_TRANSLATE_ALLOW_GCP"), default=False)
     has_gcp = gcp_translate is not None and allow_gcp
 
     if pref in {"libretranslate", "libre", "opus", "marian"}:
@@ -3816,6 +3816,11 @@ def _process_gcs_video_job_cloud_only(
         enable_celebrity_detection = _sel_enabled("enable_celebrity_detection", default=True)
         enable_celebrity_bio_image = _sel_enabled("enable_celebrity_bio_image", default=True)
 
+        # Enforce fixed product policy: no Google usage except label detection.
+        enable_label_detection = True
+        enable_famous_locations = False
+        enable_opening_closing = False
+
         # Scene-by-scene metadata is designed to be "complete" by default.
         # If the client enables scene-by-scene (or relies on the default enable), we automatically
         # enable label detection unless the client explicitly provided enable_label_detection.
@@ -3841,6 +3846,13 @@ def _process_gcs_video_job_cloud_only(
             "synopsis_generation_model": _sel_model("synopsis_generation_model"),
             "opening_closing_credit_detection_model": _sel_model("opening_closing_credit_detection_model"),
         }
+
+        # Force fixed models per requirement.
+        requested_models["label_detection_model"] = "gcp_video_intelligence"
+        requested_models["moderation_model"] = "nudenet"
+        requested_models["text_model"] = "tesseract"
+        requested_models["key_scene_detection_model"] = "transnetv2_clip_cluster"
+        requested_models["synopsis_generation_model"] = "openrouter_llama"
 
         effective_models: Dict[str, str] = {}
 
@@ -3965,28 +3977,14 @@ def _process_gcs_video_job_cloud_only(
             transcribe_effective_mode = "whisper"
         effective_models["transcribe"] = transcribe_effective_mode
 
-        # Text-on-screen model selection.
-        requested_text_model = (requested_models.get("text_model") or "auto").strip().lower() or "auto"
-        # Accept explicit VI synonyms as "auto" (cloud OCR via Video Intelligence).
-        if requested_text_model in {"gcp_video_intelligence", "gcp_vi", "video_intelligence", "vi"}:
-            requested_text_model = "auto"
+        # Text-on-screen model selection (fixed to local Tesseract).
+        requested_text_model = "tesseract"
+        use_local_ocr = True
 
-        use_local_ocr = requested_text_model in {"paddleocr", "tesseract", "mmocr"}
-        if requested_text_model == "mmocr":
-            # Not implemented yet; fall back to PaddleOCR if available.
-            requested_text_model = "paddleocr"
-            use_local_ocr = True
-
-        # If an unknown value arrives from a client, fall back to cloud OCR.
-        if requested_text_model not in {"auto", "paddleocr", "tesseract"}:
-            requested_text_model = "auto"
-            use_local_ocr = False
-
-        # Moderation model selection.
-        requested_moderation_model = (requested_models.get("moderation_model") or "auto").strip().lower() or "auto"
-        use_local_moderation = requested_moderation_model in {"nudenet", "nsfwjs"}
-        # If local moderation is requested but cannot run, allow falling back to GCP.
-        allow_moderation_fallback = _env_truthy(os.getenv("ENVID_METADATA_MODERATION_FALLBACK_TO_GCP"), default=True)
+        # Moderation model selection (fixed to local NudeNet; no GCP fallback).
+        requested_moderation_model = "nudenet"
+        use_local_moderation = True
+        allow_moderation_fallback = False
         local_moderation_url_override = _sel_model("local_moderation_url", default="").strip()
 
         # Local label detection service URL override (optional).
@@ -3998,10 +3996,8 @@ def _process_gcs_video_job_cloud_only(
         if vi_label_mode not in {"segment", "shot", "frame"}:
             vi_label_mode = "frame"
 
-        # Label detection engine selection (independent engines).
-        # No default: if label detection is enabled, the client must provide a supported model.
-        requested_label_model_raw = str(requested_models.get("label_detection_model") or "").strip()
-        requested_label_model = requested_label_model_raw.lower()
+        # Label detection engine selection (fixed to GCP Video Intelligence).
+        requested_label_model = "gcp_video_intelligence"
 
         label_engine = "disabled"
         use_yolo_labels = False
@@ -4048,10 +4044,10 @@ def _process_gcs_video_job_cloud_only(
             use_vi_label_detection = False
             use_local_label_detection_service = False
 
-        # Key scene model selection (normalized; avoid exposing ambiguous `auto`).
+        # Key scene model selection (fixed to TransNetV2 + CLIP).
         # NOTE: For key scenes/high points we avoid any implicit fallback between engines.
         key_scene_step_finalized = False
-        requested_key_scene_model_raw = requested_models.get("key_scene_detection_model")
+        requested_key_scene_model_raw = "transnetv2_clip_cluster" if enable_key_scene else requested_models.get("key_scene_detection_model")
         requested_key_scene_model = (requested_key_scene_model_raw or "").strip().lower()
         if requested_key_scene_model in {"", "auto"}:
             requested_key_scene_model = "pyscenedetect_clip_cluster"
