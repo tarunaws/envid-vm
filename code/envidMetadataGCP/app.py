@@ -115,9 +115,10 @@ except Exception:  # pragma: no cover
     language_tool_python = None  # type: ignore
 
 try:
-    from wordfreq import zipf_frequency  # type: ignore
+    from wordfreq import zipf_frequency, top_n_list  # type: ignore
 except Exception:  # pragma: no cover
     zipf_frequency = None  # type: ignore
+    top_n_list = None  # type: ignore
 
 try:
     from rapidfuzz import process as rapid_process  # type: ignore
@@ -550,9 +551,21 @@ def _apply_segment_corrections(
 ) -> tuple[str, dict[str, bool]]:
     out = (text or "").strip()
     if not out:
-        return "", {"nlp_applied": False, "grammar_applied": False, "hindi_applied": False, "punctuation_applied": False}
+        return "", {
+            "nlp_applied": False,
+            "grammar_applied": False,
+            "dictionary_applied": False,
+            "hindi_applied": False,
+            "punctuation_applied": False,
+        }
 
-    meta = {"nlp_applied": False, "grammar_applied": False, "hindi_applied": False, "punctuation_applied": False}
+    meta = {
+        "nlp_applied": False,
+        "grammar_applied": False,
+        "dictionary_applied": False,
+        "hindi_applied": False,
+        "punctuation_applied": False,
+    }
 
     if nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
         normalized, _ = _openrouter_llama_normalize_transcript(text=out, language_code=language_code)
@@ -566,12 +579,14 @@ def _apply_segment_corrections(
             out = corrected
             meta["grammar_applied"] = True
 
-    # Apply Hindi dictionary correction before deterministic punctuation.
+    # Apply dictionary correction (language-aware) before deterministic punctuation.
     if hindi_dictionary_enabled:
-        corrected = _hindi_dictionary_correct_text(text=out, language_code=language_code)
+        corrected = _dictionary_correct_text(text=out, language_code=language_code)
         if corrected and corrected != out:
             out = corrected
-            meta["hindi_applied"] = True
+            meta["dictionary_applied"] = True
+            if _is_hindi_language(language_code):
+                meta["hindi_applied"] = True
 
     if punctuation_enabled:
         corrected = _enhance_transcript_punctuation(out)
@@ -1316,9 +1331,9 @@ JOBS: Dict[str, Dict[str, Any]] = {}
 
 _LANGTOOL_LOCAL: Any | None = None
 _LANGTOOL_LOCAL_LANG: str | None = None
-_HINDI_DICTIONARY_WORDS: list[str] | None = None
-_HINDI_DICTIONARY_SET: set[str] | None = None
-_HINDI_CONFUSION_MAP: dict[str, str] | None = None
+_LANG_DICTIONARY_WORDS: dict[str, list[str]] = {}
+_LANG_DICTIONARY_SET: dict[str, set[str]] = {}
+_LANG_CONFUSION_MAP: dict[str, dict[str, str]] = {}
 
 
 def _languagetool_local_check(*, text: str, language: str) -> dict[str, Any] | None:
@@ -1358,17 +1373,61 @@ def _languagetool_local_check(*, text: str, language: str) -> dict[str, Any] | N
 def _is_hindi_language(language_code: str | None) -> bool:
     if not language_code:
         return False
+    code = _normalize_language_code(language_code)
+    return code == "hi"
+
+
+def _normalize_language_code(language_code: str | None) -> str:
+    if not language_code:
+        return ""
     code = str(language_code).strip().lower()
-    return code.startswith("hi") or code in {"hindi", "hin"}
+    if code in {"hindi", "hin"}:
+        return "hi"
+    if code in {"urdu", "urd"}:
+        return "ur"
+    if code.startswith("zh"):
+        return "zh"
+    if code.startswith("ja"):
+        return "ja"
+    if code.startswith("ko"):
+        return "ko"
+    for sep in ("-", "_"):
+        if sep in code:
+            return code.split(sep, 1)[0]
+    return code
 
 
-def _load_hindi_dictionary() -> tuple[list[str], set[str]]:
-    global _HINDI_DICTIONARY_WORDS, _HINDI_DICTIONARY_SET
-    if _HINDI_DICTIONARY_WORDS is not None and _HINDI_DICTIONARY_SET is not None:
-        return _HINDI_DICTIONARY_WORDS, _HINDI_DICTIONARY_SET
+def _dictionary_languages_enabled() -> set[str]:
+    raw = (os.getenv("ENVID_DICTIONARY_LANGS") or "hi,bn,ta,te,ml,mr,gu,kn,pa,ur,ne,si,th,id,ms,vi,zh,ja,ko,ar").strip()
+    langs = {seg.strip().lower() for seg in raw.split(",") if seg.strip()}
+    return langs
 
-    path = (os.getenv("ENVID_HINDI_DICTIONARY_PATH") or "").strip()
+
+def _language_word_pattern(lang: str) -> str:
+    if lang == "hi":
+        return r"[\u0900-\u097F]+"
+    if lang == "ar":
+        return r"[\u0600-\u06FF]+"
+    if lang in {"zh", "ja", "ko"}:
+        return r"[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]+"
+    return r"[^\W\d_]+"
+
+
+def _load_language_dictionary(lang: str) -> tuple[list[str], set[str]]:
+    if lang in _LANG_DICTIONARY_WORDS and lang in _LANG_DICTIONARY_SET:
+        return _LANG_DICTIONARY_WORDS[lang], _LANG_DICTIONARY_SET[lang]
+
     words: list[str] = []
+    raw_paths = (os.getenv("ENVID_DICTIONARY_PATHS_JSON") or "").strip()
+    path = ""
+    if raw_paths:
+        try:
+            parsed = json.loads(raw_paths)
+            if isinstance(parsed, dict):
+                path = str(parsed.get(lang) or "").strip()
+        except Exception:
+            path = ""
+
     if path:
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -1376,60 +1435,93 @@ def _load_hindi_dictionary() -> tuple[list[str], set[str]]:
                     w = line.strip()
                     if not w or w.startswith("#"):
                         continue
-                    if re.search(r"[\u0900-\u097F]", w):
-                        words.append(w)
+                    if lang == "hi" and not re.search(r"[\u0900-\u097F]", w):
+                        continue
+                    words.append(w)
+        except Exception:
+            words = []
+    elif top_n_list is not None:
+        max_words = _parse_int(os.getenv("ENVID_DICTIONARY_MAX_WORDS"), default=5000, min_value=500, max_value=20000)
+        try:
+            words = [w for w in top_n_list(lang, max_words) if w]
         except Exception:
             words = []
 
-    _HINDI_DICTIONARY_WORDS = words
-    _HINDI_DICTIONARY_SET = set(words)
+    _LANG_DICTIONARY_WORDS[lang] = words
+    _LANG_DICTIONARY_SET[lang] = set(words)
     return words, set(words)
 
 
-def _load_hindi_confusions() -> dict[str, str]:
-    global _HINDI_CONFUSION_MAP
-    if _HINDI_CONFUSION_MAP is not None:
-        return _HINDI_CONFUSION_MAP
+def _load_language_confusions(lang: str) -> dict[str, str]:
+    if lang in _LANG_CONFUSION_MAP:
+        return _LANG_CONFUSION_MAP[lang]
 
-    raw = (os.getenv("ENVID_HINDI_CONFUSIONS_JSON") or "").strip()
-    conf: dict[str, str] = {"सा": "ऐसा"}
-    if raw:
+    conf: dict[str, str] = {"सा": "ऐसा"} if lang == "hi" else {}
+    raw_all = (os.getenv("ENVID_CONFUSIONS_JSON") or "").strip()
+    if raw_all:
         try:
-            parsed = json.loads(raw)
+            parsed = json.loads(raw_all)
             if isinstance(parsed, dict):
-                conf.update({str(k): str(v) for k, v in parsed.items() if k and v})
+                item = parsed.get(lang)
+                if isinstance(item, dict):
+                    conf.update({str(k): str(v) for k, v in item.items() if k and v})
         except Exception:
             pass
-    _HINDI_CONFUSION_MAP = conf
+
+    if lang == "hi":
+        raw_hi = (os.getenv("ENVID_HINDI_CONFUSIONS_JSON") or "").strip()
+        if raw_hi:
+            try:
+                parsed = json.loads(raw_hi)
+                if isinstance(parsed, dict):
+                    conf.update({str(k): str(v) for k, v in parsed.items() if k and v})
+            except Exception:
+                pass
+
+    _LANG_CONFUSION_MAP[lang] = conf
     return conf
 
 
-def _hindi_dictionary_correct_text(*, text: str, language_code: str | None) -> str:
+def _dictionary_correct_text(*, text: str, language_code: str | None) -> str:
     if not text:
         return ""
-    if not _is_hindi_language(language_code):
+    lang = _normalize_language_code(language_code)
+    if not lang:
+        return text
+    if lang not in _dictionary_languages_enabled():
         return text
     if zipf_frequency is None and rapid_process is None:
         return text
 
-    words, wordset = _load_hindi_dictionary()
-    confusions = _load_hindi_confusions()
-    min_zipf = _safe_float(os.getenv("ENVID_HINDI_DICTIONARY_MIN_ZIPF"), 2.5)
-    fuzz_cutoff = _parse_int(os.getenv("ENVID_HINDI_DICTIONARY_FUZZ_CUTOFF"), default=92, min_value=50, max_value=100)
-    confusions_strict = _env_truthy(os.getenv("ENVID_HINDI_CONFUSIONS_STRICT"), default=False)
+    words, wordset = _load_language_dictionary(lang)
+    confusions = _load_language_confusions(lang)
+
+    min_zipf_env = os.getenv("ENVID_DICTIONARY_MIN_ZIPF")
+    min_zipf = _safe_float(min_zipf_env if min_zipf_env is not None else os.getenv("ENVID_HINDI_DICTIONARY_MIN_ZIPF"), 2.5)
+    fuzz_env = os.getenv("ENVID_DICTIONARY_FUZZ_CUTOFF")
+    fuzz_cutoff = _parse_int(
+        fuzz_env if fuzz_env is not None else os.getenv("ENVID_HINDI_DICTIONARY_FUZZ_CUTOFF"),
+        default=92,
+        min_value=50,
+        max_value=100,
+    )
+    confusions_strict_env = os.getenv("ENVID_CONFUSIONS_STRICT")
+    confusions_strict = _env_truthy(
+        confusions_strict_env if confusions_strict_env is not None else os.getenv("ENVID_HINDI_CONFUSIONS_STRICT"),
+        default=False,
+    )
 
     def _score(w: str) -> float:
         if zipf_frequency is None:
             return 0.0
         try:
-            return float(zipf_frequency(w, "hi"))
+            return float(zipf_frequency(w, lang))
         except Exception:
             return 0.0
 
     def _fix_word(w: str) -> str:
         if not w:
             return w
-        # First, apply confusion-map replacement if it is clearly more frequent.
         if w in confusions:
             cand = confusions[w]
             if cand:
@@ -1438,7 +1530,6 @@ def _hindi_dictionary_correct_text(*, text: str, language_code: str | None) -> s
                 if _score(cand) >= (_score(w) + 0.4):
                     return cand
 
-        # If a dictionary is supplied, use fuzzy lookup for near-misses.
         if words and rapid_process is not None and rapid_fuzz is not None:
             if w in wordset:
                 return w
@@ -1452,11 +1543,24 @@ def _hindi_dictionary_correct_text(*, text: str, language_code: str | None) -> s
                     return cand
         return w
 
-    def _repl(m: re.Match) -> str:
-        w = m.group(0)
-        return _fix_word(w)
+    pattern = _language_word_pattern(lang)
 
-    return re.sub(r"[\u0900-\u097F]+", _repl, text)
+    def _repl(m: re.Match) -> str:
+        return _fix_word(m.group(0))
+
+    return re.sub(pattern, _repl, text)
+
+
+def _load_hindi_dictionary() -> tuple[list[str], set[str]]:
+    return _load_language_dictionary("hi")
+
+
+def _load_hindi_confusions() -> dict[str, str]:
+    return _load_language_confusions("hi")
+
+
+def _hindi_dictionary_correct_text(*, text: str, language_code: str | None) -> str:
+    return _dictionary_correct_text(text=text, language_code=language_code)
 
 
 def _job_steps_default() -> List[Dict[str, Any]]:
@@ -4959,7 +5063,10 @@ def _process_gcs_video_job_cloud_only(
                     grammar_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_GRAMMAR_CORRECTION"), default=True)
                     grammar_url = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip()
                     grammar_local = _env_truthy(os.getenv("ENVID_GRAMMAR_CORRECTION_USE_LOCAL"), default=False)
-                    hindi_dict_enabled = _env_truthy(os.getenv("ENVID_HINDI_DICTIONARY_ENABLE"), default=True)
+                    dictionary_enabled = _env_truthy(
+                        os.getenv("ENVID_DICTIONARY_ENABLE") or os.getenv("ENVID_HINDI_DICTIONARY_ENABLE"),
+                        default=True,
+                    )
                     nlp_mode = (os.getenv("ENVID_TRANSCRIPT_NLP_CORRECTION_MODE") or "openrouter_llama").strip().lower() or "openrouter_llama"
                     punctuation_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_PUNCTUATION_ENHANCE"), default=True)
 
@@ -4970,7 +5077,7 @@ def _process_gcs_video_job_cloud_only(
                             text=transcript,
                             language_code=(whisper_language or transcript_language_code or "hi"),
                             grammar_enabled=bool(grammar_enabled),
-                            hindi_dictionary_enabled=bool(hindi_dict_enabled and _is_hindi_language(whisper_language or transcript_language_code or "hi")),
+                            hindi_dictionary_enabled=bool(dictionary_enabled),
                             nlp_mode=nlp_mode,
                             punctuation_enabled=bool(punctuation_enabled),
                         )
@@ -4979,8 +5086,14 @@ def _process_gcs_video_job_cloud_only(
                             "available": bool(grammar_url) or (bool(grammar_local) and language_tool_python is not None),
                             "applied": bool(corr_meta.get("grammar_applied")),
                         }
+                        lang_norm = _normalize_language_code(whisper_language or transcript_language_code or "hi")
+                        transcript_meta["dictionary_correction"] = {
+                            "enabled": bool(dictionary_enabled),
+                            "language": lang_norm,
+                            "applied": bool(corr_meta.get("dictionary_applied")),
+                        }
                         transcript_meta["hindi_dictionary_correction"] = {
-                            "enabled": bool(hindi_dict_enabled),
+                            "enabled": bool(dictionary_enabled and lang_norm == "hi"),
                             "applied": bool(corr_meta.get("hindi_applied")),
                         }
                         transcript_meta["nlp_correction"] = {
@@ -5016,7 +5129,7 @@ def _process_gcs_video_job_cloud_only(
                                 text=txt,
                                 language_code=(transcript_language_code or whisper_language or "hi"),
                                 grammar_enabled=bool(seg_grammar),
-                                hindi_dictionary_enabled=bool(hindi_dict_enabled and _is_hindi_language(whisper_language or transcript_language_code or "hi")),
+                                hindi_dictionary_enabled=bool(dictionary_enabled),
                                 nlp_mode=seg_nlp_mode,
                                 punctuation_enabled=bool(seg_punct),
                             )
@@ -5084,11 +5197,14 @@ def _process_gcs_video_job_cloud_only(
                         if not is_reasonable:
                             raise TranscriptVerificationError("Transcript verification failed: low-quality output")
                         if require_correction:
+                            dictionary_applied = transcript_meta.get("dictionary_correction", {}).get("applied")
+                            if dictionary_applied is None:
+                                dictionary_applied = transcript_meta.get("hindi_dictionary_correction", {}).get("applied")
                             applied_flags = [
                                 transcript_meta.get("grammar_correction", {}).get("applied"),
                                 transcript_meta.get("nlp_correction", {}).get("applied"),
                                 transcript_meta.get("punctuation_enhance", {}).get("applied"),
-                                transcript_meta.get("hindi_dictionary_correction", {}).get("applied"),
+                                dictionary_applied,
                             ]
                             applied_any = any(bool(x) for x in applied_flags)
                             transcript_meta["verification"]["corrections_applied"] = bool(applied_any)
