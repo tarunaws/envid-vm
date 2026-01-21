@@ -22,6 +22,11 @@ import { VisibleUseCasesProvider } from './VisibleUseCasesContext';
 
 function App() {
   const [scrolled, setScrolled] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const buildId = process.env.REACT_APP_BUILD_ID || 'dev';
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 12);
@@ -29,6 +34,81 @@ function App() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    try {
+      const lastBuild = window.localStorage.getItem('envidBuildId');
+      if (lastBuild && lastBuild !== buildId) {
+        setIsAuthenticated(false);
+      }
+      window.localStorage.setItem('envidBuildId', buildId);
+    } catch (err) {
+      // ignore storage errors
+    }
+  }, [buildId]);
+
+  const handleLogin = (event) => {
+    event.preventDefault();
+    const user = username.trim();
+    const pass = password.trim();
+    if (user === 'meta' && pass === 'meta') {
+      setIsAuthenticated(true);
+      setAuthError('');
+      setPassword('');
+    } else {
+      setAuthError('Invalid credentials.');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUsername('');
+    setPassword('');
+    setAuthError('');
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <GlobalStyle />
+        <LoginShell>
+          <LoginCard>
+            <LoginBrand>Envid Metadata</LoginBrand>
+            <LoginTitle>Sign in to continue</LoginTitle>
+            <LoginSubtitle>Use the provided credentials.</LoginSubtitle>
+            <LoginForm onSubmit={handleLogin}>
+              <LoginField>
+                <LoginLabel htmlFor="envid-username">Username</LoginLabel>
+                <LoginInput
+                  id="envid-username"
+                  type="text"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="Username"
+                  autoComplete="username"
+                  required
+                />
+              </LoginField>
+              <LoginField>
+                <LoginLabel htmlFor="envid-password">Password</LoginLabel>
+                <LoginInput
+                  id="envid-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Password"
+                  autoComplete="current-password"
+                  required
+                />
+              </LoginField>
+              {authError ? <LoginError>{authError}</LoginError> : null}
+              <LoginButton type="submit">Enter</LoginButton>
+            </LoginForm>
+          </LoginCard>
+        </LoginShell>
+      </>
+    );
+  }
 
   return (
     <VisibleUseCasesProvider>
@@ -50,6 +130,9 @@ function App() {
                 <NeonLink to="/about">About</NeonLink>
               </NavLinks>
               <Spacer />
+              <LogoutButton type="button" onClick={handleLogout}>
+                Logout
+              </LogoutButton>
             </NavInner>
           </NeonNav>
 
@@ -229,5 +312,113 @@ const NeonLink = styled(NavLink)`
 
 const Spacer = styled.div`
   flex: 1;
+`;
+
+const LogoutButton = styled.button`
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6e8f2;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+`;
+
+const LoginShell = styled.div`
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at top, rgba(124, 58, 237, 0.18), transparent 55%),
+    linear-gradient(180deg, rgba(5, 4, 8, 0.94), rgba(4, 3, 6, 0.98));
+`;
+
+const LoginCard = styled.div`
+  width: min(420px, 100%);
+  border-radius: 20px;
+  padding: 32px;
+  background: rgba(10, 8, 16, 0.92);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+`;
+
+const LoginBrand = styled.span`
+  display: inline-block;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  margin-bottom: 12px;
+`;
+
+const LoginTitle = styled.h1`
+  margin: 0 0 6px;
+  font-size: 1.6rem;
+`;
+
+const LoginSubtitle = styled.p`
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+`;
+
+const LoginForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const LoginField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const LoginLabel = styled.label`
+  font-size: 0.85rem;
+  color: var(--text-subtle);
+`;
+
+const LoginInput = styled.input`
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 5, 10, 0.9);
+  color: var(--text);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    border-color: rgba(168, 85, 247, 0.7);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+  }
+`;
+
+const LoginError = styled.div`
+  color: #fda4af;
+  font-size: 0.85rem;
+`;
+
+const LoginButton = styled.button`
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--button-accent), var(--button-accent-2));
+  color: var(--on-button-accent);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3);
+  }
 `;
 

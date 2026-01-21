@@ -796,6 +796,123 @@ function formatBytes(bytes) {
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[i]}`;
 }
 
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 4, 12, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 40;
+`;
+
+const ModalCard = styled.div`
+  width: min(760px, 100%);
+  max-height: 80vh;
+  background: rgba(12, 16, 32, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+`;
+
+const ModalHeader = styled.div`
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const ModalTitle = styled.div`
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #e6e8f2;
+`;
+
+const ModalSubtitle = styled.div`
+  color: rgba(230, 232, 242, 0.7);
+  font-size: 0.85rem;
+`;
+
+const ModalBody = styled.div`
+  padding: 18px 20px 22px;
+  overflow: auto;
+`;
+
+const BrowserPath = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: rgba(230, 232, 242, 0.7);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+
+  strong {
+    color: #e6e8f2;
+  }
+`;
+
+const BrowserList = styled.div`
+  display: grid;
+  gap: 8px;
+`;
+
+const BrowserRow = styled.button`
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e6e8f2;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+`;
+
+const BrowserIcon = styled.span`
+  width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const BrowserMeta = styled.span`
+  color: rgba(230, 232, 242, 0.65);
+  font-size: 0.8rem;
+`;
+
+const BrowserEmpty = styled.div`
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  color: rgba(230, 232, 242, 0.6);
+  text-align: center;
+`;
+
+const ConfirmText = styled.div`
+  color: rgba(230, 232, 242, 0.8);
+  font-size: 0.95rem;
+  margin-bottom: 18px;
+`;
+
+const ConfirmActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+`;
+
 function formatTimestamp(value) {
   try {
     if (!value) return '—';
@@ -942,20 +1059,8 @@ export default function EnvidMetadataMinimal() {
   // Multimodal task selection.
   // Defaults: everything is OFF until the user explicitly enables it.
   const [taskSelection, setTaskSelection] = useState(() => ({
-    enable_label_detection: false,
-    label_detection_model: 'gcp_video_intelligence',
-
-    enable_moderation: false,
-    moderation_model: 'nsfwjs',
-
-    enable_text: false,
-    text_model: 'tesseract',
-
-    enable_key_scene_detection: false,
-    key_scene_detection_model: 'pyscenedetect_clip_cluster',
-
-    enable_transcribe: false,
-    transcribe_model: 'whisper',
+    enable_famous_location_detection: false,
+    famous_location_detection_model: 'auto',
 
     enable_opening_closing_credit_detection: false,
     opening_closing_credit_detection_model: 'auto',
@@ -973,20 +1078,23 @@ export default function EnvidMetadataMinimal() {
       // Backend-controlled (scene detection + transcript + Meta Llama).
       enable_scene_by_scene_metadata: true,
 
-      enable_label_detection: Boolean(sel.enable_label_detection),
+      enable_label_detection: true,
       label_detection_model: String(sel.label_detection_model || '').trim() || 'gcp_video_intelligence',
 
-      enable_moderation: Boolean(sel.enable_moderation),
+      enable_moderation: true,
       moderation_model: String(sel.moderation_model || '').trim() || 'nsfwjs',
 
-      enable_text: Boolean(sel.enable_text),
+      enable_text: true,
       text_model: String(sel.text_model || '').trim() || 'tesseract',
 
-      enable_key_scene_detection: Boolean(sel.enable_key_scene_detection),
+      enable_key_scene_detection: true,
       key_scene_detection_model: String(sel.key_scene_detection_model || '').trim() || 'pyscenedetect_clip_cluster',
 
-      enable_transcribe: Boolean(sel.enable_transcribe),
+      enable_transcribe: true,
       transcribe_model: String(sel.transcribe_model || '').trim() || 'whisper',
+
+      enable_famous_location_detection: Boolean(sel.enable_famous_location_detection),
+      famous_location_detection_model: String(sel.famous_location_detection_model || '').trim() || 'auto',
 
       // Backend-controlled (Meta Llama).
       enable_synopsis_generation: true,
@@ -1009,7 +1117,16 @@ export default function EnvidMetadataMinimal() {
 
   const [gcsRawVideoObject, setGcsRawVideoObject] = useState('');
   const [gcsRawVideoLoading, setGcsRawVideoLoading] = useState(false);
-  const [gcsRawVideoObjects, setGcsRawVideoObjects] = useState([]);
+  const [gcsBrowserOpen, setGcsBrowserOpen] = useState(false);
+  const [gcsBrowserPrefix, setGcsBrowserPrefix] = useState('');
+  const [gcsBrowserQuery, setGcsBrowserQuery] = useState('');
+  const [gcsBrowserObjects, setGcsBrowserObjects] = useState([]);
+  const [gcsBrowserPrefixes, setGcsBrowserPrefixes] = useState([]);
+  const [deletePending, setDeletePending] = useState(null);
+  const [reprocessPending, setReprocessPending] = useState(null);
+  const [gcsBuckets, setGcsBuckets] = useState([]);
+  const [gcsBucket, setGcsBucket] = useState('');
+  const [gcsBucketLoading, setGcsBucketLoading] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1080,9 +1197,8 @@ export default function EnvidMetadataMinimal() {
       const raw = String(gcsRawVideoObject || '').trim();
       if (!raw) return '';
       const key = raw.toLowerCase().startsWith('gs://') ? raw.split('/').slice(3).join('/') : raw;
-      const cleaned = String(key).replace(/^rawvideo\//i, '').replace(/^rawVideo\//, '');
-      const base = cleaned.split('/').pop() || cleaned;
-      return base.replace(/\.[^/.]+$/, '') || cleaned;
+      const base = String(key).split('/').pop() || String(key);
+      return base.replace(/\.[^/.]+$/, '') || String(key);
     }
     if (selectedFile?.name) {
       return String(selectedFile.name).replace(/\.[^/.]+$/, '');
@@ -1361,17 +1477,61 @@ export default function EnvidMetadataMinimal() {
     }
   };
 
-  const loadRawVideoList = async () => {
+  const loadGcsBucketList = async () => {
+    setGcsBucketLoading(true);
+    try {
+      const resp = await axios.get(`${BACKEND_URL}/gcs/buckets/list`);
+      const buckets = Array.isArray(resp.data?.buckets) ? resp.data.buckets : [];
+      setGcsBuckets(buckets);
+      if (!gcsBucket) {
+        const preferred = resp.data?.default_bucket || buckets?.[0]?.name || '';
+        if (preferred) setGcsBucket(preferred);
+      }
+    } catch (e) {
+      setGcsBuckets([]);
+    } finally {
+      setGcsBucketLoading(false);
+    }
+  };
+
+  const loadRawVideoList = async (bucketOverride, prefixOverride) => {
     setGcsRawVideoLoading(true);
     try {
-      const resp = await axios.get(`${BACKEND_URL}/gcs/rawvideo/list`, { params: { max_results: 500 } });
-      setGcsRawVideoObjects(Array.isArray(resp.data?.objects) ? resp.data.objects : []);
+      const bucket = bucketOverride || gcsBucket;
+      const prefix = typeof prefixOverride === 'string' ? prefixOverride : gcsBrowserPrefix;
+      const resp = await axios.get(`${BACKEND_URL}/gcs/objects/list`, {
+        params: { max_results: 500, ...(bucket ? { bucket } : {}), prefix: prefix ?? '' },
+      });
+      setGcsBrowserObjects(Array.isArray(resp.data?.objects) ? resp.data.objects : []);
+      setGcsBrowserPrefixes(Array.isArray(resp.data?.prefixes) ? resp.data.prefixes : []);
+      if (!gcsBucket && resp.data?.bucket) setGcsBucket(resp.data.bucket);
     } catch (e) {
-      setGcsRawVideoObjects([]);
+      setGcsBrowserObjects([]);
+      setGcsBrowserPrefixes([]);
     } finally {
       setGcsRawVideoLoading(false);
     }
   };
+
+  const openGcsBrowser = async () => {
+    if (!gcsBucket) {
+      setMessage({ type: 'error', text: 'Select a bucket first.' });
+      return;
+    }
+    setGcsBrowserOpen(true);
+    setGcsBrowserQuery('');
+    await loadRawVideoList(gcsBucket, gcsBrowserPrefix);
+  };
+
+  const toParentPrefix = (prefix) => {
+    const trimmed = String(prefix || '').replace(/\/+$/, '');
+    if (!trimmed) return '';
+    const parts = trimmed.split('/').filter(Boolean);
+    parts.pop();
+    return parts.length ? `${parts.join('/')}/` : '';
+  };
+
+  const isVideoFile = (name) => /\.(mp4|mov|m4v|mkv|avi|webm|mxf)$/i.test(String(name || ''));
 
   useEffect(() => {
     loadAllVideos();
@@ -1379,9 +1539,15 @@ export default function EnvidMetadataMinimal() {
 
   useEffect(() => {
     if (videoSource === 'gcs') {
-      loadRawVideoList();
+      loadGcsBucketList();
     }
   }, [videoSource]);
+
+  useEffect(() => {
+    if (videoSource === 'gcs' && gcsBucket && gcsBrowserOpen) {
+      loadRawVideoList(gcsBucket, gcsBrowserPrefix);
+    }
+  }, [videoSource, gcsBucket, gcsBrowserPrefix, gcsBrowserOpen]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -1468,7 +1634,7 @@ export default function EnvidMetadataMinimal() {
     if (videoSource === 'gcs') {
       const raw = String(gcsRawVideoObject || '').trim();
       if (!raw) {
-        setMessage({ type: 'error', text: 'Select a Cloud Storage object under rawVideo/…' });
+        setMessage({ type: 'error', text: 'Select a Cloud Storage object from the bucket.' });
         return;
       }
 
@@ -1722,11 +1888,18 @@ export default function EnvidMetadataMinimal() {
   ) : null;
 
   const handleDeleteVideo = async (videoId, videoTitle) => {
-    if (!window.confirm(`Are you sure you want to delete "${videoTitle}"?`)) return;
+    if (!videoId) return;
+    setDeletePending({ videoId, videoTitle });
+  };
+
+  const confirmDeleteVideo = async () => {
+    if (!deletePending) return;
+    const { videoId, videoTitle } = deletePending;
+    setDeletePending(null);
     setMessage(null);
     try {
       const resp = await axios.delete(`${BACKEND_URL}/video/${videoId}`);
-      const baseMsg = resp.data?.message || 'Video deleted.';
+      const baseMsg = resp.data?.message || `Deleted "${videoTitle}".`;
       const warningsRaw =
         resp.data?.storage_warnings ?? resp.data?.gcs_warnings ?? resp.data?.s3_warnings ?? resp.data?.warnings ?? [];
       const warnings = Array.isArray(warningsRaw) ? warningsRaw.filter(Boolean) : [];
@@ -1746,7 +1919,13 @@ export default function EnvidMetadataMinimal() {
 
   const handleReprocessVideo = async (videoId, videoTitle) => {
     if (!videoId) return;
-    if (!window.confirm(`Reprocess "${videoTitle}" now?`)) return;
+    setReprocessPending({ videoId, videoTitle });
+  };
+
+  const confirmReprocessVideo = async () => {
+    if (!reprocessPending) return;
+    const { videoId, videoTitle } = reprocessPending;
+    setReprocessPending(null);
     setMessage(null);
     setUploading(true);
     setUploadProgress(0);
@@ -1765,10 +1944,10 @@ export default function EnvidMetadataMinimal() {
         await pollJob(resp.data.job_id);
         return;
       }
-      setMessage({ type: 'success', text: resp.data?.message || 'Reprocess requested.' });
+      setMessage({ type: 'success', text: resp.data?.message || `Reprocess requested for "${videoTitle}".` });
       await loadAllVideos();
     } catch (e) {
-      setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to start reprocess' });
+      setMessage({ type: 'error', text: e.response?.data?.error || `Failed to start reprocess for "${videoTitle}"` });
     } finally {
       if (!handedOffToPoller) {
         setUploading(false);
@@ -1814,7 +1993,7 @@ export default function EnvidMetadataMinimal() {
       <Container>
         <Header>
           <Title>Envid Metadata (Multimodal)</Title>
-          <Subtitle>Upload videos or analyze a GCS object (rawVideo/)</Subtitle>
+          <Subtitle>Upload videos or analyze a GCS object (any folder)</Subtitle>
         </Header>
 
         {message && <Message type={message.type}>{message.text}</Message>}
@@ -1861,7 +2040,7 @@ export default function EnvidMetadataMinimal() {
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                 >
-                  GCS (rawVideo/)
+                  GCS (Cloud Storage)
                 </Button>
               ) : (
                 <SecondaryButton
@@ -1873,7 +2052,7 @@ export default function EnvidMetadataMinimal() {
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                 >
-                  GCS (rawVideo/)
+                  GCS (Cloud Storage)
                 </SecondaryButton>
               )}
             </Row>
@@ -1906,45 +2085,66 @@ export default function EnvidMetadataMinimal() {
             ) : (
               <div>
                 <div style={{ marginTop: -2, marginBottom: 10, color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>
-                  Uses an existing Cloud Storage object (no browser upload).
+                  Uses an existing Cloud Storage object (no browser upload). Choose any bucket and folder prefix.
                 </div>
 
                 <Row style={{ justifyContent: 'space-between', marginBottom: 10 }}>
-                  <SecondaryButton type="button" onClick={loadRawVideoList} disabled={uploading || gcsRawVideoLoading}>
-                    {gcsRawVideoLoading ? 'Loading GCS list…' : 'Refresh GCS list'}
+                  <SecondaryButton type="button" onClick={loadGcsBucketList} disabled={uploading || gcsBucketLoading}>
+                    {gcsBucketLoading ? 'Loading buckets…' : 'Refresh buckets'}
                   </SecondaryButton>
-                  <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>
-                    {gcsRawVideoObjects.length ? `${gcsRawVideoObjects.length} file(s) found` : 'No files found in rawVideo/'}
-                  </div>
+                  <SecondaryButton type="button" onClick={openGcsBrowser} disabled={uploading || !gcsBucket}>
+                    Browse bucket
+                  </SecondaryButton>
                 </Row>
 
-                <select
-                  value={gcsRawVideoObject}
-                  onChange={(e) => setGcsRawVideoObject(e.target.value)}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontSize: 12, marginBottom: 6 }}>GCS bucket</div>
+                  <select
+                    value={gcsBucket}
+                    onChange={(e) => {
+                      setGcsBucket(e.target.value);
+                      setGcsRawVideoObject('');
+                      setGcsBrowserPrefix('');
+                    }}
+                    style={{
+                      padding: '12px 14px',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 10,
+                      fontSize: '1rem',
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      color: '#e6e8f2',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <option value="">Select a bucket…</option>
+                    {gcsBuckets.map((bucket) => {
+                      const name = bucket?.name;
+                      if (!name) return null;
+                      return (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontSize: 12, marginBottom: 10 }}>
+                    {gcsBucket ? `Browsing ${gcsBucket}` : 'Select a bucket to browse objects.'}
+                  </div>
+                </div>
+                <div
                   style={{
                     padding: '12px 14px',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: 10,
-                    fontSize: '1rem',
+                    fontSize: '0.95rem',
                     width: '100%',
                     background: 'rgba(255, 255, 255, 0.04)',
                     color: '#e6e8f2',
                   }}
                 >
-                  <option value="">Select a file from rawVideo/…</option>
-                  {gcsRawVideoObjects.map((obj) => {
-                    const key = obj?.name;
-                    if (!key) return null;
-                    const labelName = String(key).replace(/^rawvideo\//i, '').replace(/^rawVideo\//, '');
-                    const sizePart = typeof obj?.size === 'number' ? ` (${formatBytes(obj.size)})` : '';
-                    return (
-                      <option key={key} value={key}>
-                        {labelName}
-                        {sizePart}
-                      </option>
-                    );
-                  })}
-                </select>
+                  {gcsRawVideoObject ? `Selected: ${gcsRawVideoObject}` : 'No file selected yet.'}
+                </div>
               </div>
             )}
 
@@ -1962,52 +2162,12 @@ export default function EnvidMetadataMinimal() {
               <div style={{ display: 'grid', gap: 10 }}>
                 {[
                   {
-                    enableKey: 'enable_label_detection',
-                    label: 'Label detection',
-                    modelKey: 'label_detection_model',
+                    enableKey: 'enable_famous_location_detection',
+                    label: 'Famous location detection',
+                    modelKey: 'famous_location_detection_model',
                     models: [
-                      { value: 'gcp_video_intelligence', label: 'Google Video Intelligence' },
-                      { value: 'yolo_ultralytics', label: 'YOLO(Ultralytics)' },
-                      { value: 'detectron2', label: 'Detectron2' },
-                      { value: 'mmdetection', label: 'MMDetection' },
-                    ],
-                  },
-                  {
-                    enableKey: 'enable_moderation',
-                    label: 'Moderation',
-                    modelKey: 'moderation_model',
-                    models: [
-                      { value: 'gcp_video_intelligence', label: 'Google Video Intelligence' },
-                      { value: 'nudenet', label: 'NudeNet' },
-                      { value: 'nsfwjs', label: 'nsfwjs' },
-                    ],
-                  },
-                  {
-                    enableKey: 'enable_text',
-                    label: 'Text on screen',
-                    modelKey: 'text_model',
-                    models: [
-                      { value: 'auto', label: 'Google Video Intelligence' },
-                      { value: 'paddleocr', label: 'PaddleOCR' },
-                      { value: 'tesseract', label: 'Tesseract' },
-                    ],
-                  },
-                  {
-                    enableKey: 'enable_key_scene_detection',
-                    label: 'Key scene & high point detection',
-                    modelKey: 'key_scene_detection_model',
-                    models: [
-                      { value: 'gcp_video_intelligence', label: 'Google Video Intelligence' },
-                      { value: 'transnetv2_clip_cluster', label: 'CLIP clustering + TransNetV2' },
-                      { value: 'pyscenedetect_clip_cluster', label: 'CLIP clustering + PySceneDetect' },
-                    ],
-                  },
-                  {
-                    enableKey: 'enable_transcribe',
-                    label: 'Audio Transcription',
-                    modelKey: 'transcribe_model',
-                    models: [
-                      { value: 'whisper', label: 'OpenAI-Whisper(Default)' },
+                      { value: 'auto', label: 'Auto (backend default)' },
+                      { value: 'gcp_language', label: 'Google Cloud Natural Language' },
                     ],
                   },
                   {
@@ -2034,11 +2194,7 @@ export default function EnvidMetadataMinimal() {
                   },
                 ].map((t) => {
                   const defaultModelsByKey = {
-                    label_detection_model: 'gcp_video_intelligence',
-                    moderation_model: 'nsfwjs',
-                    text_model: 'tesseract',
-                    key_scene_detection_model: 'pyscenedetect_clip_cluster',
-                    transcribe_model: 'whisper',
+                    famous_location_detection_model: 'auto',
                     opening_closing_credit_detection_model: 'auto',
                     celebrity_detection_model: 'auto',
                     celebrity_bio_image_model: 'auto',
@@ -3180,6 +3336,180 @@ export default function EnvidMetadataMinimal() {
             ) : null}
           </Section>
         </div>
+
+        {gcsBrowserOpen && (
+          <ModalOverlay
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setGcsBrowserOpen(false);
+            }}
+          >
+            <ModalCard>
+              <ModalHeader>
+                <div>
+                  <ModalTitle>Browse bucket</ModalTitle>
+                  <ModalSubtitle>{gcsBucket || 'No bucket selected'}</ModalSubtitle>
+                </div>
+                <SecondaryButton type="button" onClick={() => setGcsBrowserOpen(false)}>
+                  Close
+                </SecondaryButton>
+              </ModalHeader>
+
+              <ModalBody>
+                <BrowserPath>
+                  <span>Path:</span>
+                  <strong>{gcsBrowserPrefix || '/'}</strong>
+                </BrowserPath>
+
+                <input
+                  value={gcsBrowserQuery}
+                  onChange={(event) => setGcsBrowserQuery(event.target.value)}
+                  placeholder="Search folders or files"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: '#e6e8f2',
+                    marginBottom: 12,
+                  }}
+                />
+
+                <Row style={{ marginBottom: 12, justifyContent: 'space-between' }}>
+                  <SecondaryButton
+                    type="button"
+                    onClick={() => {
+                      const parent = toParentPrefix(gcsBrowserPrefix);
+                      setGcsBrowserPrefix(parent);
+                      loadRawVideoList(gcsBucket, parent);
+                    }}
+                    disabled={!gcsBrowserPrefix}
+                  >
+                    Up
+                  </SecondaryButton>
+                  <SecondaryButton type="button" onClick={() => loadRawVideoList(gcsBucket, gcsBrowserPrefix)}>
+                    {gcsRawVideoLoading ? 'Loading…' : 'Refresh'}
+                  </SecondaryButton>
+                </Row>
+
+                <BrowserList>
+                  {gcsBrowserPrefixes
+                    .filter((prefix) => {
+                      if (!gcsBrowserQuery) return true;
+                      const name = String(prefix || '').replace(gcsBrowserPrefix, '').replace(/\/+$/, '').toLowerCase();
+                      return name.includes(gcsBrowserQuery.toLowerCase());
+                    })
+                    .map((prefix) => {
+                    const name = String(prefix || '').replace(gcsBrowserPrefix, '').replace(/\/+$/, '');
+                    if (!name) return null;
+                    return (
+                      <BrowserRow
+                        key={prefix}
+                        onClick={() => {
+                          setGcsBrowserPrefix(prefix);
+                          loadRawVideoList(gcsBucket, prefix);
+                        }}
+                      >
+                        <BrowserIcon>📁</BrowserIcon>
+                        <div>{name}</div>
+                      </BrowserRow>
+                    );
+                  })}
+
+                  {gcsBrowserObjects
+                    .filter((obj) => isVideoFile(obj?.name))
+                    .filter((obj) => {
+                      if (!gcsBrowserQuery) return true;
+                      const name = String(obj?.name || '').replace(gcsBrowserPrefix, '').toLowerCase();
+                      return name.includes(gcsBrowserQuery.toLowerCase());
+                    })
+                    .map((obj) => {
+                    const name = String(obj?.name || '').replace(gcsBrowserPrefix, '');
+                    const size = typeof obj?.size === 'number' ? formatBytes(obj.size) : null;
+                    return (
+                      <BrowserRow
+                        key={obj?.uri || obj?.name}
+                        onClick={() => {
+                          const value = obj?.bucket ? `gs://${obj.bucket}/${obj.name}` : obj?.uri || obj?.name;
+                          setGcsRawVideoObject(value || '');
+                          setGcsBrowserOpen(false);
+                        }}
+                      >
+                        <BrowserIcon>🎞️</BrowserIcon>
+                        <div>{name}</div>
+                        {size ? <BrowserMeta>{size}</BrowserMeta> : null}
+                      </BrowserRow>
+                    );
+                  })}
+
+                  {!gcsBrowserPrefixes.length && !gcsBrowserObjects.some((obj) => isVideoFile(obj?.name)) && (
+                    <BrowserEmpty>No video files found in this folder.</BrowserEmpty>
+                  )}
+                </BrowserList>
+              </ModalBody>
+            </ModalCard>
+          </ModalOverlay>
+        )}
+
+        {deletePending && (
+          <ModalOverlay
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setDeletePending(null);
+            }}
+          >
+            <ModalCard>
+              <ModalHeader>
+                <div>
+                  <ModalTitle>Delete video</ModalTitle>
+                  <ModalSubtitle>{deletePending.videoTitle || 'Selected video'}</ModalSubtitle>
+                </div>
+              </ModalHeader>
+              <ModalBody>
+                <ConfirmText>
+                  Are you sure you want to delete this video? This action cannot be undone.
+                </ConfirmText>
+                <ConfirmActions>
+                  <SecondaryButton type="button" onClick={() => setDeletePending(null)}>
+                    Cancel
+                  </SecondaryButton>
+                  <DeleteButton type="button" onClick={confirmDeleteVideo}>
+                    Delete
+                  </DeleteButton>
+                </ConfirmActions>
+              </ModalBody>
+            </ModalCard>
+          </ModalOverlay>
+        )}
+
+        {reprocessPending && (
+          <ModalOverlay
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setReprocessPending(null);
+            }}
+          >
+            <ModalCard>
+              <ModalHeader>
+                <div>
+                  <ModalTitle>Reprocess video</ModalTitle>
+                  <ModalSubtitle>{reprocessPending.videoTitle || 'Selected video'}</ModalSubtitle>
+                </div>
+              </ModalHeader>
+              <ModalBody>
+                <ConfirmText>
+                  Reprocessing will rerun the selected pipeline steps for this video. Proceed?
+                </ConfirmText>
+                <ConfirmActions>
+                  <SecondaryButton type="button" onClick={() => setReprocessPending(null)}>
+                    Cancel
+                  </SecondaryButton>
+                  <ReprocessButton type="button" onClick={confirmReprocessVideo}>
+                    Reprocess
+                  </ReprocessButton>
+                </ConfirmActions>
+              </ModalBody>
+            </ModalCard>
+          </ModalOverlay>
+        )}
       </Container>
     </PageWrapper>
   );

@@ -932,6 +932,21 @@ def _gcs_rawvideo_prefix() -> str:
     return prefix
 
 
+def _gcs_enforce_prefix() -> bool:
+    return _env_truthy(os.getenv("ENVID_METADATA_GCS_ENFORCE_PREFIX"), default=True)
+
+
+def _allowed_gcs_buckets() -> set[str] | None:
+    raw = (
+        os.getenv("ENVID_METADATA_ALLOWED_GCS_BUCKETS")
+        or os.getenv("GCP_GCS_ALLOWED_BUCKETS")
+        or ""
+    ).strip()
+    if not raw:
+        return None
+    return {b.strip() for b in raw.split(",") if b.strip()}
+
+
 def _gcs_artifacts_bucket(fallback: str) -> str:
     return (
         (os.getenv("ENVID_METADATA_GCS_ARTIFACTS_BUCKET")
@@ -962,6 +977,7 @@ def _parse_allowed_gcs_video_source(raw: str) -> Tuple[str, str]:
         raise ValueError("Missing gcs_object (or gcs_uri)")
 
     bucket = _gcs_bucket_name()
+    allowed = _allowed_gcs_buckets()
     prefix = _gcs_rawvideo_prefix()
 
     if v.lower().startswith("gs://"):
@@ -970,12 +986,14 @@ def _parse_allowed_gcs_video_source(raw: str) -> Tuple[str, str]:
             raise ValueError("Invalid gs:// URI")
         uri_bucket = parts[2]
         obj = parts[3]
-        if uri_bucket != bucket:
-            raise ValueError(f"Bucket not allowed: {uri_bucket}. Allowed: {bucket}")
+        if allowed is not None and uri_bucket not in allowed:
+            raise ValueError(f"Bucket not allowed: {uri_bucket}. Allowed: {', '.join(sorted(allowed))}")
+        if allowed is None:
+            bucket = uri_bucket
     else:
         obj = v.lstrip("/")
 
-    if not obj.startswith(prefix):
+    if _gcs_enforce_prefix() and not obj.startswith(prefix):
         raise ValueError(f"Object must be under {prefix}")
     if obj.endswith("/"):
         raise ValueError("Object cannot be a folder")
@@ -5766,10 +5784,21 @@ def health() -> Any:
 @app.route("/gcs/rawvideo/list", methods=["GET"])
 def list_gcs_rawvideo_objects() -> Any:
     try:
-        bucket = _gcs_bucket_name()
-        prefix = _gcs_rawvideo_prefix()
+        bucket = (request.args.get("bucket") or "").strip() or _gcs_bucket_name()
+        raw_prefix = request.args.get("prefix")
+        if raw_prefix is None:
+            prefix = _gcs_rawvideo_prefix()
+        else:
+            prefix = (raw_prefix or "").strip()
+            if prefix.lower() in {"*", "all", "__all__"}:
+                prefix = ""
+        if prefix and not prefix.endswith("/"):
+            prefix += "/"
         max_results = _parse_int(request.args.get("max_results") or request.args.get("max_keys") or "200", default=200, min_value=1, max_value=2000)
         page_token = (request.args.get("page_token") or "").strip() or None
+        allowed = _allowed_gcs_buckets()
+        if allowed is not None and bucket not in allowed:
+            return jsonify({"error": f"Bucket not allowed: {bucket}. Allowed: {', '.join(sorted(allowed))}"}), 400
 
         client = _gcs_client()
         blobs_iter = client.list_blobs(bucket, prefix=prefix, max_results=max_results, page_token=page_token)
@@ -5779,10 +5808,89 @@ def list_gcs_rawvideo_objects() -> Any:
             name = getattr(blob, "name", "")
             if not name or name.endswith("/"):
                 continue
-            objects.append({"name": name, "size": int(getattr(blob, "size", 0) or 0), "updated": getattr(blob, "updated", None).isoformat() if getattr(blob, "updated", None) else None, "uri": f"gs://{bucket}/{name}"})
+            objects.append({"bucket": bucket, "name": name, "size": int(getattr(blob, "size", 0) or 0), "updated": getattr(blob, "updated", None).isoformat() if getattr(blob, "updated", None) else None, "uri": f"gs://{bucket}/{name}"})
 
         next_token = getattr(blobs_iter, "next_page_token", None)
         return jsonify({"bucket": bucket, "prefix": prefix.rstrip("/"), "objects": objects, "next_page_token": next_token})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/gcs/buckets/list", methods=["GET"])
+def list_gcs_buckets() -> Any:
+    try:
+        project_id = _gcp_project_id()
+        if not project_id:
+            return jsonify({"error": "Missing GCP_PROJECT_ID"}), 400
+
+        client = _gcs_client()
+        allowed = _allowed_gcs_buckets()
+        buckets = []
+        for bucket in client.list_buckets(project=project_id):
+            name = getattr(bucket, "name", None)
+            if not name:
+                continue
+            if allowed is not None and name not in allowed:
+                continue
+            buckets.append(
+                {
+                    "name": name,
+                    "location": getattr(bucket, "location", None),
+                    "storage_class": getattr(bucket, "storage_class", None),
+                }
+            )
+        default_bucket = None
+        try:
+            default_bucket = _gcs_bucket_name()
+        except Exception:
+            default_bucket = None
+        return jsonify({"buckets": buckets, "default_bucket": default_bucket, "allowed": sorted(allowed) if allowed is not None else None})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/gcs/objects/list", methods=["GET"])
+def list_gcs_objects() -> Any:
+    try:
+        bucket = (request.args.get("bucket") or "").strip() or _gcs_bucket_name()
+        prefix = (request.args.get("prefix") or "").strip()
+        if prefix.lower() in {"*", "all", "__all__"}:
+            prefix = ""
+        if prefix and not prefix.endswith("/"):
+            prefix += "/"
+
+        allowed = _allowed_gcs_buckets()
+        if allowed is not None and bucket not in allowed:
+            return jsonify({"error": f"Bucket not allowed: {bucket}. Allowed: {', '.join(sorted(allowed))}"}), 400
+
+        max_results = _parse_int(request.args.get("max_results") or request.args.get("max_keys") or "200", default=200, min_value=1, max_value=2000)
+        page_token = (request.args.get("page_token") or "").strip() or None
+
+        client = _gcs_client()
+        blobs_iter = client.list_blobs(bucket, prefix=prefix, delimiter="/", max_results=max_results, page_token=page_token)
+
+        objects: List[Dict[str, Any]] = []
+        for blob in blobs_iter:
+            name = getattr(blob, "name", "")
+            if not name or name.endswith("/"):
+                continue
+            objects.append(
+                {
+                    "bucket": bucket,
+                    "name": name,
+                    "size": int(getattr(blob, "size", 0) or 0),
+                    "updated": getattr(blob, "updated", None).isoformat() if getattr(blob, "updated", None) else None,
+                    "uri": f"gs://{bucket}/{name}",
+                }
+            )
+
+        prefixes = sorted(list(getattr(blobs_iter, "prefixes", []) or []))
+        next_token = getattr(blobs_iter, "next_page_token", None)
+        return jsonify({"bucket": bucket, "prefix": prefix, "prefixes": prefixes, "objects": objects, "next_page_token": next_token})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
