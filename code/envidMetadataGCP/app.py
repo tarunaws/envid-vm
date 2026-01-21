@@ -547,29 +547,39 @@ def _apply_segment_corrections(
     hindi_dictionary_enabled: bool,
     nlp_mode: str,
     punctuation_enabled: bool,
-) -> str:
+) -> tuple[str, dict[str, bool]]:
     out = (text or "").strip()
     if not out:
-        return ""
+        return "", {"nlp_applied": False, "grammar_applied": False, "hindi_applied": False, "punctuation_applied": False}
 
-    if grammar_enabled:
-        corrected, _ = _languagetool_correct_text(text=out, language=language_code)
-        if corrected:
-            out = corrected
+    meta = {"nlp_applied": False, "grammar_applied": False, "hindi_applied": False, "punctuation_applied": False}
 
     if nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
         normalized, _ = _openrouter_llama_normalize_transcript(text=out, language_code=language_code)
-        if normalized:
+        if normalized and normalized != out:
             out = normalized
+            meta["nlp_applied"] = True
+
+    if grammar_enabled:
+        corrected, _ = _languagetool_correct_text(text=out, language=language_code)
+        if corrected and corrected != out:
+            out = corrected
+            meta["grammar_applied"] = True
+
+    # Apply Hindi dictionary correction before deterministic punctuation.
+    if hindi_dictionary_enabled:
+        corrected = _hindi_dictionary_correct_text(text=out, language_code=language_code)
+        if corrected and corrected != out:
+            out = corrected
+            meta["hindi_applied"] = True
 
     if punctuation_enabled:
-        out = _enhance_transcript_punctuation(out)
+        corrected = _enhance_transcript_punctuation(out)
+        if corrected and corrected != out:
+            out = corrected
+            meta["punctuation_applied"] = True
 
-    # Final pass: enforce Hindi confusion fixes after any LLM/punctuation changes.
-    if hindi_dictionary_enabled:
-        out = _hindi_dictionary_correct_text(text=out, language_code=language_code)
-
-    return out.strip()
+    return out.strip(), meta
 
 
 def _normalize_scene_segments(*, scenes: list[dict[str, Any]], duration_seconds: float | None) -> list[dict[str, Any]]:
@@ -4657,9 +4667,9 @@ def _process_gcs_video_job_cloud_only(
 
                     # Audio preprocessing (best-effort): extract clean mono 16kHz WAV and optionally slow down tempo.
                     # This improves stability for noisy inputs and some fast-speaking clips.
-                    preprocess_enabled = _env_truthy(os.getenv("ENVID_WHISPER_AUDIO_PREPROCESS"), default=True)
+                    preprocess_enabled = True
                     tempo_raw = (os.getenv("ENVID_WHISPER_AUDIO_ATEMPO") or "").strip()
-                    tempo = _safe_float(tempo_raw, 1.0) if tempo_raw else 1.0
+                    tempo = _safe_float(tempo_raw or "0.9", 0.9)
                     filters = (os.getenv("ENVID_WHISPER_AUDIO_FILTERS") or "").strip()
                     if preprocess_enabled and not filters:
                         # Default denoise chain for speech (best-effort): band-limit + denoise + normalize.
@@ -4948,6 +4958,7 @@ def _process_gcs_video_job_cloud_only(
                     # Correction settings (applied to both transcript and segments).
                     grammar_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_GRAMMAR_CORRECTION"), default=True)
                     grammar_url = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip()
+                    grammar_local = _env_truthy(os.getenv("ENVID_GRAMMAR_CORRECTION_USE_LOCAL"), default=False)
                     hindi_dict_enabled = _env_truthy(os.getenv("ENVID_HINDI_DICTIONARY_ENABLE"), default=True)
                     nlp_mode = (os.getenv("ENVID_TRANSCRIPT_NLP_CORRECTION_MODE") or "openrouter_llama").strip().lower() or "openrouter_llama"
                     punctuation_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_PUNCTUATION_ENHANCE"), default=True)
@@ -4955,7 +4966,7 @@ def _process_gcs_video_job_cloud_only(
                     # Apply full correction pipeline to the full transcript (for metadata/visibility).
                     if transcript:
                         before = transcript
-                        transcript = _apply_segment_corrections(
+                        transcript, corr_meta = _apply_segment_corrections(
                             text=transcript,
                             language_code=(whisper_language or transcript_language_code or "hi"),
                             grammar_enabled=bool(grammar_enabled),
@@ -4965,20 +4976,21 @@ def _process_gcs_video_job_cloud_only(
                         )
                         transcript_meta["grammar_correction"] = {
                             "enabled": True,
-                            "available": bool(grammar_url),
-                            "applied": bool(before and transcript and transcript != before),
+                            "available": bool(grammar_url) or (bool(grammar_local) and language_tool_python is not None),
+                            "applied": bool(corr_meta.get("grammar_applied")),
                         }
                         transcript_meta["hindi_dictionary_correction"] = {
                             "enabled": bool(hindi_dict_enabled),
-                            "applied": bool(before and transcript and transcript != before),
+                            "applied": bool(corr_meta.get("hindi_applied")),
                         }
                         transcript_meta["nlp_correction"] = {
                             "enabled": nlp_mode in {"openrouter_llama", "llama", "openrouter"},
                             "mode": nlp_mode,
+                            "applied": bool(corr_meta.get("nlp_applied")),
                         }
                         transcript_meta["punctuation_enhance"] = {
                             "enabled": bool(punctuation_enabled),
-                            "applied": bool(before and transcript and transcript != before),
+                            "applied": bool(corr_meta.get("punctuation_applied")),
                         }
 
                     # Keep time-band segments consistent with corrected transcript.
@@ -5000,7 +5012,7 @@ def _process_gcs_video_job_cloud_only(
                             seg_nlp_mode = nlp_mode if segment_mode in {"full", "nlp"} else ""
                             seg_punct = punctuation_enabled or segment_mode in {"full", "nlp", "punctuation"}
 
-                            corrected_txt = _apply_segment_corrections(
+                            corrected_txt, _seg_meta = _apply_segment_corrections(
                                 text=txt,
                                 language_code=(transcript_language_code or whisper_language or "hi"),
                                 grammar_enabled=bool(seg_grammar),
@@ -5074,7 +5086,7 @@ def _process_gcs_video_job_cloud_only(
                         if require_correction:
                             applied_flags = [
                                 transcript_meta.get("grammar_correction", {}).get("applied"),
-                                transcript_meta.get("nlp_correction", {}).get("enabled"),
+                                transcript_meta.get("nlp_correction", {}).get("applied"),
                                 transcript_meta.get("punctuation_enhance", {}).get("applied"),
                                 transcript_meta.get("hindi_dictionary_correction", {}).get("applied"),
                             ]
