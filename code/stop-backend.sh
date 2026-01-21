@@ -96,7 +96,7 @@ stop_service() {
     fi
     rm -f "$pid_file"
   else
-    echo "⚠️  No $service_name PID file found"
+    :
   fi
 }
 
