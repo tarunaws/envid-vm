@@ -805,6 +805,163 @@ def _openrouter_llama_generate_synopses(*, text: str, language_code: str | None)
         return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
 
 
+def _openrouter_llama_scene_summaries(
+    *,
+    scenes: list[dict[str, Any]],
+    transcript_segments: list[dict[str, Any]],
+    labels_src: list[dict[str, Any]] | None,
+    language_code: str | None,
+) -> tuple[dict[int, str] | None, dict[str, Any]]:
+    """Generate scene-by-scene summaries using OpenRouter (Meta Llama).
+
+    Returns (scene_index_to_summary_or_none, meta).
+    """
+
+    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+    if not api_key:
+        return None, {"available": False}
+
+    if not scenes:
+        return None, {"available": True, "applied": False}
+
+    base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
+    model = (
+        os.getenv("OPENROUTER_SCENE_MODEL")
+        or os.getenv("OPENROUTER_SYNOPSIS_MODEL")
+        or os.getenv("OPENROUTER_MODEL")
+        or "meta-llama/llama-3.3-70b-instruct:free"
+    ).strip()
+    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 25.0)
+
+    max_scenes = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_SCENES"), default=30, min_value=1, max_value=200)
+    max_chars = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_CHARS_PER_SCENE"), default=600, min_value=120, max_value=4000)
+
+    lang = (language_code or "").strip() or "unknown"
+
+    def _scene_context_text(sc: dict[str, Any]) -> tuple[int, str]:
+        try:
+            st = float(sc.get("start") or sc.get("start_seconds") or 0.0)
+            en = float(sc.get("end") or sc.get("end_seconds") or st)
+        except Exception:
+            st, en = 0.0, 0.0
+        if en < st:
+            st, en = en, st
+
+        idx = int(sc.get("index") or 0)
+        segs: list[str] = []
+        for seg in transcript_segments:
+            if not isinstance(seg, dict):
+                continue
+            ss = _safe_float(seg.get("start"), 0.0)
+            se = _safe_float(seg.get("end"), ss)
+            if se <= ss:
+                continue
+            if _overlap_seconds(ss, se, st, en) <= 0:
+                continue
+            text = str(seg.get("text") or "").strip()
+            if text:
+                segs.append(text)
+
+        label_names: list[str] = []
+        if labels_src:
+            for lab in labels_src:
+                if not isinstance(lab, dict):
+                    continue
+                if _count_overlapping_segments([lab], st, en) <= 0:
+                    continue
+                name = str(lab.get("name") or lab.get("label") or "").strip()
+                if name:
+                    label_names.append(name)
+        label_names = list(dict.fromkeys(label_names))
+
+        transcript_text = " ".join(segs).strip()
+        if len(transcript_text) > max_chars:
+            transcript_text = transcript_text[:max_chars].rsplit(" ", 1)[0].strip()
+
+        labels_text = ", ".join(label_names[:20])
+        if labels_text:
+            context = f"Transcript: {transcript_text}\nLabels: {labels_text}".strip()
+        else:
+            context = f"Transcript: {transcript_text}".strip()
+        return idx, context
+
+    scene_inputs: list[dict[str, Any]] = []
+    for sc in scenes[:max_scenes]:
+        if not isinstance(sc, dict):
+            continue
+        idx, context = _scene_context_text(sc)
+        if not context.replace("Transcript:", "").strip() and "Labels:" not in context:
+            continue
+        scene_inputs.append({"index": idx, "context": context})
+
+    if not scene_inputs:
+        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
+
+    prompt = (
+        "You are a scene-by-scene summarizer.\n"
+        "Summarize each scene in 1-2 short sentences.\n"
+        "Use ONLY the provided scene context.\n"
+        "Return STRICT JSON only: {\"scenes\": [{\"index\": <int>, \"summary\": <string>}]}\n"
+        "Do not add any extra keys or commentary.\n"
+        "Write in the SAME LANGUAGE as the transcript. Do NOT translate.\n\n"
+        f"Language hint: {lang}\n\n"
+        f"Scenes:\n{json.dumps(scene_inputs, ensure_ascii=False)[:20000]}\n"
+    )
+
+    headers: Dict[str, str] = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
+    x_title = (os.getenv("OPENROUTER_X_TITLE") or "").strip()
+    if http_referer:
+        headers["HTTP-Referer"] = http_referer
+    if x_title:
+        headers["X-Title"] = x_title
+
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "Return only JSON."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+        "max_tokens": 1400,
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base_url}/chat/completions",
+        data=data,
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=float(timeout_s)) as r:
+            resp = json.loads(r.read().decode("utf-8"))
+        content = (((resp.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+        m = re.search(r"\{.*\}", content, flags=re.DOTALL)
+        payload_json = json.loads(m.group(0) if m else content)
+        scene_items = payload_json.get("scenes") if isinstance(payload_json, dict) else None
+        if isinstance(scene_items, list):
+            out: dict[int, str] = {}
+            for item in scene_items:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    idx = int(item.get("index"))
+                except Exception:
+                    continue
+                summary = str(item.get("summary") or "").strip()
+                if summary:
+                    out[idx] = summary
+            if out:
+                return out, {"available": True, "applied": True, "provider": "openrouter", "model": model}
+        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
+    except Exception:
+        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
+
+
 def _synopsis_is_reasonable(text: str, language_code: str | None, *, min_words: int, max_words: int) -> bool:
     raw = str(text or "").strip()
     if not raw:
@@ -1918,7 +2075,13 @@ def _build_categorized_metadata_json(video: dict[str, Any]) -> dict[str, Any]:
                     item["transcript_segments"] = segs
                     txt = " ".join([str(s.get("text") or "").strip() for s in segs if str(s.get("text") or "").strip()]).strip()
                     if txt:
+                        item["summary_text_transcript"] = txt[:320]
                         item["summary_text"] = txt[:320]
+
+            llm_summary = str(sc.get("summary_llm") or sc.get("summary_text_llm") or "").strip()
+            if llm_summary:
+                item["summary_text_llm"] = llm_summary
+                item["summary_text"] = llm_summary
 
             # Attach overlapping labels for scene context.
             if labels_src:
@@ -5293,6 +5456,43 @@ def _process_gcs_video_job_cloud_only(
                 if fallback:
                     scenes = fallback
                     scenes_source = "fallback_uniform"
+
+            # Optional: OpenRouter (Meta Llama) scene-by-scene summaries.
+            scene_llm_mode = (requested_models.get("scene_by_scene_metadata_model") or "").strip().lower()
+            use_scene_llm = scene_llm_mode in {"openrouter_llama", "openrouter", "llama"} or _env_truthy(
+                os.getenv("ENVID_SCENE_BY_SCENE_LLM"),
+                default=False,
+            )
+            if enable_scene_by_scene and use_scene_llm and scenes:
+                try:
+                    labels_src = None
+                    if isinstance(video_intelligence, dict):
+                        labels_src = video_intelligence.get("labels")
+                        if not isinstance(labels_src, list):
+                            labels_src = None
+                    summaries, meta = _openrouter_llama_scene_summaries(
+                        scenes=scenes,
+                        transcript_segments=transcript_segments,
+                        labels_src=labels_src,
+                        language_code=transcript_language_code or "",
+                    )
+                    if summaries:
+                        for sc in scenes:
+                            if not isinstance(sc, dict):
+                                continue
+                            try:
+                                idx = int(sc.get("index") or 0)
+                            except Exception:
+                                continue
+                            summary = summaries.get(idx)
+                            if summary:
+                                sc["summary_llm"] = summary
+                    if meta.get("applied"):
+                        effective_models["scene_by_scene_metadata"] = meta.get("model") or "openrouter"
+                    else:
+                        effective_models["scene_by_scene_metadata"] = "openrouter_unavailable"
+                except Exception as exc:
+                    app.logger.warning("Scene-by-scene LLM summary failed: %s", exc)
 
             if scenes:
                 ranking_error: str | None = None
