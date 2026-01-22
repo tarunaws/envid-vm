@@ -57,6 +57,14 @@ if [ -f "$ENV_LOCAL_FILE" ]; then
   set +a
 fi
 
+# Fixup GCP credentials path when env points to a non-existent local path.
+if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+  if [ -f "$HOME/gcpAccess/gcp.json" ]; then
+    echo "ℹ️  Overriding GOOGLE_APPLICATION_CREDENTIALS to $HOME/gcpAccess/gcp.json"
+    export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcpAccess/gcp.json"
+  fi
+fi
+
 # Derive default local-service URLs for the backend/UI.
 # These must be set even when using default ports, because the backend expects the URL env vars.
 export ENVID_LOCAL_MODERATION_PORT="${ENVID_LOCAL_MODERATION_PORT:-5081}"
