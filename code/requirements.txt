@@ -34,3 +34,33 @@ ultralytics>=8.3
 # Optional: Local scene segmentation (PySceneDetect CLI)
 # Used by: key scene combo `pyscenedetect_clip_cluster`
 scenedetect>=0.6
+
+# Optional: Offline/local models (used directly by envidMetadataGCP)
+# OpenAI Whisper (speech-to-text)
+openai-whisper>=20231117
+torch>=2.2.0
+torchaudio>=2.2.0
+torchvision>=0.17.0
+
+# CLIP (key-scene clustering)
+open-clip-torch>=2.24.0
+
+# PaddleOCR / Tesseract (OCR)
+paddleocr>=2.7.3
+pytesseract>=0.3.10
+
+# NudeNet (moderation)
+nudenet>=3.0.8
+
+# YOLOv8 (local label detection)
+ultralytics>=8.3
+
+# Detectron2/MMDetection (local label detection sidecar)
+# NOTE: These are usually installed in the localLabelDetection service env/container.
+detectron2>=0.6
+mmcv>=2.1.0
+mmengine>=0.10.0
+mmdet>=3.3.0
+
+# OpenRouter Llama (text/scene NLP correction)
+# NOTE: Uses HTTP API via requests; no dedicated Python package required.

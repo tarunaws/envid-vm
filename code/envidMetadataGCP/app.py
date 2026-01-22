@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 import zipfile
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from math import exp
 from datetime import datetime, timedelta
@@ -1741,6 +1741,7 @@ def _precheck_models(
     enable_moderation: bool,
     enable_text_on_screen: bool,
     enable_key_scene: bool,
+    enable_scene_by_scene: bool,
     enable_famous_locations: bool,
     requested_key_scene_model: str,
     requested_label_model: str,
@@ -1775,11 +1776,20 @@ def _precheck_models(
     # Whisper availability
     if enable_transcribe:
         _require(openai_whisper is not None, "whisper", "openai-whisper is not installed")
+        nlp_mode = (os.getenv("ENVID_TRANSCRIPT_NLP_CORRECTION_MODE") or "openrouter_llama").strip().lower() or "openrouter_llama"
+        if nlp_mode in {"openrouter_llama", "openrouter", "llama"}:
+            api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+            _require(bool(api_key), "openrouter", "OPENROUTER_API_KEY is not set (transcript correction)")
 
     # OpenRouter for synopses
     if enable_synopsis_generation:
         api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
         _require(bool(api_key), "openrouter", "OPENROUTER_API_KEY is not set")
+
+    # OpenRouter for scene-by-scene summaries
+    if enable_scene_by_scene and _env_truthy(os.getenv("ENVID_SCENE_BY_SCENE_LLM"), default=False):
+        api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+        _require(bool(api_key), "openrouter", "OPENROUTER_API_KEY is not set (scene-by-scene)")
 
     # Local label detection service
     if enable_label_detection and use_local_label_detection_service:
@@ -1789,6 +1799,15 @@ def _precheck_models(
         else:
             health = _check_service_health(f"{service_url}/health")
             _require(bool(health.get("ok")), "local_label_detection", f"local label detection unhealthy: {health.get('error') or health.get('raw')}")
+    if enable_label_detection and requested_label_model in {"yolo_ultralytics", "yolo", "yolov8", "yolov11"}:
+        _require(UltralyticsYOLO is not None, "yolo", "ultralytics is not installed")
+        yolo_model = (os.getenv("ENVID_METADATA_YOLO_MODEL") or "yolov8n.pt").strip() or "yolov8n.pt"
+        yolo_path = Path(yolo_model)
+        if not yolo_path.exists():
+            candidate = _repo_root() / yolo_model
+            if candidate.exists():
+                yolo_path = candidate
+        _require(yolo_path.exists(), "yolo", f"YOLO model not found: {yolo_model}")
 
     # Local moderation service
     if enable_moderation and use_local_moderation:
@@ -1796,7 +1815,10 @@ def _precheck_models(
         service_url_nsfwjs = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL") or "").strip()
         service_url = (local_moderation_url_override or (service_url_nsfwjs if requested_moderation_model == "nsfwjs" else "") or service_url_default).strip()
         if not service_url:
-            _require(False, "local_moderation", "ENVID_METADATA_LOCAL_MODERATION_URL is not set")
+            if requested_moderation_model == "nudenet":
+                _require(NudeClassifier is not None, "nudenet", f"nudenet is not installed: {_NUDENET_IMPORT_ERROR or 'missing dependency'}")
+            else:
+                _require(False, "local_moderation", "ENVID_METADATA_LOCAL_MODERATION_URL is not set")
         else:
             health = _check_service_health(f"{service_url.rstrip('/')}/health")
             _require(bool(health.get("ok")), "local_moderation", f"local moderation unhealthy: {health.get('error') or health.get('raw')}")
@@ -1807,8 +1829,15 @@ def _precheck_models(
     if enable_text_on_screen and use_local_ocr:
         if requested_text_model == "paddleocr":
             _require(PaddleOCR is not None, "paddleocr", "paddleocr is not installed")
+            if PaddleOCR is not None:
+                try:
+                    import paddle  # type: ignore
+                    _require(True, "paddlepaddle", "paddlepaddle available")
+                except Exception as exc:
+                    _require(False, "paddlepaddle", f"paddlepaddle is not installed: {exc}")
         elif requested_text_model == "tesseract":
             _require(pytesseract is not None, "tesseract", "pytesseract is not installed")
+            _require(bool(shutil.which("tesseract")), "tesseract", "tesseract binary is not available in PATH")
     if enable_text_on_screen and (not use_local_ocr) and want_any_vi:
         _require(gcp_video_intelligence is not None, "gcp_video_intelligence", "google-cloud-videointelligence is not installed")
 
@@ -1816,23 +1845,17 @@ def _precheck_models(
     if enable_key_scene and requested_key_scene_model in {"transnetv2_clip_cluster", "pyscenedetect_clip_cluster", "clip_cluster"}:
         base = (os.getenv("ENVID_METADATA_LOCAL_KEYSCENE_URL") or "").strip().rstrip("/")
         if not base:
-            if requested_key_scene_model == "transnetv2_clip_cluster":
-                _require(False, "keyscene_sidecar", "ENVID_METADATA_LOCAL_KEYSCENE_URL is not set (required for transnetv2)")
-            else:
-                _warn(False, "keyscene_sidecar", "ENVID_METADATA_LOCAL_KEYSCENE_URL is not set; CLIP clustering will be disabled")
+            _require(False, "keyscene_sidecar", "ENVID_METADATA_LOCAL_KEYSCENE_URL is not set")
         else:
             health = _check_service_health(f"{base}/health")
             if not health.get("ok"):
-                if requested_key_scene_model == "transnetv2_clip_cluster":
-                    _require(False, "keyscene_sidecar", f"key scene sidecar unhealthy: {health.get('error') or health.get('raw')}")
-                else:
-                    _warn(False, "keyscene_sidecar", f"CLIP clustering unavailable: {health.get('error') or health.get('raw')}")
+                _require(False, "keyscene_sidecar", f"key scene sidecar unhealthy: {health.get('error') or health.get('raw')}")
             else:
                 # If CLIP is degraded, only warn (optional clustering)
                 raw = health.get("raw") if isinstance(health.get("raw"), dict) else {}
                 clip_ok = bool(((raw or {}).get("details") or {}).get("clip", {}).get("ok")) if isinstance(raw, dict) else True
                 if not clip_ok:
-                    _warn(False, "clip_model", "CLIP model unavailable; clustering will be disabled")
+                    _require(False, "clip_model", "CLIP model unavailable")
 
     # LibreTranslate availability (when translation is enabled)
     enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
@@ -4131,6 +4154,7 @@ def _process_gcs_video_job_cloud_only(
             enable_moderation=enable_moderation,
             enable_text_on_screen=enable_text_on_screen,
             enable_key_scene=enable_key_scene,
+            enable_scene_by_scene=enable_scene_by_scene,
             enable_famous_locations=enable_famous_locations,
             requested_key_scene_model=requested_key_scene_model,
             requested_label_model=requested_label_model,
@@ -4290,6 +4314,14 @@ def _process_gcs_video_job_cloud_only(
         local_moderation_started = False
         whisper_started = False
         scenes_started = False
+        sequential_scene_then_whisper = _env_truthy(
+            os.getenv("ENVID_METADATA_SEQUENTIAL_SCENE_BEFORE_WHISPER"),
+            default=False,
+        )
+        run_all_sequential = _env_truthy(
+            os.getenv("ENVID_METADATA_RUN_ALL_SEQUENTIAL"),
+            default=False,
+        )
 
         def _ensure_parallel_executor() -> ThreadPoolExecutor:
             nonlocal parallel_executor
@@ -4390,8 +4422,10 @@ def _process_gcs_video_job_cloud_only(
         def _run_whisper_transcription() -> None:
             nonlocal transcript, transcript_language_code, languages_detected, transcript_words, transcript_segments, transcript_meta, effective_models
             if openai_whisper is None:
+                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Whisper not installed")
                 return
             try:
+                app.logger.info("Whisper transcription started")
                 _job_update(job_id, progress=32, message="Whisper")
                 whisper_size = "large-v3"
                 _job_step_update(job_id, "transcribe", status="running", percent=5, message=f"Running (OpenAI Whisper/{whisper_size})")
@@ -4867,12 +4901,14 @@ def _process_gcs_video_job_cloud_only(
 
                 effective_models["transcribe"] = f"openai_whisper/{whisper_size}"
                 _job_step_update(job_id, "transcribe", status="completed", percent=100, message=f"Completed (OpenAI Whisper/{whisper_size})")
+                app.logger.info("Whisper transcription completed")
             except TranscriptVerificationError as exc:
                 app.logger.warning("Transcript verification failed: %s", exc)
                 _job_step_update(job_id, "transcribe", status="failed", message=str(exc)[:240])
                 raise
             except Exception as exc:
                 app.logger.warning("Whisper failed: %s", exc)
+                _job_step_update(job_id, "transcribe", status="failed", percent=100, message=str(exc)[:240])
                 # Fall through to the GCP path below.
                 transcript = ""
                 transcript_language_code = ""
@@ -4882,40 +4918,71 @@ def _process_gcs_video_job_cloud_only(
 
         def _run_scene_detect_task() -> None:
             nonlocal precomputed_scenes, precomputed_scenes_source
-            if enable_key_scene:
-                _job_step_update(job_id, "key_scene_detection", status="running", percent=5, message="Running (scene detection)")
-            if use_transnetv2_for_scenes:
-                try:
-                    precomputed_scenes = _transnetv2_list_scenes(video_path=local_path, temp_dir=temp_dir)
-                    precomputed_scenes_source = "transnetv2"
-                except Exception as exc:
-                    app.logger.warning("TransNetV2 failed: %s", exc)
-                    precomputed_scenes = []
-                    precomputed_scenes_source = "transnetv2_failed"
-            if (not precomputed_scenes) and use_pyscenedetect_for_scenes:
-                try:
-                    precomputed_scenes = _pyscenedetect_list_scenes(video_path=local_path, temp_dir=temp_dir)
-                    precomputed_scenes_source = "pyscenedetect"
-                except Exception as exc:
-                    app.logger.warning("PySceneDetect failed: %s", exc)
-                    precomputed_scenes = []
-                    precomputed_scenes_source = "pyscenedetect_failed"
+            try:
+                if enable_key_scene:
+                    _job_step_update(job_id, "key_scene_detection", status="running", percent=5, message="Running (scene detection)")
+                app.logger.info("Scene detection started")
+                if use_transnetv2_for_scenes:
+                    try:
+                        precomputed_scenes = _transnetv2_list_scenes(video_path=local_path, temp_dir=temp_dir)
+                        precomputed_scenes_source = "transnetv2"
+                    except Exception as exc:
+                        app.logger.warning("TransNetV2 failed: %s", exc)
+                        precomputed_scenes = []
+                        precomputed_scenes_source = "transnetv2_failed"
+                if (not precomputed_scenes) and use_pyscenedetect_for_scenes:
+                    try:
+                        precomputed_scenes = _pyscenedetect_list_scenes(video_path=local_path, temp_dir=temp_dir)
+                        precomputed_scenes_source = "pyscenedetect"
+                    except Exception as exc:
+                        app.logger.warning("PySceneDetect failed: %s", exc)
+                        precomputed_scenes = []
+                        precomputed_scenes_source = "pyscenedetect_failed"
+                if enable_key_scene:
+                    scene_count = len(precomputed_scenes or [])
+                    source = precomputed_scenes_source or "unknown"
+                    _job_step_update(
+                        job_id,
+                        "key_scene_detection",
+                        status="completed",
+                        percent=100,
+                        message=f"Completed ({scene_count} scenes; {source})",
+                    )
+                app.logger.info("Scene detection completed")
+            except Exception as exc:
+                app.logger.warning("Scene detection failed: %s", exc)
+                if enable_key_scene:
+                    _job_step_update(job_id, "key_scene_detection", status="failed", percent=100, message=str(exc)[:240])
 
         if enable_text_on_screen and use_local_ocr:
             local_ocr_started = True
-            parallel_futures["local_ocr"] = _ensure_parallel_executor().submit(_run_local_ocr_task)
+            if run_all_sequential:
+                _run_local_ocr_task()
+            else:
+                parallel_futures["local_ocr"] = _ensure_parallel_executor().submit(_run_local_ocr_task)
 
         if enable_moderation and use_local_moderation:
             local_moderation_started = True
-            parallel_futures["local_moderation"] = _ensure_parallel_executor().submit(_run_local_moderation_task)
-
-        if enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is not None:
-            whisper_started = True
-            parallel_futures["whisper"] = _ensure_parallel_executor().submit(_run_whisper_transcription)
+            if run_all_sequential:
+                _run_local_moderation_task()
+            else:
+                parallel_futures["local_moderation"] = _ensure_parallel_executor().submit(_run_local_moderation_task)
 
         if (enable_scene_by_scene or enable_key_scene or enable_high_point) and (use_transnetv2_for_scenes or use_pyscenedetect_for_scenes):
             scenes_started = True
-            parallel_futures["scene_detect"] = _ensure_parallel_executor().submit(_run_scene_detect_task)
+            if run_all_sequential or sequential_scene_then_whisper:
+                _run_scene_detect_task()
+            else:
+                parallel_futures["scene_detect"] = _ensure_parallel_executor().submit(_run_scene_detect_task)
+
+        if enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is None:
+            _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Whisper not installed")
+        elif enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is not None:
+            whisper_started = True
+            if run_all_sequential or sequential_scene_then_whisper:
+                _run_whisper_transcription()
+            else:
+                parallel_futures["whisper"] = _ensure_parallel_executor().submit(_run_whisper_transcription)
 
         if enable_vi and gcp_video_intelligence is not None and want_any_vi:
             try:
@@ -5265,9 +5332,27 @@ def _process_gcs_video_job_cloud_only(
                     _job_step_update(job_id, step, status="skipped", percent=100, message="Disabled")
 
         if parallel_executor is not None:
+            whisper_timeout = float(os.getenv("ENVID_METADATA_WHISPER_TIMEOUT_SECONDS") or 5400.0)
+            scene_timeout = float(os.getenv("ENVID_METADATA_SCENE_DETECT_TIMEOUT_SECONDS") or 1200.0)
+            default_timeout = float(os.getenv("ENVID_METADATA_PARALLEL_TASK_TIMEOUT_SECONDS") or 1200.0)
             for name, fut in list(parallel_futures.items()):
+                timeout = default_timeout
+                if name == "whisper":
+                    timeout = whisper_timeout
+                elif name == "scene_detect":
+                    timeout = scene_timeout
                 try:
-                    fut.result()
+                    fut.result(timeout=timeout if timeout and timeout > 0 else None)
+                except FutureTimeoutError:
+                    app.logger.warning("Parallel task %s timed out", name)
+                    if name == "whisper":
+                        _job_step_update(job_id, "transcribe", status="failed", percent=100, message="Whisper timed out")
+                    elif name == "scene_detect":
+                        _job_step_update(job_id, "key_scene_detection", status="failed", percent=100, message="Scene detect timed out")
+                    elif name == "local_ocr":
+                        _job_step_update(job_id, "text_on_screen", status="failed", percent=100, message="OCR timed out")
+                    elif name == "local_moderation":
+                        _job_step_update(job_id, "moderation", status="failed", percent=100, message="Moderation timed out")
                 except TranscriptVerificationError:
                     raise
                 except Exception as exc:
