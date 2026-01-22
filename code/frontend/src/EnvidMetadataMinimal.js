@@ -1072,6 +1072,8 @@ export default function EnvidMetadataMinimal() {
     celebrity_bio_image_model: 'auto',
   }));
 
+  const [targetTranslateLanguage, setTargetTranslateLanguage] = useState('');
+
   const taskSelectionPayload = useMemo(() => {
     const sel = taskSelection || {};
     return {
@@ -1120,7 +1122,6 @@ export default function EnvidMetadataMinimal() {
   const [translateLanguageOptions, setTranslateLanguageOptions] = useState([]);
   const [translateLanguagesLoading, setTranslateLanguagesLoading] = useState(false);
   const [translateLanguagesError, setTranslateLanguagesError] = useState('');
-  const [targetTranslateLanguage, setTargetTranslateLanguage] = useState('');
 
   const [gcsRawVideoObject, setGcsRawVideoObject] = useState('');
   const [gcsRawVideoLoading, setGcsRawVideoLoading] = useState(false);
