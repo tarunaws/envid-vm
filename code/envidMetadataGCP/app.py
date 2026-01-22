@@ -5946,17 +5946,13 @@ def _process_gcs_video_job_cloud_only(
                 _job_step_update(job_id, "key_scene_detection", status="skipped", percent=100, message="Disabled")
 
         opening_closing: Dict[str, Any] | None = None
-        effective_models["opening_closing_credit_detection"] = "disabled"
+        effective_models["opening_closing_credit_detection"] = "not_implemented"
         _job_step_update(
             job_id,
             "opening_closing_credit_detection",
             status="skipped",
             percent=100,
-            message=(
-                f"Not implemented (requested: {requested_models.get('opening_closing_credit_detection_model')})"
-                if enable_opening_closing
-                else "Disabled"
-            ),
+            message="Not implemented",
         )
 
         metadata_text = " ".join([p for p in [video_title, video_description, transcript] if (p or "").strip()])
