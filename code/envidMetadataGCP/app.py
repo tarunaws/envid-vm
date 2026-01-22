@@ -4382,7 +4382,7 @@ def _process_gcs_video_job_cloud_only(
             try:
                 _job_update(job_id, progress=32, message="Whisper")
                 whisper_size = "large-v3"
-                _job_step_update(job_id, "transcribe", status="running", percent=0, message=f"Running (OpenAI Whisper/{whisper_size})")
+                _job_step_update(job_id, "transcribe", status="running", percent=5, message=f"Running (OpenAI Whisper/{whisper_size})")
 
                 model = openai_whisper.load_model(whisper_size)
 
@@ -4565,11 +4565,21 @@ def _process_gcs_video_job_cloud_only(
                         if len(starts) > 200:
                             break
 
+                    total_chunks = max(1, len(starts))
+
                     last_end = 0.0
                     for i, st0 in enumerate(starts):
                         out_chunk = temp_dir / f"whisper_chunk_{i:03d}.wav"
                         _extract_wav_chunk(src=audio_for_whisper, out=out_chunk, start_s=st0, dur_s=float(chunk_seconds))
                         r = _whisper_transcribe_compat(out_chunk)
+                        pct = 5 + int(((i + 1) / total_chunks) * 80)
+                        _job_step_update(
+                            job_id,
+                            "transcribe",
+                            status="running",
+                            percent=min(85, max(5, pct)),
+                            message=f"Running (OpenAI Whisper/{whisper_size}) {i + 1}/{total_chunks}",
+                        )
                         if not detected_language:
                             detected_language = str(r.get("language") or "").strip()
 
@@ -4620,6 +4630,13 @@ def _process_gcs_video_job_cloud_only(
                     languages_detected = [detected_language] if detected_language else []
                 else:
                     result = _whisper_transcribe_compat(Path(audio_for_whisper))
+                    _job_step_update(
+                        job_id,
+                        "transcribe",
+                        status="running",
+                        percent=70,
+                        message=f"Running (OpenAI Whisper/{whisper_size}) post-processing",
+                    )
 
                     transcript = str(result.get("text") or "").strip()
                     transcript_language_code = str(result.get("language") or "").strip()
@@ -4854,7 +4871,7 @@ def _process_gcs_video_job_cloud_only(
         def _run_scene_detect_task() -> None:
             nonlocal precomputed_scenes, precomputed_scenes_source
             if enable_key_scene:
-                _job_step_update(job_id, "key_scene_detection", status="running", percent=0, message="Running (scene detection)")
+                _job_step_update(job_id, "key_scene_detection", status="running", percent=5, message="Running (scene detection)")
             if use_transnetv2_for_scenes:
                 try:
                     precomputed_scenes = _transnetv2_list_scenes(video_path=local_path, temp_dir=temp_dir)
@@ -5828,6 +5845,8 @@ def _process_gcs_video_job_cloud_only(
             if scenes:
                 ranking_error: str | None = None
                 if enable_key_scene or enable_high_point:
+                    if not key_scene_step_finalized and enable_key_scene:
+                        _job_step_update(job_id, "key_scene_detection", status="running", percent=60, message="Ranking key scenes")
                     try:
                         top_k = _parse_int(os.getenv("ENVID_METADATA_KEY_SCENE_TOP_K"), default=10, min_value=1, max_value=50)
                     except Exception:
