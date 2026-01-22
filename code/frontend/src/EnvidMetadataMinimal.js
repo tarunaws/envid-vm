@@ -1108,12 +1108,19 @@ export default function EnvidMetadataMinimal() {
 
       enable_celebrity_bio_image: Boolean(sel.enable_celebrity_bio_image),
       celebrity_bio_image_model: String(sel.celebrity_bio_image_model || '').trim() || 'auto',
+
+      translate_targets: targetTranslateLanguage ? [targetTranslateLanguage] : [],
     };
-  }, [taskSelection]);
+  }, [taskSelection, targetTranslateLanguage]);
 
   const [videoSource, setVideoSource] = useState('gcs'); // 'local' | 'gcs'
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const [translateLanguageOptions, setTranslateLanguageOptions] = useState([]);
+  const [translateLanguagesLoading, setTranslateLanguagesLoading] = useState(false);
+  const [translateLanguagesError, setTranslateLanguagesError] = useState('');
+  const [targetTranslateLanguage, setTargetTranslateLanguage] = useState('');
 
   const [gcsRawVideoObject, setGcsRawVideoObject] = useState('');
   const [gcsRawVideoLoading, setGcsRawVideoLoading] = useState(false);
@@ -1221,6 +1228,39 @@ export default function EnvidMetadataMinimal() {
 
   useEffect(() => {
     return () => stopPolling();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLanguages = async () => {
+      setTranslateLanguagesLoading(true);
+      setTranslateLanguagesError('');
+      try {
+        const resp = await axios.get(`${BACKEND_URL}/translate/languages`);
+        if (cancelled) return;
+        const langs = Array.isArray(resp.data?.languages) ? resp.data.languages : [];
+        const normalized = langs
+          .map((lang) => {
+            const code = String(lang?.code || '').trim();
+            const name = String(lang?.name || '').trim();
+            if (!code) return null;
+            return { code, name: name || code };
+          })
+          .filter(Boolean);
+        setTranslateLanguageOptions(normalized);
+      } catch (e) {
+        if (!cancelled) {
+          setTranslateLanguagesError('Failed to load LibreTranslate languages.');
+          setTranslateLanguageOptions([]);
+        }
+      } finally {
+        if (!cancelled) setTranslateLanguagesLoading(false);
+      }
+    };
+    loadLanguages();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1629,6 +1669,11 @@ export default function EnvidMetadataMinimal() {
   const handleUpload = async () => {
     setMessage(null);
 
+    if (!targetTranslateLanguage) {
+      setMessage({ type: 'error', text: 'Select a target translation language before analyzing.' });
+      return;
+    }
+
     let handedOffToPoller = false;
 
     if (videoSource === 'gcs') {
@@ -1768,6 +1813,32 @@ export default function EnvidMetadataMinimal() {
     videoSource === 'local' ? Boolean(selectedFile) : Boolean(String(gcsRawVideoObject || '').trim());
 
   const showStatusPanel = Boolean(activeJob?.jobId) || uploading || hasSelectedInput;
+
+  const subtitleLanguageLabels = useMemo(() => {
+    const map = new Map();
+    translateLanguageOptions.forEach((lang) => {
+      if (lang?.code) map.set(String(lang.code).toLowerCase(), lang.name || lang.code);
+    });
+    map.set('orig', 'Original');
+    map.set('en', 'English');
+    return map;
+  }, [translateLanguageOptions]);
+
+  const subtitleLanguages = useMemo(() => {
+    const langs = new Set();
+    langs.add('orig');
+    if (selectedMeta?.translations?.languages && Array.isArray(selectedMeta.translations.languages)) {
+      selectedMeta.translations.languages.forEach((lang) => {
+        if (lang) langs.add(String(lang).toLowerCase());
+      });
+    }
+    if (selectedMeta?.language_code) {
+      const lc = String(selectedMeta.language_code || '').toLowerCase();
+      if (lc) langs.add(lc);
+    }
+    langs.add('en');
+    return Array.from(langs);
+  }, [selectedMeta]);
 
   const serverUploadStatus = (() => {
     if (videoSource !== 'local') return null;
@@ -2158,6 +2229,37 @@ export default function EnvidMetadataMinimal() {
               }}
             >
               <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Task Selection</div>
+
+              <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, color: '#e6e8f2' }}>Target translation language</div>
+                <select
+                  value={targetTranslateLanguage}
+                  onChange={(e) => setTargetTranslateLanguage(e.target.value)}
+                  disabled={uploading || translateLanguagesLoading}
+                  style={{
+                    padding: '10px 12px',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: 10,
+                    fontSize: 14,
+                    width: '100%',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: '#e6e8f2',
+                  }}
+                >
+                  <option value="">Select a target language…</option>
+                  {translateLanguageOptions.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.name} ({lang.code})
+                    </option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>
+                  Original and English are included by default. Choose a target language for translation.
+                </div>
+                {translateLanguagesError ? (
+                  <div style={{ fontSize: 12, color: '#ff6b6b' }}>{translateLanguagesError}</div>
+                ) : null}
+              </div>
 
               <div style={{ display: 'grid', gap: 10 }}>
                 {[
@@ -2599,42 +2701,31 @@ export default function EnvidMetadataMinimal() {
                                 <div>
                                   <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontWeight: 900, marginBottom: 6 }}>Subtitles</div>
                                   <div style={{ display: 'grid', gap: 8 }}>
-                                    <Row style={{ gap: 10, flexWrap: 'wrap' }}>
-                                      <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>Original</div>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.srt`} target="_blank" rel="noreferrer">
-                                        Download .srt
-                                      </LinkA>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.vtt`} target="_blank" rel="noreferrer">
-                                        Download .vtt
-                                      </LinkA>
-                                    </Row>
-                                    <Row style={{ gap: 10, flexWrap: 'wrap' }}>
-                                      <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>English</div>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.en.srt`} target="_blank" rel="noreferrer">
-                                        Download .en.srt
-                                      </LinkA>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.en.vtt`} target="_blank" rel="noreferrer">
-                                        Download .en.vtt
-                                      </LinkA>
-                                    </Row>
-                                    <Row style={{ gap: 10, flexWrap: 'wrap' }}>
-                                      <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>Arabic</div>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.ar.srt`} target="_blank" rel="noreferrer">
-                                        Download .ar.srt
-                                      </LinkA>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.ar.vtt`} target="_blank" rel="noreferrer">
-                                        Download .ar.vtt
-                                      </LinkA>
-                                    </Row>
-                                    <Row style={{ gap: 10, flexWrap: 'wrap' }}>
-                                      <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>Indonesian</div>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.id.srt`} target="_blank" rel="noreferrer">
-                                        Download .id.srt
-                                      </LinkA>
-                                      <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles.id.vtt`} target="_blank" rel="noreferrer">
-                                        Download .id.vtt
-                                      </LinkA>
-                                    </Row>
+                                    {subtitleLanguages.map((lang) => {
+                                      const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
+                                      const isOrig = lang === 'orig';
+                                      const srtLabel = isOrig ? '.srt' : `.${lang}.srt`;
+                                      const vttLabel = isOrig ? '.vtt' : `.${lang}.vtt`;
+                                      return (
+                                        <Row key={lang} style={{ gap: 10, flexWrap: 'wrap' }}>
+                                          <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>{label}</div>
+                                          <LinkA
+                                            href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.srt`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            Download {srtLabel}
+                                          </LinkA>
+                                          <LinkA
+                                            href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.vtt`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            Download {vttLabel}
+                                          </LinkA>
+                                        </Row>
+                                      );
+                                    })}
                                   </div>
                                 </div>
 

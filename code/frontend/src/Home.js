@@ -126,11 +126,11 @@ export default function Home() {
       <Hero>
         <HeroInner>
           <HeroBrand>
-            <HeroLogo src="/envid.png?v=1" alt="Envid AI Studio" />
-            <HeroTagline>Envid AI Studio</HeroTagline>
+            <HeroLogo src="/envid.png?v=1" alt="Envid AI Studio - Dev" />
+            <HeroTagline>Envid AI Studio - Dev</HeroTagline>
           </HeroBrand>
           <HighlightTag>AI for media workflows</HighlightTag>
-            <Title>Build next-gen content ecosystems with Envid AI Studio</Title>
+            <Title>Build next-gen content ecosystems with Envid AI Studio - Dev</Title>
           <Subtitle>
               Adaptive subtitling, synthetic voice, intelligent editing, and semantic discovery—one workspace built for modern media pipelines.
           </Subtitle>

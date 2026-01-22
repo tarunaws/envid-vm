@@ -118,9 +118,9 @@ function App() {
           <NeonNav $scrolled={scrolled}>
             <NavInner>
               <Brand to="/">
-                <BrandLogo src="/envid.png?v=1" alt="Envid AI Studio" />
+                <BrandLogo src="/envid.png?v=1" alt="Envid AI Studio - Dev" />
                 <BrandCopy>
-                  <BrandText>Envid AI Studio</BrandText>
+                  <BrandText>Envid AI Studio - Dev</BrandText>
                   <BrandTagline>AI studio for media workflows</BrandTagline>
                 </BrandCopy>
               </Brand>

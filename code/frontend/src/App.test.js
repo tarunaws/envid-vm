@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders Envid AI Studio hero content', () => {
+test('renders Envid AI Studio - Dev hero content', () => {
   render(<App />);
   expect(
     screen.getByRole('heading', {
-      name: /Build next-gen content ecosystems with Envid AI Studio/i,
+      name: /Build next-gen content ecosystems with Envid AI Studio - Dev/i,
     }),
   ).toBeInTheDocument();
 
