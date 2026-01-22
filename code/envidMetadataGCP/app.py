@@ -131,6 +131,13 @@ except Exception:  # pragma: no cover
 
 load_environment()
 
+# Ensure GOOGLE_APPLICATION_CREDENTIALS points to an existing file.
+_gac = (os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
+if _gac and not Path(_gac).expanduser().exists():
+    fallback_gac = Path.home() / "gcpAccess" / "gcp.json"
+    if fallback_gac.exists():
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(fallback_gac)
+
 # Only Google Video Intelligence is allowed; disable other GCP services by default.
 _DISABLE_GCP_NON_VI = (os.getenv("ENVID_METADATA_ONLY_GCP_VIDEO_INTELLIGENCE") or "true").strip().lower() in {
     "1",
