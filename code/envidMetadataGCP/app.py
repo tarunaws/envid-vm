@@ -167,8 +167,6 @@ def _gcp_translate_location() -> str:
 
 
 def _translate_provider() -> str:
-    if _DISABLE_GCP_NON_VI:
-        return "disabled"
     pref = (os.getenv("ENVID_METADATA_TRANSLATE_PROVIDER") or "auto").strip().lower()
     libre_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
     has_libre = bool(libre_url)
@@ -1838,8 +1836,6 @@ def _precheck_models(
 
     # LibreTranslate availability (when translation is enabled)
     enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
-    if _DISABLE_GCP_NON_VI:
-        enable_translate = False
     translate_provider = _translate_provider()
     if enable_translate and translate_provider == "libretranslate":
         base_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
@@ -4268,12 +4264,9 @@ def _process_gcs_video_job_cloud_only(
             translate_label = "gcp_translate"
         else:
             translate_label = "disabled"
-        if _DISABLE_GCP_NON_VI:
-            effective_models["famous_location_detection"] = "disabled"
-        else:
-            effective_models["famous_location_detection"] = (
-                f"{translate_label}+gcp_language" if (translate_label != "disabled" and gcp_language is not None) else "disabled"
-            )
+        effective_models["famous_location_detection"] = (
+            f"{translate_label}+gcp_language" if (translate_label != "disabled" and gcp_language is not None) else "disabled"
+        )
         effective_models["key_scene_detection"] = requested_key_scene_model if enable_key_scene else "disabled"
 
         vi_min_label_conf = float(os.getenv("ENVID_METADATA_GCP_VI_MIN_LABEL_CONFIDENCE") or 0.0)
@@ -5580,9 +5573,6 @@ def _process_gcs_video_job_cloud_only(
         en_segments: List[Dict[str, Any]] = []
         enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
         translate_provider = _translate_provider()
-        if _DISABLE_GCP_NON_VI:
-            enable_translate = False
-            translate_provider = "disabled"
         has_text_to_translate = bool(transcript_segments) or bool((transcript or "").strip())
         requested_targets = _translate_targets_from_selection(sel)
         translate_targets = requested_targets or _translate_targets()
@@ -5657,8 +5647,7 @@ def _process_gcs_video_job_cloud_only(
             translations_meta["enabled"] = False
             _job_step_update(job_id, "translate_output", status="skipped", percent=100, message="No text to translate")
         else:
-            msg = "Disabled (Video Intelligence only)" if _DISABLE_GCP_NON_VI else "Disabled"
-            _job_step_update(job_id, "translate_output", status="skipped", percent=100, message=msg)
+            _job_step_update(job_id, "translate_output", status="skipped", percent=100, message="Disabled")
 
         source_lang = (transcript_language_code or "").strip().lower()
         if transcript_segments:
@@ -6861,8 +6850,6 @@ def subtitles_any(video_id: str, lang: str, fmt: str) -> Any:
 
 @app.get("/translate/languages")
 def translate_languages() -> Any:
-    if _DISABLE_GCP_NON_VI:
-        return jsonify({"ok": False, "languages": [], "error": "Translation disabled (Video Intelligence only)"}), 200
     base_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
     if not base_url:
         return jsonify({"ok": False, "languages": [], "error": "LibreTranslate URL is not configured"}), 200
