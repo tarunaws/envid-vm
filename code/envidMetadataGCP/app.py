@@ -1621,8 +1621,8 @@ def _hindi_dictionary_correct_text(*, text: str, language_code: str | None) -> s
 
 def _job_steps_default() -> List[Dict[str, Any]]:
     return [
-        {"id": "upload_to_cloud_storage", "label": "Upload to cloud storage", "status": "not_started", "percent": 0, "message": None},
         {"id": "precheck_models", "label": "Precheck models", "status": "not_started", "percent": 0, "message": None},
+        {"id": "upload_to_cloud_storage", "label": "Upload to cloud storage", "status": "not_started", "percent": 0, "message": None},
         {"id": "technical_metadata", "label": "Technical Metadata", "status": "not_started", "percent": 0, "message": None},
         {"id": "transcode_normalize", "label": "Transcode to Normalize @ 1.5 mbps", "status": "not_started", "percent": 0, "message": None},
         {"id": "label_detection", "label": "Label detection", "status": "not_started", "percent": 0, "message": None},
