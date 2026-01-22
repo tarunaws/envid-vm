@@ -1633,7 +1633,7 @@ def _job_steps_default() -> List[Dict[str, Any]]:
         {"id": "synopsis_generation", "label": "Synopsis Generation", "status": "not_started", "percent": 0, "message": None},
         {"id": "scene_by_scene_metadata", "label": "Scene by scene metadata", "status": "not_started", "percent": 0, "message": None},
         {"id": "famous_location_detection", "label": "Famous location detection", "status": "not_started", "percent": 0, "message": None},
-        {"id": "translate_output", "label": "Translate everything in English, Arabic,Indonesian", "status": "not_started", "percent": 0, "message": None},
+        {"id": "translate_output", "label": "Translation of Metadata", "status": "not_started", "percent": 0, "message": None},
         {"id": "opening_closing_credit_detection", "label": "Opening/Closing credit detection", "status": "not_started", "percent": 0, "message": None},
         {"id": "celebrity_detection", "label": "Celebrity detection", "status": "not_started", "percent": 0, "message": None},
         {"id": "celebrity_bio_image", "label": "Celebrity bio & Image", "status": "not_started", "percent": 0, "message": None},
@@ -5946,63 +5946,18 @@ def _process_gcs_video_job_cloud_only(
                 _job_step_update(job_id, "key_scene_detection", status="skipped", percent=100, message="Disabled")
 
         opening_closing: Dict[str, Any] | None = None
-        if enable_opening_closing:
-            requested_credits_model = (requested_models.get("opening_closing_credit_detection_model") or "auto").strip().lower() or "auto"
-            effective_engine = "ffmpeg_blackdetect" if requested_credits_model in {"", "auto", "ffmpeg_blackdetect"} else requested_credits_model
-            if effective_engine == "pyscenedetect":
-                # Not implemented here; fall back to blackdetect.
-                effective_engine = "ffmpeg_blackdetect"
-
-            effective_models["opening_closing_credit_detection"] = effective_engine
-
-            _job_step_update(
-                job_id,
-                "opening_closing_credit_detection",
-                status="running",
-                percent=0,
-                message=f"Running ({effective_engine}; requested: {requested_models.get('opening_closing_credit_detection_model')})",
-            )
-            try:
-                _job_update(job_id, progress=78, message="Opening/Closing credits")
-                segments = _ffmpeg_blackdetect_segments(video_path=local_path)
-
-                # Heuristic: treat black segments near start/end as credits transitions.
-                window = float(_parse_int(os.getenv("ENVID_METADATA_CREDITS_BLACK_WINDOW_SECONDS"), default=20, min_value=5, max_value=120) or 20)
-                opening = [s for s in segments if float(s.get("end") or 0.0) <= window]
-                closing: List[Dict[str, Any]] = []
-                if duration_seconds and float(duration_seconds) > 0:
-                    end_window_start = max(0.0, float(duration_seconds) - window)
-                    closing = [s for s in segments if float(s.get("start") or 0.0) >= end_window_start]
-
-                opening_end = max([float(s.get("end") or 0.0) for s in opening], default=0.0)
-                closing_start = min([float(s.get("start") or 0.0) for s in closing], default=(float(duration_seconds) if duration_seconds else 0.0))
-
-                opening_closing = {
-                    "engine": effective_engine,
-                    "window_seconds": window,
-                    "black_segments": segments,
-                    "opening_black_segments": opening,
-                    "closing_black_segments": closing,
-                    "opening_credit_end_estimate": opening_end,
-                    "closing_credit_start_estimate": closing_start,
-                }
-
-                if segments:
-                    _job_step_update(
-                        job_id,
-                        "opening_closing_credit_detection",
-                        status="completed",
-                        percent=100,
-                        message=f"{len(opening)} opening / {len(closing)} closing black segments",
-                    )
-                else:
-                    _job_step_update(job_id, "opening_closing_credit_detection", status="completed", percent=100, message="No black segments")
-            except Exception as exc:
-                app.logger.warning("Opening/Closing credit detection failed: %s", exc)
-                _job_step_update(job_id, "opening_closing_credit_detection", status="failed", message=str(exc)[:240])
-        else:
-            effective_models["opening_closing_credit_detection"] = "disabled"
-            _job_step_update(job_id, "opening_closing_credit_detection", status="skipped", percent=100, message="Disabled")
+        effective_models["opening_closing_credit_detection"] = "disabled"
+        _job_step_update(
+            job_id,
+            "opening_closing_credit_detection",
+            status="skipped",
+            percent=100,
+            message=(
+                f"Not implemented (requested: {requested_models.get('opening_closing_credit_detection_model')})"
+                if enable_opening_closing
+                else "Disabled"
+            ),
+        )
 
         metadata_text = " ".join([p for p in [video_title, video_description, transcript] if (p or "").strip()])
 
