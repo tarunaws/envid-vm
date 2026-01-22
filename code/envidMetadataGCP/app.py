@@ -3873,7 +3873,7 @@ def _process_gcs_video_job_cloud_only(
         # with older clients which send `enable_high_point` explicitly.
         enable_high_point = _sel_enabled("enable_high_point", default=enable_key_scene)
         enable_synopsis_generation = _sel_enabled("enable_synopsis_generation", default=True)
-        enable_opening_closing = _sel_enabled("enable_opening_closing_credit_detection", default=True)
+        enable_opening_closing = _sel_enabled("enable_opening_closing_credit_detection", default=False)
         enable_celebrity_detection = _sel_enabled("enable_celebrity_detection", default=True)
         enable_celebrity_bio_image = _sel_enabled("enable_celebrity_bio_image", default=True)
 
@@ -3951,80 +3951,6 @@ def _process_gcs_video_job_cloud_only(
         precomputed_scenes_source = "none"
         local_moderation_frames: List[Dict[str, Any]] | None = None
         local_moderation_source: str | None = None
-
-        ext = Path(gcs_object).suffix or ".mp4"
-        local_path = temp_dir / f"video{ext}"
-        _download_gcs_object_to_file(bucket=gcs_bucket, obj=gcs_object, dest_path=local_path, job_id=job_id)
-
-        _job_step_update(job_id, "technical_metadata", status="running", percent=0, message="Probing")
-        technical_ffprobe = _probe_technical_metadata(local_path)
-        duration_seconds = _video_duration_seconds_from_ffprobe(technical_ffprobe)
-        _job_step_update(job_id, "technical_metadata", status="completed", percent=100, message="Completed")
-
-        # Transcode normalize (best-effort). Keep it lightweight and optional.
-        normalize_enabled = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSCODE_NORMALIZE"), default=True)
-        normalized_path = temp_dir / f"video_normalized{ext}"
-        if normalize_enabled:
-            try:
-                _job_step_update(job_id, "transcode_normalize", status="running", percent=0, message="Running")
-                _job_update(job_id, progress=6, message="Transcode normalize")
-                # Target ~1.5mbps video bitrate; keep audio modest.
-                cmd = [
-                    FFMPEG_PATH,
-                    "-i",
-                    str(local_path),
-                    "-c:v",
-                    "libx264",
-                    "-b:v",
-                    "1500k",
-                    "-maxrate",
-                    "1500k",
-                    "-bufsize",
-                    "3000k",
-                    "-pix_fmt",
-                    "yuv420p",
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    "128k",
-                    "-movflags",
-                    "+faststart",
-                    str(normalized_path),
-                    "-y",
-                ]
-                subprocess.run(cmd, capture_output=True, check=True)
-                if normalized_path.exists() and normalized_path.stat().st_size > 0:
-                    local_path = normalized_path
-                _job_step_update(job_id, "transcode_normalize", status="completed", percent=100, message="Completed")
-            except Exception as exc:
-                app.logger.warning("Transcode normalize failed: %s", exc)
-                _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Failed; using original")
-        else:
-            _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Disabled")
-
-        # Placeholders for steps not implemented in this backend yet.
-        _job_step_update(
-            job_id,
-            "celebrity_detection",
-            status="skipped",
-            percent=100,
-            message=(
-                f"Not implemented (requested: {requested_models.get('celebrity_detection_model')})"
-                if enable_celebrity_detection
-                else "Disabled"
-            ),
-        )
-        _job_step_update(
-            job_id,
-            "celebrity_bio_image",
-            status="skipped",
-            percent=100,
-            message=(
-                f"Not implemented (requested: {requested_models.get('celebrity_bio_image_model')})"
-                if enable_celebrity_bio_image
-                else "Disabled"
-            ),
-        )
 
         enable_vi = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_VIDEO_INTELLIGENCE"), default=True)
 
@@ -4225,6 +4151,80 @@ def _process_gcs_video_job_cloud_only(
                 clip_ok = False
         if not clip_ok:
             use_clip_cluster_for_key_scenes = False
+
+        ext = Path(gcs_object).suffix or ".mp4"
+        local_path = temp_dir / f"video{ext}"
+        _download_gcs_object_to_file(bucket=gcs_bucket, obj=gcs_object, dest_path=local_path, job_id=job_id)
+
+        _job_step_update(job_id, "technical_metadata", status="running", percent=0, message="Probing")
+        technical_ffprobe = _probe_technical_metadata(local_path)
+        duration_seconds = _video_duration_seconds_from_ffprobe(technical_ffprobe)
+        _job_step_update(job_id, "technical_metadata", status="completed", percent=100, message="Completed")
+
+        # Transcode normalize (best-effort). Keep it lightweight and optional.
+        normalize_enabled = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSCODE_NORMALIZE"), default=True)
+        normalized_path = temp_dir / f"video_normalized{ext}"
+        if normalize_enabled:
+            try:
+                _job_step_update(job_id, "transcode_normalize", status="running", percent=0, message="Running")
+                _job_update(job_id, progress=6, message="Transcode normalize")
+                # Target ~1.5mbps video bitrate; keep audio modest.
+                cmd = [
+                    FFMPEG_PATH,
+                    "-i",
+                    str(local_path),
+                    "-c:v",
+                    "libx264",
+                    "-b:v",
+                    "1500k",
+                    "-maxrate",
+                    "1500k",
+                    "-bufsize",
+                    "3000k",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "128k",
+                    "-movflags",
+                    "+faststart",
+                    str(normalized_path),
+                    "-y",
+                ]
+                subprocess.run(cmd, capture_output=True, check=True)
+                if normalized_path.exists() and normalized_path.stat().st_size > 0:
+                    local_path = normalized_path
+                _job_step_update(job_id, "transcode_normalize", status="completed", percent=100, message="Completed")
+            except Exception as exc:
+                app.logger.warning("Transcode normalize failed: %s", exc)
+                _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Failed; using original")
+        else:
+            _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Disabled")
+
+        # Placeholders for steps not implemented in this backend yet.
+        _job_step_update(
+            job_id,
+            "celebrity_detection",
+            status="skipped",
+            percent=100,
+            message=(
+                f"Not implemented (requested: {requested_models.get('celebrity_detection_model')})"
+                if enable_celebrity_detection
+                else "Disabled"
+            ),
+        )
+        _job_step_update(
+            job_id,
+            "celebrity_bio_image",
+            status="skipped",
+            percent=100,
+            message=(
+                f"Not implemented (requested: {requested_models.get('celebrity_bio_image_model')})"
+                if enable_celebrity_bio_image
+                else "Disabled"
+            ),
+        )
 
         # vi_label_mode is already set above; it may be overridden by explicit label model values.
 
