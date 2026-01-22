@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from math import exp
 from datetime import datetime, timedelta
@@ -157,18 +158,18 @@ def _translate_provider() -> str:
     pref = (os.getenv("ENVID_METADATA_TRANSLATE_PROVIDER") or "auto").strip().lower()
     libre_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
     has_libre = bool(libre_url)
-    allow_gcp = _env_truthy(os.getenv("ENVID_METADATA_TRANSLATE_ALLOW_GCP"), default=False)
-    has_gcp = gcp_translate is not None and allow_gcp
+    # Google Translate is explicitly disabled (GCP is reserved for label detection only).
+    # Keep the env flag for legacy compatibility, but never allow it to enable translation.
+    allow_gcp = False
+    has_gcp = False
 
     if pref in {"libretranslate", "libre", "opus", "marian"}:
         return "libretranslate" if has_libre else "disabled"
     if pref in {"gcp", "google", "google_translate"}:
-        return "gcp_translate" if has_gcp else "disabled"
+        return "disabled"
 
     if has_libre:
         return "libretranslate"
-    if has_gcp:
-        return "gcp_translate"
     return "disabled"
 
 
@@ -176,6 +177,7 @@ _LIBRE_LANG_CACHE: tuple[set[str], float] = (set(), 0.0)
 
 
 def _libretranslate_supported_langs(base_url: str) -> set[str]:
+    global _LIBRE_LANG_CACHE
     endpoint = base_url.rstrip("/") + "/languages"
     cached, ts = _LIBRE_LANG_CACHE
     if cached and (time.time() - ts) < 600:
@@ -197,6 +199,16 @@ def _libretranslate_supported_langs(base_url: str) -> set[str]:
     except Exception:
         pass
     return cached
+
+
+def _libretranslate_languages_raw(base_url: str) -> list[dict[str, Any]]:
+    endpoint = base_url.rstrip("/") + "/languages"
+    resp = requests.get(endpoint, timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, list):
+        return [x for x in data if isinstance(x, dict)]
+    return []
 
 
 def _libretranslate_translate(*, text: str, source_lang: str | None, target_lang: str) -> str:
@@ -258,7 +270,39 @@ def _translate_targets() -> list[str]:
     return out
 
 
+def _translate_targets_from_selection(sel: Dict[str, Any]) -> list[str]:
+    raw = None
+    for key in (
+        "translate_targets",
+        "translate_target_languages",
+        "translate_target_language",
+        "target_languages",
+        "target_language",
+        "translation_targets",
+    ):
+        if isinstance(sel, dict) and key in sel:
+            raw = sel.get(key)
+            break
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        langs = [str(x).strip().lower() for x in raw if str(x).strip()]
+    else:
+        langs = [seg.strip().lower() for seg in str(raw).split(",") if seg.strip()]
+    # De-duplicate while preserving order.
+    seen: set[str] = set()
+    out: list[str] = []
+    for lang in langs:
+        if lang in seen:
+            continue
+        seen.add(lang)
+        out.append(lang)
+    return out
+
+
 def _init_translate_client(provider: str) -> tuple[Any | None, str | None]:
+    if provider == "gcp_translate":
+        raise RuntimeError("GCP Translate is disabled in this stack")
     if provider != "gcp_translate":
         return None, None
     if gcp_translate is None:
@@ -1777,6 +1821,20 @@ def _precheck_models(
                 clip_ok = bool(((raw or {}).get("details") or {}).get("clip", {}).get("ok")) if isinstance(raw, dict) else True
                 if not clip_ok:
                     _warn(False, "clip_model", "CLIP model unavailable; clustering will be disabled")
+
+    # LibreTranslate availability (when translation is enabled)
+    enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
+    translate_provider = _translate_provider()
+    if enable_translate and translate_provider == "libretranslate":
+        base_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
+        if not base_url:
+            _require(False, "libretranslate", "ENVID_LIBRETRANSLATE_URL is not set")
+        else:
+            try:
+                langs = _libretranslate_languages_raw(base_url)
+                _require(bool(langs), "libretranslate", "LibreTranslate /languages returned no data")
+            except Exception as exc:
+                _require(False, "libretranslate", f"LibreTranslate unavailable: {exc}")
 
     # GCP Language (locations)
     if enable_famous_locations and gcp_language is None:
@@ -3364,10 +3422,13 @@ def _aggregate_text_segments(
     max_items: int = 250,
 ) -> List[Dict[str, Any]]:
     """Aggregate (text, start, end, conf) into [{text, segments:[...]}]"""
+    min_conf = _safe_float(os.getenv("ENVID_METADATA_OCR_MIN_CONF"), 0.6)
     by_text: Dict[str, List[Dict[str, Any]]] = {}
     for txt, st, en, conf in hits:
         key = (txt or "").strip()
         if not key:
+            continue
+        if conf < min_conf:
             continue
         by_text.setdefault(key, []).append({"start": float(st), "end": float(en), "confidence": float(conf)})
 
@@ -3885,6 +3946,11 @@ def _process_gcs_video_job_cloud_only(
         transcript_words: List[Dict[str, Any]] = []
         transcript_segments: List[Dict[str, Any]] = []
         transcript_meta: Dict[str, Any] = {}
+        local_text: List[Dict[str, Any]] = []
+        precomputed_scenes: List[Dict[str, Any]] = []
+        precomputed_scenes_source = "none"
+        local_moderation_frames: List[Dict[str, Any]] | None = None
+        local_moderation_source: str | None = None
 
         ext = Path(gcs_object).suffix or ".mp4"
         local_path = temp_dir / f"video{ext}"
@@ -3997,6 +4063,7 @@ def _process_gcs_video_job_cloud_only(
             vi_label_mode = "frame"
 
         # Label detection engine selection (fixed to GCP Video Intelligence).
+        requested_label_model_raw = (requested_models.get("label_detection_model") or "").strip()
         requested_label_model = "gcp_video_intelligence"
 
         label_engine = "disabled"
@@ -4204,6 +4271,623 @@ def _process_gcs_video_job_cloud_only(
         enable_objects = _env_truthy(os.getenv("ENVID_METADATA_GCP_VI_ENABLE_OBJECT_TRACKING"), default=False)
         enable_logos = _env_truthy(os.getenv("ENVID_METADATA_GCP_VI_ENABLE_LOGO_RECOGNITION"), default=False)
         enable_people = _env_truthy(os.getenv("ENVID_METADATA_GCP_VI_ENABLE_PERSON_DETECTION"), default=False)
+
+        parallel_futures: Dict[str, Any] = {}
+        parallel_executor: ThreadPoolExecutor | None = None
+        local_ocr_started = False
+        local_moderation_started = False
+        whisper_started = False
+        scenes_started = False
+
+        def _ensure_parallel_executor() -> ThreadPoolExecutor:
+            nonlocal parallel_executor
+            if parallel_executor is None:
+                parallel_executor = ThreadPoolExecutor(max_workers=5)
+            return parallel_executor
+
+        def _run_local_ocr_task() -> None:
+            nonlocal local_text, effective_models
+            try:
+                _job_update(job_id, progress=26, message="Text on Screen (OCR)")
+                interval = float(_parse_int(os.getenv("ENVID_METADATA_OCR_FRAME_INTERVAL_SECONDS"), default=2, min_value=1, max_value=30) or 2)
+                max_frames = int(_parse_int(os.getenv("ENVID_METADATA_OCR_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
+                ocr_lang = (os.getenv("ENVID_METADATA_OCR_LANG") or "en").strip() or "en"
+                ocr_timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_OCR_TIMEOUT_SECONDS"), default=600, min_value=10, max_value=3600) or 600)
+
+                _job_step_update(job_id, "text_on_screen", status="running", percent=0, message=f"Running ({requested_text_model})")
+                if requested_text_model == "tesseract":
+                    local_text = _tesseract_text_from_video(video_path=local_path, interval_seconds=interval, max_frames=max_frames)
+                    effective_models["text_on_screen"] = "tesseract"
+                else:
+                    paddle_service_url = (os.getenv("ENVID_METADATA_LOCAL_OCR_PADDLE_URL") or "").strip()
+                    if paddle_service_url:
+                        local_text = _local_ocr_paddle_service_text_from_video(
+                            video_path=local_path,
+                            interval_seconds=interval,
+                            max_frames=max_frames,
+                            service_base_url=paddle_service_url,
+                            lang=ocr_lang,
+                            timeout_seconds=ocr_timeout,
+                        )
+                        effective_models["text_on_screen"] = "paddleocr_service"
+                    else:
+                        local_text = _paddleocr_text_from_video(
+                            video_path=local_path,
+                            interval_seconds=interval,
+                            max_frames=max_frames,
+                            lang=ocr_lang,
+                        )
+                        effective_models["text_on_screen"] = "paddleocr"
+                _job_step_update(job_id, "text_on_screen", status="completed", percent=100, message=f"{len(local_text)} text entries ({effective_models.get('text_on_screen')})")
+            except Exception as exc:
+                app.logger.warning("Local OCR failed: %s", exc)
+                _job_step_update(job_id, "text_on_screen", status="failed", message=str(exc)[:240])
+
+        def _run_local_moderation_task() -> None:
+            nonlocal local_moderation_frames, local_moderation_source, effective_models
+            try:
+                _job_update(job_id, progress=28, message="Moderation (local)")
+                interval = float(_parse_int(os.getenv("ENVID_METADATA_MODERATION_FRAME_INTERVAL_SECONDS"), default=2, min_value=1, max_value=30) or 2)
+                max_frames = int(_parse_int(os.getenv("ENVID_METADATA_MODERATION_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
+                service_url_default = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_URL") or "").strip()
+                service_url_nsfwjs = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL") or "").strip()
+                service_url = (local_moderation_url_override or (service_url_nsfwjs if requested_moderation_model == "nsfwjs" else "") or service_url_default).strip()
+                service_timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_MODERATION_TIMEOUT_SECONDS"), default=60, min_value=1, max_value=600) or 60)
+
+                _job_step_update(job_id, "moderation", status="running", percent=0, message=f"Running ({requested_moderation_model})")
+                if requested_moderation_model == "nudenet":
+                    if service_url:
+                        local_moderation_frames = _local_moderation_service_explicit_frames_from_video(
+                            video_path=local_path,
+                            interval_seconds=interval,
+                            max_frames=max_frames,
+                            service_base_url=service_url,
+                            timeout_seconds=service_timeout,
+                        )
+                        local_moderation_source = "nudenet_service"
+                    else:
+                        local_moderation_frames = _nudenet_moderation_explicit_frames_from_video(
+                            video_path=local_path,
+                            interval_seconds=interval,
+                            max_frames=max_frames,
+                        )
+                        local_moderation_source = "nudenet"
+                    effective_models["moderation"] = "nudenet" if local_moderation_source == "nudenet" else "nudenet_service"
+                    _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(local_moderation_frames or [])} frames ({local_moderation_source})")
+                elif requested_moderation_model == "nsfwjs":
+                    if not service_url:
+                        raise RuntimeError(
+                            "nsfwjs requires a local moderation service; set ENVID_METADATA_LOCAL_MODERATION_URL (e.g. http://localhost:5081)"
+                        )
+                    local_moderation_frames = _local_moderation_service_explicit_frames_from_video(
+                        video_path=local_path,
+                        interval_seconds=interval,
+                        max_frames=max_frames,
+                        service_base_url=service_url,
+                        timeout_seconds=service_timeout,
+                    )
+                    local_moderation_source = "nsfwjs_service"
+                    effective_models["moderation"] = local_moderation_source
+                    _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(local_moderation_frames or [])} frames ({local_moderation_source})")
+                else:
+                    raise RuntimeError(f"Unsupported moderation model: {requested_moderation_model}")
+            except Exception as exc:
+                app.logger.warning("Local moderation failed: %s", exc)
+                _job_step_update(job_id, "moderation", status="failed", message=str(exc)[:240])
+
+        def _run_whisper_transcription() -> None:
+            nonlocal transcript, transcript_language_code, languages_detected, transcript_words, transcript_segments, transcript_meta, effective_models
+            if openai_whisper is None:
+                return
+            try:
+                _job_update(job_id, progress=32, message="Whisper")
+                whisper_size = "large-v3"
+                _job_step_update(job_id, "transcribe", status="running", percent=0, message=f"Running (OpenAI Whisper/{whisper_size})")
+
+                model = openai_whisper.load_model(whisper_size)
+
+                # Audio preprocessing (best-effort): extract clean mono 16kHz WAV and optionally slow down tempo.
+                # This improves stability for noisy inputs and some fast-speaking clips.
+                preprocess_enabled = True
+                tempo_raw = (os.getenv("ENVID_WHISPER_AUDIO_ATEMPO") or "").strip()
+                tempo = _safe_float(tempo_raw or "0.9", 0.9)
+                filters = (os.getenv("ENVID_WHISPER_AUDIO_FILTERS") or "").strip()
+                if preprocess_enabled and not filters:
+                    # Default denoise chain for speech (best-effort): band-limit + denoise + normalize.
+                    # If any filter isn't supported by the local ffmpeg build, we fall back at runtime.
+                    filters = "highpass=f=80,lowpass=f=8000,anlmdn,afftdn,loudnorm=I=-16:LRA=11:TP=-1.5"
+                if preprocess_enabled and tempo and abs(float(tempo) - 1.0) > 1e-6:
+                    atempo_chain = _build_ffmpeg_atempo_chain(float(tempo))
+                    if atempo_chain:
+                        filters = f"{filters},{atempo_chain}" if filters else atempo_chain
+
+                audio_for_whisper: Path = local_path
+                audio_preprocess_fallback_used = False
+                if preprocess_enabled:
+                    audio_path = temp_dir / "whisper_audio.wav"
+                    cmd_base = [
+                        FFMPEG_PATH,
+                        "-i",
+                        str(local_path),
+                        "-vn",
+                        "-ac",
+                        "1",
+                        "-ar",
+                        "16000",
+                        "-acodec",
+                        "pcm_s16le",
+                    ]
+                    cmd = list(cmd_base)
+                    if filters:
+                        cmd += ["-af", filters]
+                    cmd += [str(audio_path), "-y"]
+                    res = subprocess.run(cmd, capture_output=True)
+                    if res.returncode != 0:
+                        err = (res.stderr or b"").decode("utf-8", errors="ignore")
+                        raise RuntimeError(f"FFmpeg denoise failed (filters required): {err[:240]}")
+                    audio_for_whisper = audio_path
+
+                transcript_meta["whisper"] = {
+                    "model": whisper_size,
+                    "audio_preprocess": {
+                        "enabled": bool(preprocess_enabled),
+                        "filters": filters,
+                        "atempo": float(tempo) if tempo else 1.0,
+                        "format": "wav_s16le_mono_16khz" if preprocess_enabled else "source_video",
+                        "fallback_used": bool(audio_preprocess_fallback_used),
+                    },
+                }
+
+                # Decoding params (best-effort). Some older whisper builds may not accept all kwargs.
+                # Hindi is the primary expected input language for this product.
+                # Set ENVID_WHISPER_LANGUAGE_CODE=auto to re-enable auto-detection.
+                _wl_raw = (os.getenv("ENVID_WHISPER_LANGUAGE_CODE") or "").strip()
+                if _wl_raw.lower() in {"", "auto", "detect"}:
+                    whisper_language = None
+                else:
+                    whisper_language = _wl_raw
+                if whisper_language is None:
+                    whisper_language = "hi"
+                whisper_prompt = (os.getenv("ENVID_WHISPER_INITIAL_PROMPT") or "").strip() or None
+                quality = (os.getenv("ENVID_WHISPER_QUALITY") or "best").strip().lower() or "best"
+
+                # Defaults lean towards quality; user can tune via env vars.
+                temperature = _safe_float(os.getenv("ENVID_WHISPER_TEMPERATURE"), 0.0)
+                if quality == "best":
+                    beam_default = 10
+                    best_default = 10
+                elif quality == "fast":
+                    beam_default = 3
+                    best_default = 3
+                else:
+                    beam_default = 8
+                    best_default = 8
+
+                beam_size = _parse_int(os.getenv("ENVID_WHISPER_BEAM_SIZE"), default=beam_default, min_value=1, max_value=10)
+                best_of = _parse_int(os.getenv("ENVID_WHISPER_BEST_OF"), default=best_default, min_value=1, max_value=10)
+                condition_prev = _env_truthy(os.getenv("ENVID_WHISPER_CONDITION_ON_PREVIOUS_TEXT"), default=True)
+
+                decode_kwargs: Dict[str, Any] = {
+                    "fp16": False,
+                    "temperature": float(temperature),
+                    "beam_size": int(beam_size),
+                    "best_of": int(best_of),
+                    "condition_on_previous_text": bool(condition_prev),
+                }
+                if whisper_language:
+                    decode_kwargs["language"] = whisper_language
+                if whisper_prompt:
+                    decode_kwargs["initial_prompt"] = whisper_prompt
+
+                transcript_meta["whisper"]["decode"] = {
+                    "quality": quality,
+                    "language": whisper_language,
+                    "initial_prompt": bool(whisper_prompt),
+                    "temperature": float(temperature),
+                    "beam_size": int(beam_size),
+                    "best_of": int(best_of),
+                    "condition_on_previous_text": bool(condition_prev),
+                }
+
+                # Chunking (best-effort): improves completeness on long audio by avoiding
+                # any single extremely long decoding pass.
+                chunking_enabled = _env_truthy(os.getenv("ENVID_WHISPER_CHUNKING"), default=True)
+                chunk_seconds = float(os.getenv("ENVID_WHISPER_CHUNK_SECONDS") or 900.0)
+                overlap_seconds = float(os.getenv("ENVID_WHISPER_CHUNK_OVERLAP_SECONDS") or 3.0)
+                # Only chunk when reasonably long, unless explicitly requested.
+                min_chunk_duration = float(os.getenv("ENVID_WHISPER_MIN_DURATION_TO_CHUNK_SECONDS") or 900.0)
+
+                transcript_words = []
+                transcript_segments = []
+                seg_quality_issues: List[Dict[str, Any]] = []
+
+                def _whisper_transcribe_compat(path: Path) -> dict[str, Any]:
+                    try:
+                        return model.transcribe(str(path), **decode_kwargs)
+                    except TypeError:
+                        # Backward-compat with older openai-whisper signatures.
+                        safe_kwargs: Dict[str, Any] = {"fp16": False}
+                        if whisper_language:
+                            safe_kwargs["language"] = whisper_language
+                        try:
+                            return model.transcribe(str(path), **safe_kwargs)
+                        except Exception:
+                            return model.transcribe(str(path), fp16=False)
+
+                def _extract_wav_chunk(*, src: Path, out: Path, start_s: float, dur_s: float) -> None:
+                    ss = max(0.0, float(start_s))
+                    tt = max(0.1, float(dur_s))
+                    cmd_base = [
+                        FFMPEG_PATH,
+                        "-ss",
+                        f"{ss:.3f}",
+                        "-t",
+                        f"{tt:.3f}",
+                        "-i",
+                        str(src),
+                        "-ac",
+                        "1",
+                        "-ar",
+                        "16000",
+                        "-acodec",
+                        "pcm_s16le",
+                    ]
+                    cmd = list(cmd_base)
+                    if filters:
+                        cmd += ["-af", filters]
+                    cmd += [str(out), "-y"]
+                    res = subprocess.run(cmd, capture_output=True)
+                    if res.returncode != 0:
+                        err = (res.stderr or b"").decode("utf-8", errors="ignore")
+                        raise RuntimeError(f"FFmpeg denoise failed for chunk (filters required): {err[:240]}")
+
+                # Determine duration for chunking decision.
+                dur_for_chunk = float(duration_seconds or 0.0)
+                do_chunk = bool(chunking_enabled and chunk_seconds >= 60.0 and dur_for_chunk >= min_chunk_duration)
+                transcript_meta["whisper"]["chunking"] = {
+                    "enabled": bool(chunking_enabled),
+                    "applied": bool(do_chunk),
+                    "chunk_seconds": float(chunk_seconds),
+                    "overlap_seconds": float(overlap_seconds),
+                    "min_duration_to_chunk_seconds": float(min_chunk_duration),
+                    "duration_seconds": float(dur_for_chunk),
+                }
+
+                detected_language: str = ""
+
+                if do_chunk:
+                    step = max(10.0, float(chunk_seconds) - max(0.0, float(overlap_seconds)))
+                    starts: List[float] = []
+                    cur = 0.0
+                    while cur < max(0.0, dur_for_chunk):
+                        starts.append(cur)
+                        cur += step
+                        if len(starts) > 200:
+                            break
+
+                    last_end = 0.0
+                    for i, st0 in enumerate(starts):
+                        out_chunk = temp_dir / f"whisper_chunk_{i:03d}.wav"
+                        _extract_wav_chunk(src=audio_for_whisper, out=out_chunk, start_s=st0, dur_s=float(chunk_seconds))
+                        r = _whisper_transcribe_compat(out_chunk)
+                        if not detected_language:
+                            detected_language = str(r.get("language") or "").strip()
+
+                        for seg in (r.get("segments") or [])[:50000]:
+                            try:
+                                st = float(seg.get("start") or 0.0) + float(st0)
+                                en = float(seg.get("end") or (seg.get("start") or 0.0)) + float(st0)
+                                txt = str(seg.get("text") or "").strip()
+                            except Exception:
+                                continue
+                            if not txt:
+                                continue
+
+                            # Drop tiny overlap duplicates.
+                            if en <= (last_end + 0.15):
+                                continue
+                            if st < last_end:
+                                st = float(last_end)
+
+                            avg_logprob = _safe_float(seg.get("avg_logprob"), 0.0)
+                            no_speech_prob = _safe_float(seg.get("no_speech_prob"), 0.0)
+                            compression_ratio = _safe_float(seg.get("compression_ratio"), 0.0)
+                            flags: list[str] = []
+                            if avg_logprob and avg_logprob < -1.0:
+                                flags.append("low_logprob")
+                            if no_speech_prob and no_speech_prob > 0.6:
+                                flags.append("possible_non_speech")
+                            if compression_ratio and compression_ratio > 2.4:
+                                flags.append("possible_hallucination")
+                            if flags:
+                                seg_quality_issues.append({"start": st, "end": en, "flags": flags})
+
+                            transcript_segments.append(
+                                {
+                                    "start": st,
+                                    "end": en,
+                                    "text": txt,
+                                    "avg_logprob": avg_logprob,
+                                    "no_speech_prob": no_speech_prob,
+                                    "compression_ratio": compression_ratio,
+                                    "flags": flags,
+                                }
+                            )
+                            last_end = max(float(last_end), float(en))
+
+                    transcript = " ".join([str(s.get("text") or "").strip() for s in transcript_segments if (s.get("text") or "").strip()]).strip()
+                    transcript_language_code = detected_language
+                    languages_detected = [detected_language] if detected_language else []
+                else:
+                    result = _whisper_transcribe_compat(Path(audio_for_whisper))
+
+                    transcript = str(result.get("text") or "").strip()
+                    transcript_language_code = str(result.get("language") or "").strip()
+                    languages_detected = [transcript_language_code] if transcript_language_code else []
+                    transcript_words = []
+                    transcript_segments = []
+                    for seg in (result.get("segments") or [])[:50000]:
+                        try:
+                            st = float(seg.get("start") or 0.0)
+                            en = float(seg.get("end") or st)
+                            txt = str(seg.get("text") or "").strip()
+                        except Exception:
+                            continue
+                        if not txt:
+                            continue
+
+                        avg_logprob = _safe_float(seg.get("avg_logprob"), 0.0)
+                        no_speech_prob = _safe_float(seg.get("no_speech_prob"), 0.0)
+                        compression_ratio = _safe_float(seg.get("compression_ratio"), 0.0)
+                        flags: list[str] = []
+                        # Heuristics: highlight segments likely to be inaccurate/hallucinated.
+                        if avg_logprob and avg_logprob < -1.0:
+                            flags.append("low_logprob")
+                        if no_speech_prob and no_speech_prob > 0.6:
+                            flags.append("possible_non_speech")
+                        if compression_ratio and compression_ratio > 2.4:
+                            flags.append("possible_hallucination")
+                        if flags:
+                            seg_quality_issues.append({"start": st, "end": en, "flags": flags})
+
+                        transcript_segments.append(
+                            {
+                                "start": st,
+                                "end": en,
+                                "text": txt,
+                                "avg_logprob": avg_logprob,
+                                "no_speech_prob": no_speech_prob,
+                                "compression_ratio": compression_ratio,
+                                "flags": flags,
+                            }
+                        )
+
+                    # Prefer assembling transcript from segments to avoid missing tails.
+                    if transcript_segments:
+                        transcript = " ".join(
+                            [
+                                str(s.get("text") or "").strip()
+                                for s in transcript_segments
+                                if (s.get("text") or "").strip()
+                            ]
+                        ).strip()
+
+                # Preserve raw transcript/segments for diagnostics before any corrections.
+                raw_transcript = transcript
+                raw_transcript_segments = [dict(s) for s in transcript_segments] if transcript_segments else []
+
+                # Correction settings (applied to both transcript and segments).
+                grammar_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_GRAMMAR_CORRECTION"), default=True)
+                grammar_url = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip()
+                grammar_local = _env_truthy(os.getenv("ENVID_GRAMMAR_CORRECTION_USE_LOCAL"), default=False)
+                dictionary_enabled = _env_truthy(
+                    os.getenv("ENVID_DICTIONARY_ENABLE") or os.getenv("ENVID_HINDI_DICTIONARY_ENABLE"),
+                    default=True,
+                )
+                nlp_mode = (os.getenv("ENVID_TRANSCRIPT_NLP_CORRECTION_MODE") or "openrouter_llama").strip().lower() or "openrouter_llama"
+                punctuation_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_PUNCTUATION_ENHANCE"), default=True)
+
+                # Apply full correction pipeline to the full transcript (for metadata/visibility).
+                if transcript:
+                    before = transcript
+                    transcript, corr_meta = _apply_segment_corrections(
+                        text=transcript,
+                        language_code=(whisper_language or transcript_language_code or "hi"),
+                        grammar_enabled=bool(grammar_enabled),
+                        hindi_dictionary_enabled=bool(dictionary_enabled),
+                        nlp_mode=nlp_mode,
+                        punctuation_enabled=bool(punctuation_enabled),
+                    )
+                    transcript_meta["grammar_correction"] = {
+                        "enabled": True,
+                        "available": bool(grammar_url) or (bool(grammar_local) and language_tool_python is not None),
+                        "applied": bool(corr_meta.get("grammar_applied")),
+                    }
+                    lang_norm = _normalize_language_code(whisper_language or transcript_language_code or "hi")
+                    transcript_meta["dictionary_correction"] = {
+                        "enabled": bool(dictionary_enabled),
+                        "language": lang_norm,
+                        "applied": bool(corr_meta.get("dictionary_applied")),
+                    }
+                    transcript_meta["hindi_dictionary_correction"] = {
+                        "enabled": bool(dictionary_enabled and lang_norm == "hi"),
+                        "applied": bool(corr_meta.get("hindi_applied")),
+                    }
+                    transcript_meta["nlp_correction"] = {
+                        "enabled": nlp_mode in {"openrouter_llama", "llama", "openrouter"},
+                        "mode": nlp_mode,
+                        "applied": bool(corr_meta.get("nlp_applied")),
+                    }
+                    transcript_meta["punctuation_enhance"] = {
+                        "enabled": bool(punctuation_enabled),
+                        "applied": bool(corr_meta.get("punctuation_applied")),
+                    }
+
+                # Keep time-band segments consistent with corrected transcript.
+                segment_correction_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_SEGMENT_CORRECTION"), default=True)
+                segment_mode = (os.getenv("ENVID_TRANSCRIPT_SEGMENT_CORRECTION_MODE") or "full").strip().lower() or "full"
+                segment_max = _parse_int(os.getenv("ENVID_TRANSCRIPT_SEGMENT_CORRECTION_MAX"), default=5000, min_value=10, max_value=100000)
+                if segment_correction_enabled and transcript_segments:
+                    corrected_segments: list[dict[str, Any]] = []
+                    corrected_count = 0
+                    for seg in transcript_segments[:segment_max]:
+                        if not isinstance(seg, dict):
+                            continue
+                        txt = str(seg.get("text") or "").strip()
+                        if not txt:
+                            corrected_segments.append(seg)
+                            continue
+
+                        seg_grammar = grammar_enabled and segment_mode == "full"
+                        seg_nlp_mode = nlp_mode if segment_mode in {"full", "nlp"} else ""
+                        seg_punct = punctuation_enabled or segment_mode in {"full", "nlp", "punctuation"}
+
+                        corrected_txt, _seg_meta = _apply_segment_corrections(
+                            text=txt,
+                            language_code=(transcript_language_code or whisper_language or "hi"),
+                            grammar_enabled=bool(seg_grammar),
+                            hindi_dictionary_enabled=bool(dictionary_enabled),
+                            nlp_mode=seg_nlp_mode,
+                            punctuation_enabled=bool(seg_punct),
+                        )
+                        if corrected_txt and corrected_txt != txt:
+                            seg = {**seg, "text": corrected_txt}
+                            corrected_count += 1
+                        corrected_segments.append(seg)
+
+                    # Preserve any remaining segments without heavy correction.
+                    if len(transcript_segments) > segment_max:
+                        corrected_segments.extend(transcript_segments[segment_max:])
+
+                    transcript_segments = corrected_segments
+                    transcript_meta.setdefault("segment_correction", {})
+                    transcript_meta["segment_correction"].update(
+                        {
+                            "enabled": True,
+                            "mode": segment_mode,
+                            "applied_count": int(corrected_count),
+                            "max_segments": int(segment_max),
+                        }
+                    )
+
+                    # Rebuild the raw transcript from corrected segments for consistency.
+                    rebuilt = " ".join(
+                        [
+                            str(s.get("text") or "").strip()
+                            for s in transcript_segments
+                            if isinstance(s, dict) and (s.get("text") or "").strip()
+                        ]
+                    ).strip()
+                    if rebuilt:
+                        transcript = rebuilt
+                        transcript_meta["correction_source"] = "segment_corrected"
+
+                # If corrections significantly diverged, revert to raw transcript.
+                if raw_transcript and transcript:
+                    def _word_similarity(a: str, b: str) -> float:
+                        a_words = re.findall(r"[\w\u0900-\u097F]+", a or "")
+                        b_words = re.findall(r"[\w\u0900-\u097F]+", b or "")
+                        if not a_words or not b_words:
+                            return 0.0
+                        return difflib.SequenceMatcher(None, a_words, b_words).ratio()
+
+                    min_similarity = _safe_float(os.getenv("ENVID_TRANSCRIPT_MIN_SIMILARITY"), 0.7)
+                    similarity = _word_similarity(raw_transcript, transcript)
+                    transcript_meta["correction_similarity"] = float(similarity)
+                    if similarity < min_similarity:
+                        transcript = raw_transcript
+                        if raw_transcript_segments:
+                            transcript_segments = raw_transcript_segments
+                        transcript_meta["correction_reverted"] = True
+
+                # Strict verification: fail the job if transcript looks invalid.
+                verify_strict = _env_truthy(os.getenv("ENVID_TRANSCRIPT_VERIFY_STRICT"), default=True)
+                require_correction = _env_truthy(os.getenv("ENVID_TRANSCRIPT_VERIFY_REQUIRE_CORRECTION"), default=True)
+                if verify_strict:
+                    lang_for_check = transcript_language_code or whisper_language or "hi"
+                    is_reasonable = _transcript_is_reasonable(transcript, lang_for_check)
+                    transcript_meta["verification"] = {
+                        "strict": True,
+                        "require_correction": bool(require_correction),
+                        "reasonable": bool(is_reasonable),
+                    }
+                    if not is_reasonable:
+                        raise TranscriptVerificationError("Transcript verification failed: low-quality output")
+                    if require_correction:
+                        dictionary_applied = transcript_meta.get("dictionary_correction", {}).get("applied")
+                        if dictionary_applied is None:
+                            dictionary_applied = transcript_meta.get("hindi_dictionary_correction", {}).get("applied")
+                        applied_flags = [
+                            transcript_meta.get("grammar_correction", {}).get("applied"),
+                            transcript_meta.get("nlp_correction", {}).get("applied"),
+                            transcript_meta.get("punctuation_enhance", {}).get("applied"),
+                            dictionary_applied,
+                        ]
+                        applied_any = any(bool(x) for x in applied_flags)
+                        transcript_meta["verification"]["corrections_applied"] = bool(applied_any)
+                        if not applied_any:
+                            raise TranscriptVerificationError("Transcript verification failed: corrections not applied")
+
+                if seg_quality_issues:
+                    transcript_meta.setdefault("quality", {})
+                    transcript_meta["quality"]["segment_flags"] = seg_quality_issues[:500]
+
+                transcript_meta.setdefault("raw_transcript", raw_transcript)
+                if raw_transcript_segments:
+                    transcript_meta.setdefault("raw_segments", raw_transcript_segments)
+
+                effective_models["transcribe"] = f"openai_whisper/{whisper_size}"
+                _job_step_update(job_id, "transcribe", status="completed", percent=100, message=f"Completed (OpenAI Whisper/{whisper_size})")
+            except TranscriptVerificationError as exc:
+                app.logger.warning("Transcript verification failed: %s", exc)
+                _job_step_update(job_id, "transcribe", status="failed", message=str(exc)[:240])
+                raise
+            except Exception as exc:
+                app.logger.warning("Whisper failed: %s", exc)
+                # Fall through to the GCP path below.
+                transcript = ""
+                transcript_language_code = ""
+                languages_detected = []
+                transcript_words = []
+                transcript_segments = []
+
+        def _run_scene_detect_task() -> None:
+            nonlocal precomputed_scenes, precomputed_scenes_source
+            if enable_key_scene:
+                _job_step_update(job_id, "key_scene_detection", status="running", percent=0, message="Running (scene detection)")
+            if use_transnetv2_for_scenes:
+                try:
+                    precomputed_scenes = _transnetv2_list_scenes(video_path=local_path, temp_dir=temp_dir)
+                    precomputed_scenes_source = "transnetv2"
+                except Exception as exc:
+                    app.logger.warning("TransNetV2 failed: %s", exc)
+                    precomputed_scenes = []
+                    precomputed_scenes_source = "transnetv2_failed"
+            if (not precomputed_scenes) and use_pyscenedetect_for_scenes:
+                try:
+                    precomputed_scenes = _pyscenedetect_list_scenes(video_path=local_path, temp_dir=temp_dir)
+                    precomputed_scenes_source = "pyscenedetect"
+                except Exception as exc:
+                    app.logger.warning("PySceneDetect failed: %s", exc)
+                    precomputed_scenes = []
+                    precomputed_scenes_source = "pyscenedetect_failed"
+
+        if enable_text_on_screen and use_local_ocr:
+            local_ocr_started = True
+            parallel_futures["local_ocr"] = _ensure_parallel_executor().submit(_run_local_ocr_task)
+
+        if enable_moderation and use_local_moderation:
+            local_moderation_started = True
+            parallel_futures["local_moderation"] = _ensure_parallel_executor().submit(_run_local_moderation_task)
+
+        if enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is not None:
+            whisper_started = True
+            parallel_futures["whisper"] = _ensure_parallel_executor().submit(_run_whisper_transcription)
+
+        if (enable_scene_by_scene or enable_key_scene or enable_high_point) and (use_transnetv2_for_scenes or use_pyscenedetect_for_scenes):
+            scenes_started = True
+            parallel_futures["scene_detect"] = _ensure_parallel_executor().submit(_run_scene_detect_task)
+
         if enable_vi and gcp_video_intelligence is not None and want_any_vi:
             try:
                 _job_update(job_id, progress=12, message="Video Intelligence")
@@ -4239,13 +4923,14 @@ def _process_gcs_video_job_cloud_only(
 
                 if enable_text_on_screen:
                     if use_local_ocr:
-                        _job_step_update(
-                            job_id,
-                            "text_on_screen",
-                            status="not_started",
-                            percent=0,
-                            message=f"Pending local OCR ({requested_text_model})",
-                        )
+                        if not local_ocr_started:
+                            _job_step_update(
+                                job_id,
+                                "text_on_screen",
+                                status="not_started",
+                                percent=0,
+                                message=f"Pending local OCR ({requested_text_model})",
+                            )
                     else:
                         _job_step_update(
                             job_id,
@@ -4259,13 +4944,14 @@ def _process_gcs_video_job_cloud_only(
 
                 if enable_moderation:
                     if use_local_moderation:
-                        _job_step_update(
-                            job_id,
-                            "moderation",
-                            status="not_started",
-                            percent=0,
-                            message=f"Pending local moderation ({requested_moderation_model})",
-                        )
+                        if not local_moderation_started:
+                            _job_step_update(
+                                job_id,
+                                "moderation",
+                                status="not_started",
+                                percent=0,
+                                message=f"Pending local moderation ({requested_moderation_model})",
+                            )
                     else:
                         _job_step_update(
                             job_id,
@@ -4549,6 +5235,40 @@ def _process_gcs_video_job_cloud_only(
                 else:
                     _job_step_update(job_id, step, status="skipped", percent=100, message="Disabled")
 
+        if parallel_executor is not None:
+            for name, fut in list(parallel_futures.items()):
+                try:
+                    fut.result()
+                except TranscriptVerificationError:
+                    raise
+                except Exception as exc:
+                    app.logger.warning("Parallel task %s failed: %s", name, exc)
+            parallel_executor.shutdown(wait=True)
+
+        if local_moderation_frames is not None:
+            if not isinstance(video_intelligence, dict):
+                video_intelligence = {}
+            video_intelligence["moderation"] = {
+                "explicit_frames": local_moderation_frames,
+                "source": local_moderation_source or "local",
+            }
+        elif enable_moderation and use_local_moderation and allow_moderation_fallback:
+            fallback_frames: List[Dict[str, Any]] = []
+            try:
+                if isinstance(video_intelligence, dict):
+                    fallback_frames = ((video_intelligence.get("moderation") or {}).get("explicit_frames") or [])
+            except Exception:
+                fallback_frames = []
+            if fallback_frames:
+                effective_models["moderation"] = "gcp_video_intelligence_fallback"
+                _job_step_update(
+                    job_id,
+                    "moderation",
+                    status="completed",
+                    percent=100,
+                    message=f"{len(fallback_frames)} frames (fallback: gcp_video_intelligence)",
+                )
+
         # Local label detection via Ultralytics YOLO (when requested).
         if enable_label_detection and use_yolo_labels:
             try:
@@ -4634,601 +5354,16 @@ def _process_gcs_video_job_cloud_only(
                 _job_step_update(job_id, "label_detection", status="failed", message=str(exc)[:240])
 
         # Local Text-on-Screen OCR (when requested).
-        local_text: List[Dict[str, Any]] = []
-        if enable_text_on_screen and use_local_ocr:
-            try:
-                _job_update(job_id, progress=26, message="Text on Screen (OCR)")
-                interval = float(_parse_int(os.getenv("ENVID_METADATA_OCR_FRAME_INTERVAL_SECONDS"), default=2, min_value=1, max_value=30) or 2)
-                max_frames = int(_parse_int(os.getenv("ENVID_METADATA_OCR_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
-                ocr_lang = (os.getenv("ENVID_METADATA_OCR_LANG") or "en").strip() or "en"
-                ocr_timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_OCR_TIMEOUT_SECONDS"), default=600, min_value=10, max_value=3600) or 600)
-
-                _job_step_update(job_id, "text_on_screen", status="running", percent=0, message=f"Running ({requested_text_model})")
-                if requested_text_model == "tesseract":
-                    local_text = _tesseract_text_from_video(video_path=local_path, interval_seconds=interval, max_frames=max_frames)
-                    effective_models["text_on_screen"] = "tesseract"
-                else:
-                    paddle_service_url = (os.getenv("ENVID_METADATA_LOCAL_OCR_PADDLE_URL") or "").strip()
-                    if paddle_service_url:
-                        local_text = _local_ocr_paddle_service_text_from_video(
-                            video_path=local_path,
-                            interval_seconds=interval,
-                            max_frames=max_frames,
-                            service_base_url=paddle_service_url,
-                            lang=ocr_lang,
-                            timeout_seconds=ocr_timeout,
-                        )
-                        effective_models["text_on_screen"] = "paddleocr_service"
-                    else:
-                        local_text = _paddleocr_text_from_video(
-                            video_path=local_path,
-                            interval_seconds=interval,
-                            max_frames=max_frames,
-                            lang=ocr_lang,
-                        )
-                        effective_models["text_on_screen"] = "paddleocr"
-                _job_step_update(job_id, "text_on_screen", status="completed", percent=100, message=f"{len(local_text)} text entries ({effective_models.get('text_on_screen')})")
-            except Exception as exc:
-                app.logger.warning("Local OCR failed: %s", exc)
-                _job_step_update(job_id, "text_on_screen", status="failed", message=str(exc)[:240])
+        if enable_text_on_screen and use_local_ocr and not local_ocr_started:
+            _run_local_ocr_task()
 
         # Local moderation (when requested).
-        if enable_moderation and use_local_moderation:
-            try:
-                _job_update(job_id, progress=28, message="Moderation (local)")
-                interval = float(_parse_int(os.getenv("ENVID_METADATA_MODERATION_FRAME_INTERVAL_SECONDS"), default=2, min_value=1, max_value=30) or 2)
-                max_frames = int(_parse_int(os.getenv("ENVID_METADATA_MODERATION_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
-                service_url_default = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_URL") or "").strip()
-                service_url_nsfwjs = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL") or "").strip()
-                service_url = (local_moderation_url_override or (service_url_nsfwjs if requested_moderation_model == "nsfwjs" else "") or service_url_default).strip()
-                service_timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_MODERATION_TIMEOUT_SECONDS"), default=60, min_value=1, max_value=600) or 60)
-
-                _job_step_update(job_id, "moderation", status="running", percent=0, message=f"Running ({requested_moderation_model})")
-                if requested_moderation_model == "nudenet":
-                    if service_url:
-                        local_frames = _local_moderation_service_explicit_frames_from_video(
-                            video_path=local_path,
-                            interval_seconds=interval,
-                            max_frames=max_frames,
-                            service_base_url=service_url,
-                            timeout_seconds=service_timeout,
-                        )
-                        source = "nudenet_service"
-                    else:
-                        local_frames = _nudenet_moderation_explicit_frames_from_video(
-                            video_path=local_path,
-                            interval_seconds=interval,
-                            max_frames=max_frames,
-                        )
-                        source = "nudenet"
-                    # Ensure video_intelligence exists.
-                    if not isinstance(video_intelligence, dict):
-                        video_intelligence = {}
-                    # Prefer local moderation output.
-                    video_intelligence["moderation"] = {"explicit_frames": local_frames, "source": source}
-                    effective_models["moderation"] = "nudenet" if source == "nudenet" else "nudenet_service"
-                    _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(local_frames)} frames ({source})")
-                elif requested_moderation_model == "nsfwjs":
-                    if not service_url:
-                        raise RuntimeError(
-                            "nsfwjs requires a local moderation service; set ENVID_METADATA_LOCAL_MODERATION_URL (e.g. http://localhost:5081)"
-                        )
-
-                    local_frames = _local_moderation_service_explicit_frames_from_video(
-                        video_path=local_path,
-                        interval_seconds=interval,
-                        max_frames=max_frames,
-                        service_base_url=service_url,
-                        timeout_seconds=service_timeout,
-                    )
-                    source = "nsfwjs_service"
-
-                    if not isinstance(video_intelligence, dict):
-                        video_intelligence = {}
-                    video_intelligence["moderation"] = {"explicit_frames": local_frames, "source": source}
-                    effective_models["moderation"] = source
-                    _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(local_frames)} frames ({source})")
-                else:
-                    raise RuntimeError(f"Unsupported moderation model: {requested_moderation_model}")
-            except Exception as exc:
-                app.logger.warning("Local moderation failed: %s", exc)
-                # If VI already produced moderation frames, treat that as a fallback.
-                fallback_frames = []
-                try:
-                    if isinstance(video_intelligence, dict):
-                        fallback_frames = ((video_intelligence.get("moderation") or {}).get("explicit_frames") or [])
-                except Exception:
-                    fallback_frames = []
-
-                if allow_moderation_fallback and fallback_frames:
-                    effective_models["moderation"] = "gcp_video_intelligence_fallback"
-                    _job_step_update(
-                        job_id,
-                        "moderation",
-                        status="completed",
-                        percent=100,
-                        message=f"{len(fallback_frames)} frames (fallback: gcp_video_intelligence; local error: {str(exc)[:120]})",
-                    )
-                else:
-                    _job_step_update(job_id, "moderation", status="failed", message=str(exc)[:240])
+        if enable_moderation and use_local_moderation and not local_moderation_started:
+            _run_local_moderation_task()
 
         # Run Whisper when it's the selected/effective transcription engine.
-        if enable_transcribe and (transcribe_effective_mode == "whisper"):
-            if openai_whisper is None:
-                # Defer to the GCP speech path below (if enabled/selected).
-                pass
-            else:
-                try:
-                    _job_update(job_id, progress=32, message="Whisper")
-                    whisper_size = "large-v3"
-                    _job_step_update(job_id, "transcribe", status="running", percent=0, message=f"Running (OpenAI Whisper/{whisper_size})")
-
-                    model = openai_whisper.load_model(whisper_size)
-
-                    # Audio preprocessing (best-effort): extract clean mono 16kHz WAV and optionally slow down tempo.
-                    # This improves stability for noisy inputs and some fast-speaking clips.
-                    preprocess_enabled = True
-                    tempo_raw = (os.getenv("ENVID_WHISPER_AUDIO_ATEMPO") or "").strip()
-                    tempo = _safe_float(tempo_raw or "0.9", 0.9)
-                    filters = (os.getenv("ENVID_WHISPER_AUDIO_FILTERS") or "").strip()
-                    if preprocess_enabled and not filters:
-                        # Default denoise chain for speech (best-effort): band-limit + denoise + normalize.
-                        # If any filter isn't supported by the local ffmpeg build, we fall back at runtime.
-                        filters = "highpass=f=80,lowpass=f=8000,anlmdn,afftdn,loudnorm=I=-16:LRA=11:TP=-1.5"
-                    if preprocess_enabled and tempo and abs(float(tempo) - 1.0) > 1e-6:
-                        atempo_chain = _build_ffmpeg_atempo_chain(float(tempo))
-                        if atempo_chain:
-                            filters = f"{filters},{atempo_chain}" if filters else atempo_chain
-
-                    audio_for_whisper: Path = local_path
-                    audio_preprocess_fallback_used = False
-                    if preprocess_enabled:
-                        audio_path = temp_dir / "whisper_audio.wav"
-                        cmd_base = [
-                            FFMPEG_PATH,
-                            "-i",
-                            str(local_path),
-                            "-vn",
-                            "-ac",
-                            "1",
-                            "-ar",
-                            "16000",
-                            "-acodec",
-                            "pcm_s16le",
-                        ]
-                        cmd = list(cmd_base)
-                        if filters:
-                            cmd += ["-af", filters]
-                        cmd += [str(audio_path), "-y"]
-                        res = subprocess.run(cmd, capture_output=True)
-                        if res.returncode != 0:
-                            err = (res.stderr or b"").decode("utf-8", errors="ignore")
-                            raise RuntimeError(f"FFmpeg denoise failed (filters required): {err[:240]}")
-                        audio_for_whisper = audio_path
-
-                    transcript_meta["whisper"] = {
-                        "model": whisper_size,
-                        "audio_preprocess": {
-                            "enabled": bool(preprocess_enabled),
-                            "filters": filters,
-                            "atempo": float(tempo) if tempo else 1.0,
-                            "format": "wav_s16le_mono_16khz" if preprocess_enabled else "source_video",
-                            "fallback_used": bool(audio_preprocess_fallback_used),
-                        },
-                    }
-
-                    # Decoding params (best-effort). Some older whisper builds may not accept all kwargs.
-                    # Hindi is the primary expected input language for this product.
-                    # Set ENVID_WHISPER_LANGUAGE_CODE=auto to re-enable auto-detection.
-                    _wl_raw = (os.getenv("ENVID_WHISPER_LANGUAGE_CODE") or "").strip()
-                    if _wl_raw.lower() in {"", "auto", "detect"}:
-                        whisper_language = None
-                    else:
-                        whisper_language = _wl_raw
-                    if whisper_language is None:
-                        whisper_language = "hi"
-                    whisper_prompt = (os.getenv("ENVID_WHISPER_INITIAL_PROMPT") or "").strip() or None
-                    quality = (os.getenv("ENVID_WHISPER_QUALITY") or "best").strip().lower() or "best"
-
-                    # Defaults lean towards quality; user can tune via env vars.
-                    temperature = _safe_float(os.getenv("ENVID_WHISPER_TEMPERATURE"), 0.0)
-                    if quality == "best":
-                        beam_default = 10
-                        best_default = 10
-                    elif quality == "fast":
-                        beam_default = 3
-                        best_default = 3
-                    else:
-                        beam_default = 8
-                        best_default = 8
-
-                    beam_size = _parse_int(os.getenv("ENVID_WHISPER_BEAM_SIZE"), default=beam_default, min_value=1, max_value=10)
-                    best_of = _parse_int(os.getenv("ENVID_WHISPER_BEST_OF"), default=best_default, min_value=1, max_value=10)
-                    condition_prev = _env_truthy(os.getenv("ENVID_WHISPER_CONDITION_ON_PREVIOUS_TEXT"), default=True)
-
-                    decode_kwargs: Dict[str, Any] = {
-                        "fp16": False,
-                        "temperature": float(temperature),
-                        "beam_size": int(beam_size),
-                        "best_of": int(best_of),
-                        "condition_on_previous_text": bool(condition_prev),
-                    }
-                    if whisper_language:
-                        decode_kwargs["language"] = whisper_language
-                    if whisper_prompt:
-                        decode_kwargs["initial_prompt"] = whisper_prompt
-
-                    transcript_meta["whisper"]["decode"] = {
-                        "quality": quality,
-                        "language": whisper_language,
-                        "initial_prompt": bool(whisper_prompt),
-                        "temperature": float(temperature),
-                        "beam_size": int(beam_size),
-                        "best_of": int(best_of),
-                        "condition_on_previous_text": bool(condition_prev),
-                    }
-
-                    # Chunking (best-effort): improves completeness on long audio by avoiding
-                    # any single extremely long decoding pass.
-                    chunking_enabled = _env_truthy(os.getenv("ENVID_WHISPER_CHUNKING"), default=True)
-                    chunk_seconds = float(os.getenv("ENVID_WHISPER_CHUNK_SECONDS") or 900.0)
-                    overlap_seconds = float(os.getenv("ENVID_WHISPER_CHUNK_OVERLAP_SECONDS") or 3.0)
-                    # Only chunk when reasonably long, unless explicitly requested.
-                    min_chunk_duration = float(os.getenv("ENVID_WHISPER_MIN_DURATION_TO_CHUNK_SECONDS") or 900.0)
-
-                    transcript_words = []
-                    transcript_segments = []
-                    seg_quality_issues: List[Dict[str, Any]] = []
-
-                    def _whisper_transcribe_compat(path: Path) -> dict[str, Any]:
-                        try:
-                            return model.transcribe(str(path), **decode_kwargs)
-                        except TypeError:
-                            # Backward-compat with older openai-whisper signatures.
-                            safe_kwargs: Dict[str, Any] = {"fp16": False}
-                            if whisper_language:
-                                safe_kwargs["language"] = whisper_language
-                            try:
-                                return model.transcribe(str(path), **safe_kwargs)
-                            except Exception:
-                                return model.transcribe(str(path), fp16=False)
-
-                    def _extract_wav_chunk(*, src: Path, out: Path, start_s: float, dur_s: float) -> None:
-                        ss = max(0.0, float(start_s))
-                        tt = max(0.1, float(dur_s))
-                        cmd_base = [
-                            FFMPEG_PATH,
-                            "-ss",
-                            f"{ss:.3f}",
-                            "-t",
-                            f"{tt:.3f}",
-                            "-i",
-                            str(src),
-                            "-ac",
-                            "1",
-                            "-ar",
-                            "16000",
-                            "-acodec",
-                            "pcm_s16le",
-                        ]
-                        cmd = list(cmd_base)
-                        if filters:
-                            cmd += ["-af", filters]
-                        cmd += [str(out), "-y"]
-                        res = subprocess.run(cmd, capture_output=True)
-                        if res.returncode != 0:
-                            err = (res.stderr or b"").decode("utf-8", errors="ignore")
-                            raise RuntimeError(f"FFmpeg denoise failed for chunk (filters required): {err[:240]}")
-
-                    # Determine duration for chunking decision.
-                    dur_for_chunk = float(duration_seconds or 0.0)
-                    do_chunk = bool(chunking_enabled and chunk_seconds >= 60.0 and dur_for_chunk >= min_chunk_duration)
-                    transcript_meta["whisper"]["chunking"] = {
-                        "enabled": bool(chunking_enabled),
-                        "applied": bool(do_chunk),
-                        "chunk_seconds": float(chunk_seconds),
-                        "overlap_seconds": float(overlap_seconds),
-                        "min_duration_to_chunk_seconds": float(min_chunk_duration),
-                        "duration_seconds": float(dur_for_chunk),
-                    }
-
-                    detected_language: str = ""
-
-                    if do_chunk:
-                        step = max(10.0, float(chunk_seconds) - max(0.0, float(overlap_seconds)))
-                        starts: List[float] = []
-                        cur = 0.0
-                        while cur < max(0.0, dur_for_chunk):
-                            starts.append(cur)
-                            cur += step
-                            if len(starts) > 200:
-                                break
-
-                        last_end = 0.0
-                        for i, st0 in enumerate(starts):
-                            out_chunk = temp_dir / f"whisper_chunk_{i:03d}.wav"
-                            _extract_wav_chunk(src=audio_for_whisper, out=out_chunk, start_s=st0, dur_s=float(chunk_seconds))
-                            r = _whisper_transcribe_compat(out_chunk)
-                            if not detected_language:
-                                detected_language = str(r.get("language") or "").strip()
-
-                            for seg in (r.get("segments") or [])[:50000]:
-                                try:
-                                    st = float(seg.get("start") or 0.0) + float(st0)
-                                    en = float(seg.get("end") or (seg.get("start") or 0.0)) + float(st0)
-                                    txt = str(seg.get("text") or "").strip()
-                                except Exception:
-                                    continue
-                                if not txt:
-                                    continue
-
-                                # Drop tiny overlap duplicates.
-                                if en <= (last_end + 0.15):
-                                    continue
-                                if st < last_end:
-                                    st = float(last_end)
-
-                                avg_logprob = _safe_float(seg.get("avg_logprob"), 0.0)
-                                no_speech_prob = _safe_float(seg.get("no_speech_prob"), 0.0)
-                                compression_ratio = _safe_float(seg.get("compression_ratio"), 0.0)
-                                flags: list[str] = []
-                                if avg_logprob and avg_logprob < -1.0:
-                                    flags.append("low_logprob")
-                                if no_speech_prob and no_speech_prob > 0.6:
-                                    flags.append("possible_non_speech")
-                                if compression_ratio and compression_ratio > 2.4:
-                                    flags.append("possible_hallucination")
-                                if flags:
-                                    seg_quality_issues.append({"start": st, "end": en, "flags": flags})
-
-                                transcript_segments.append(
-                                    {
-                                        "start": st,
-                                        "end": en,
-                                        "text": txt,
-                                        "avg_logprob": avg_logprob,
-                                        "no_speech_prob": no_speech_prob,
-                                        "compression_ratio": compression_ratio,
-                                        "flags": flags,
-                                    }
-                                )
-                                last_end = max(float(last_end), float(en))
-
-                        transcript = " ".join([str(s.get("text") or "").strip() for s in transcript_segments if (s.get("text") or "").strip()]).strip()
-                        transcript_language_code = detected_language
-                        languages_detected = [detected_language] if detected_language else []
-                    else:
-                        result = _whisper_transcribe_compat(Path(audio_for_whisper))
-
-                        transcript = str(result.get("text") or "").strip()
-                        transcript_language_code = str(result.get("language") or "").strip()
-                        languages_detected = [transcript_language_code] if transcript_language_code else []
-                        transcript_words = []
-                        transcript_segments = []
-                        for seg in (result.get("segments") or [])[:50000]:
-                            try:
-                                st = float(seg.get("start") or 0.0)
-                                en = float(seg.get("end") or st)
-                                txt = str(seg.get("text") or "").strip()
-                            except Exception:
-                                continue
-                            if not txt:
-                                continue
-
-                            avg_logprob = _safe_float(seg.get("avg_logprob"), 0.0)
-                            no_speech_prob = _safe_float(seg.get("no_speech_prob"), 0.0)
-                            compression_ratio = _safe_float(seg.get("compression_ratio"), 0.0)
-                            flags: list[str] = []
-                            # Heuristics: highlight segments likely to be inaccurate/hallucinated.
-                            if avg_logprob and avg_logprob < -1.0:
-                                flags.append("low_logprob")
-                            if no_speech_prob and no_speech_prob > 0.6:
-                                flags.append("possible_non_speech")
-                            if compression_ratio and compression_ratio > 2.4:
-                                flags.append("possible_hallucination")
-                            if flags:
-                                seg_quality_issues.append({"start": st, "end": en, "flags": flags})
-
-                            transcript_segments.append(
-                                {
-                                    "start": st,
-                                    "end": en,
-                                    "text": txt,
-                                    "avg_logprob": avg_logprob,
-                                    "no_speech_prob": no_speech_prob,
-                                    "compression_ratio": compression_ratio,
-                                    "flags": flags,
-                                }
-                            )
-
-                        # Prefer assembling transcript from segments to avoid missing tails.
-                        if transcript_segments:
-                            transcript = " ".join(
-                                [
-                                    str(s.get("text") or "").strip()
-                                    for s in transcript_segments
-                                    if (s.get("text") or "").strip()
-                                ]
-                            ).strip()
-
-                    # Preserve raw transcript/segments for diagnostics before any corrections.
-                    raw_transcript = transcript
-                    raw_transcript_segments = [dict(s) for s in transcript_segments] if transcript_segments else []
-
-                    # Correction settings (applied to both transcript and segments).
-                    grammar_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_GRAMMAR_CORRECTION"), default=True)
-                    grammar_url = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip()
-                    grammar_local = _env_truthy(os.getenv("ENVID_GRAMMAR_CORRECTION_USE_LOCAL"), default=False)
-                    dictionary_enabled = _env_truthy(
-                        os.getenv("ENVID_DICTIONARY_ENABLE") or os.getenv("ENVID_HINDI_DICTIONARY_ENABLE"),
-                        default=True,
-                    )
-                    nlp_mode = (os.getenv("ENVID_TRANSCRIPT_NLP_CORRECTION_MODE") or "openrouter_llama").strip().lower() or "openrouter_llama"
-                    punctuation_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_PUNCTUATION_ENHANCE"), default=True)
-
-                    # Apply full correction pipeline to the full transcript (for metadata/visibility).
-                    if transcript:
-                        before = transcript
-                        transcript, corr_meta = _apply_segment_corrections(
-                            text=transcript,
-                            language_code=(whisper_language or transcript_language_code or "hi"),
-                            grammar_enabled=bool(grammar_enabled),
-                            hindi_dictionary_enabled=bool(dictionary_enabled),
-                            nlp_mode=nlp_mode,
-                            punctuation_enabled=bool(punctuation_enabled),
-                        )
-                        transcript_meta["grammar_correction"] = {
-                            "enabled": True,
-                            "available": bool(grammar_url) or (bool(grammar_local) and language_tool_python is not None),
-                            "applied": bool(corr_meta.get("grammar_applied")),
-                        }
-                        lang_norm = _normalize_language_code(whisper_language or transcript_language_code or "hi")
-                        transcript_meta["dictionary_correction"] = {
-                            "enabled": bool(dictionary_enabled),
-                            "language": lang_norm,
-                            "applied": bool(corr_meta.get("dictionary_applied")),
-                        }
-                        transcript_meta["hindi_dictionary_correction"] = {
-                            "enabled": bool(dictionary_enabled and lang_norm == "hi"),
-                            "applied": bool(corr_meta.get("hindi_applied")),
-                        }
-                        transcript_meta["nlp_correction"] = {
-                            "enabled": nlp_mode in {"openrouter_llama", "llama", "openrouter"},
-                            "mode": nlp_mode,
-                            "applied": bool(corr_meta.get("nlp_applied")),
-                        }
-                        transcript_meta["punctuation_enhance"] = {
-                            "enabled": bool(punctuation_enabled),
-                            "applied": bool(corr_meta.get("punctuation_applied")),
-                        }
-
-                    # Keep time-band segments consistent with corrected transcript.
-                    segment_correction_enabled = _env_truthy(os.getenv("ENVID_TRANSCRIPT_SEGMENT_CORRECTION"), default=True)
-                    segment_mode = (os.getenv("ENVID_TRANSCRIPT_SEGMENT_CORRECTION_MODE") or "full").strip().lower() or "full"
-                    segment_max = _parse_int(os.getenv("ENVID_TRANSCRIPT_SEGMENT_CORRECTION_MAX"), default=5000, min_value=10, max_value=100000)
-                    if segment_correction_enabled and transcript_segments:
-                        corrected_segments: list[dict[str, Any]] = []
-                        corrected_count = 0
-                        for seg in transcript_segments[:segment_max]:
-                            if not isinstance(seg, dict):
-                                continue
-                            txt = str(seg.get("text") or "").strip()
-                            if not txt:
-                                corrected_segments.append(seg)
-                                continue
-
-                            seg_grammar = grammar_enabled and segment_mode == "full"
-                            seg_nlp_mode = nlp_mode if segment_mode in {"full", "nlp"} else ""
-                            seg_punct = punctuation_enabled or segment_mode in {"full", "nlp", "punctuation"}
-
-                            corrected_txt, _seg_meta = _apply_segment_corrections(
-                                text=txt,
-                                language_code=(transcript_language_code or whisper_language or "hi"),
-                                grammar_enabled=bool(seg_grammar),
-                                hindi_dictionary_enabled=bool(dictionary_enabled),
-                                nlp_mode=seg_nlp_mode,
-                                punctuation_enabled=bool(seg_punct),
-                            )
-                            if corrected_txt and corrected_txt != txt:
-                                seg = {**seg, "text": corrected_txt}
-                                corrected_count += 1
-                            corrected_segments.append(seg)
-
-                        # Preserve any remaining segments without heavy correction.
-                        if len(transcript_segments) > segment_max:
-                            corrected_segments.extend(transcript_segments[segment_max:])
-
-                        transcript_segments = corrected_segments
-                        transcript_meta.setdefault("segment_correction", {})
-                        transcript_meta["segment_correction"].update(
-                            {
-                                "enabled": True,
-                                "mode": segment_mode,
-                                "applied_count": int(corrected_count),
-                                "max_segments": int(segment_max),
-                            }
-                        )
-
-                        # Rebuild the raw transcript from corrected segments for consistency.
-                        rebuilt = " ".join(
-                            [
-                                str(s.get("text") or "").strip()
-                                for s in transcript_segments
-                                if isinstance(s, dict) and (s.get("text") or "").strip()
-                            ]
-                        ).strip()
-                        if rebuilt:
-                            transcript = rebuilt
-                            transcript_meta["correction_source"] = "segment_corrected"
-
-                    # If corrections significantly diverged, revert to raw transcript.
-                    if raw_transcript and transcript:
-                        def _word_similarity(a: str, b: str) -> float:
-                            a_words = re.findall(r"[\w\u0900-\u097F]+", a or "")
-                            b_words = re.findall(r"[\w\u0900-\u097F]+", b or "")
-                            if not a_words or not b_words:
-                                return 0.0
-                            return difflib.SequenceMatcher(None, a_words, b_words).ratio()
-
-                        min_similarity = _safe_float(os.getenv("ENVID_TRANSCRIPT_MIN_SIMILARITY"), 0.7)
-                        similarity = _word_similarity(raw_transcript, transcript)
-                        transcript_meta["correction_similarity"] = float(similarity)
-                        if similarity < min_similarity:
-                            transcript = raw_transcript
-                            if raw_transcript_segments:
-                                transcript_segments = raw_transcript_segments
-                            transcript_meta["correction_reverted"] = True
-
-                    # Strict verification: fail the job if transcript looks invalid.
-                    verify_strict = _env_truthy(os.getenv("ENVID_TRANSCRIPT_VERIFY_STRICT"), default=True)
-                    require_correction = _env_truthy(os.getenv("ENVID_TRANSCRIPT_VERIFY_REQUIRE_CORRECTION"), default=True)
-                    if verify_strict:
-                        lang_for_check = transcript_language_code or whisper_language or "hi"
-                        is_reasonable = _transcript_is_reasonable(transcript, lang_for_check)
-                        transcript_meta["verification"] = {
-                            "strict": True,
-                            "require_correction": bool(require_correction),
-                            "reasonable": bool(is_reasonable),
-                        }
-                        if not is_reasonable:
-                            raise TranscriptVerificationError("Transcript verification failed: low-quality output")
-                        if require_correction:
-                            dictionary_applied = transcript_meta.get("dictionary_correction", {}).get("applied")
-                            if dictionary_applied is None:
-                                dictionary_applied = transcript_meta.get("hindi_dictionary_correction", {}).get("applied")
-                            applied_flags = [
-                                transcript_meta.get("grammar_correction", {}).get("applied"),
-                                transcript_meta.get("nlp_correction", {}).get("applied"),
-                                transcript_meta.get("punctuation_enhance", {}).get("applied"),
-                                dictionary_applied,
-                            ]
-                            applied_any = any(bool(x) for x in applied_flags)
-                            transcript_meta["verification"]["corrections_applied"] = bool(applied_any)
-                            if not applied_any:
-                                raise TranscriptVerificationError("Transcript verification failed: corrections not applied")
-
-                    if seg_quality_issues:
-                        transcript_meta.setdefault("quality", {})
-                        transcript_meta["quality"]["segment_flags"] = seg_quality_issues[:500]
-
-                    transcript_meta.setdefault("raw_transcript", raw_transcript)
-                    if raw_transcript_segments:
-                        transcript_meta.setdefault("raw_segments", raw_transcript_segments)
-
-                    effective_models["transcribe"] = f"openai_whisper/{whisper_size}"
-                    _job_step_update(job_id, "transcribe", status="completed", percent=100, message=f"Completed (OpenAI Whisper/{whisper_size})")
-                except TranscriptVerificationError as exc:
-                    app.logger.warning("Transcript verification failed: %s", exc)
-                    _job_step_update(job_id, "transcribe", status="failed", message=str(exc)[:240])
-                    raise
-                except Exception as exc:
-                    app.logger.warning("Whisper failed: %s", exc)
-                    # Fall through to the GCP path below.
-                    transcript = ""
-                    transcript_language_code = ""
-                    languages_detected = []
-                    transcript_words = []
-                    transcript_segments = []
+        if enable_transcribe and (transcribe_effective_mode == "whisper") and not whisper_started:
+            _run_whisper_transcription()
 
         enable_speech = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_SPEECH"), default=True)
         if enable_transcribe and (transcribe_effective_mode == "gcp_speech") and enable_speech and gcp_speech is not None and not transcript:
@@ -5372,6 +5507,33 @@ def _process_gcs_video_job_cloud_only(
                 _subtitles_local_path(job_id, lang="orig", fmt="vtt").write_text(_segments_to_vtt(transcript_segments), encoding="utf-8")
             except Exception:
                 pass
+            source_lang = (transcript_language_code or "").strip().lower()
+            if source_lang:
+                subtitles.setdefault("orig", {"language_code": source_lang})
+                try:
+                    _subtitles_local_path(job_id, lang=source_lang, fmt="srt").write_text(
+                        _segments_to_srt(transcript_segments),
+                        encoding="utf-8",
+                    )
+                    _subtitles_local_path(job_id, lang=source_lang, fmt="vtt").write_text(
+                        _segments_to_vtt(transcript_segments),
+                        encoding="utf-8",
+                    )
+                except Exception:
+                    pass
+                if source_lang.startswith("en"):
+                    subtitles.setdefault("en", {"language_code": "en"})
+                    try:
+                        _subtitles_local_path(job_id, lang="en", fmt="srt").write_text(
+                            _segments_to_srt(transcript_segments),
+                            encoding="utf-8",
+                        )
+                        _subtitles_local_path(job_id, lang="en", fmt="vtt").write_text(
+                            _segments_to_vtt(transcript_segments),
+                            encoding="utf-8",
+                        )
+                    except Exception:
+                        pass
 
         # Famous locations (best-effort): optionally translate transcript to English then run entity extraction.
         if enable_famous_locations:
@@ -5383,7 +5545,10 @@ def _process_gcs_video_job_cloud_only(
         enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
         translate_provider = _translate_provider()
         has_text_to_translate = bool(transcript_segments) or bool((transcript or "").strip())
-        translate_targets = _translate_targets()
+        requested_targets = _translate_targets_from_selection(sel)
+        translate_targets = requested_targets or _translate_targets()
+        if "en" not in translate_targets:
+            translate_targets = ["en", *translate_targets]
         translations_meta: Dict[str, Any] = {
             "enabled": bool(enable_translate),
             "provider": translate_provider,
@@ -5435,6 +5600,15 @@ def _process_gcs_video_job_cloud_only(
                 if "en" in translations_by_lang:
                     en_segments = translations_by_lang["en"].get("transcript", {}).get("segments") or []
                     translated_en = translations_by_lang["en"].get("transcript", {}).get("text") or ""
+                source_lang = (transcript_language_code or "").strip().lower()
+                if source_lang and source_lang not in translations_by_lang:
+                    translations_by_lang[source_lang] = {
+                        "transcript": {
+                            "text": str(transcript or "").strip(),
+                            "segments": transcript_segments,
+                            "language_code": source_lang,
+                        }
+                    }
                 if translations_by_lang:
                     _job_step_update(job_id, "translate_output", status="completed", percent=100, message=f"{len(translations_by_lang)} languages")
             except Exception as exc:
@@ -5445,6 +5619,39 @@ def _process_gcs_video_job_cloud_only(
             _job_step_update(job_id, "translate_output", status="skipped", percent=100, message="No text to translate")
         else:
             _job_step_update(job_id, "translate_output", status="skipped", percent=100, message="Disabled")
+
+        source_lang = (transcript_language_code or "").strip().lower()
+        if transcript_segments:
+            if source_lang and source_lang not in translations_by_lang:
+                translations_by_lang[source_lang] = {
+                    "transcript": {
+                        "text": str(transcript or "").strip(),
+                        "segments": transcript_segments,
+                        "language_code": source_lang,
+                    }
+                }
+            if "en" not in translations_by_lang:
+                translations_by_lang["en"] = {
+                    "transcript": {
+                        "text": str(transcript or "").strip(),
+                        "segments": transcript_segments,
+                        "language_code": "en",
+                        "fallback_copy": True,
+                    }
+                }
+            subtitles.setdefault("orig", {"language_code": source_lang or ""})
+            subtitles.setdefault("en", {"language_code": "en"})
+            try:
+                _subtitles_local_path(job_id, lang="en", fmt="srt").write_text(
+                    _segments_to_srt(transcript_segments),
+                    encoding="utf-8",
+                )
+                _subtitles_local_path(job_id, lang="en", fmt="vtt").write_text(
+                    _segments_to_vtt(transcript_segments),
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
 
         locations: List[Dict[str, Any]] = []
         try:
@@ -5534,13 +5741,13 @@ def _process_gcs_video_job_cloud_only(
             effective_models["synopsis_generation"] = "failed"
             _job_step_update(job_id, "synopsis_generation", status="failed", message=msg[:240])
             critical_failures.append(f"synopsis_generation: {msg[:200]}")
-        scenes: List[Dict[str, Any]] = []
-        scenes_source = "none"
+        scenes: List[Dict[str, Any]] = list(precomputed_scenes) if precomputed_scenes else []
+        scenes_source = precomputed_scenes_source if precomputed_scenes else "none"
         key_scenes: list[dict[str, Any]] = []
         high_points: list[dict[str, Any]] = []
         if enable_scene_by_scene or enable_key_scene or enable_high_point:
             # Prefer local engines when explicitly selected.
-            if use_transnetv2_for_scenes:
+            if (not scenes) and use_transnetv2_for_scenes:
                 try:
                     scenes = _transnetv2_list_scenes(video_path=local_path, temp_dir=temp_dir)
                     scenes_source = "transnetv2"
@@ -6577,6 +6784,49 @@ def subtitles_id_vtt(video_id: str) -> Any:
     if not path.exists():
         return jsonify({"error": "Indonesian subtitles not found"}), 404
     return _serve_text_file(path, "text/vtt")
+
+
+@app.route("/video/<video_id>/subtitles/<lang>.<fmt>", methods=["GET"])
+def subtitles_any(video_id: str, lang: str, fmt: str) -> Any:
+    lang_norm = (lang or "").strip().lower() or "orig"
+    fmt_norm = (fmt or "").strip().lower().lstrip(".")
+    if fmt_norm not in {"srt", "vtt"}:
+        return jsonify({"error": "Unsupported subtitle format"}), 400
+    with VIDEO_INDEX_LOCK:
+        v = next((x for x in VIDEO_INDEX if str(x.get("id")) == str(video_id)), None)
+    artifacts = (v.get("gcs_artifacts") if isinstance(v, dict) else None) if v else None
+    subs = artifacts.get("subtitles") if isinstance(artifacts, dict) else None
+    key = f"{lang_norm}.{fmt_norm}"
+    info = subs.get(key) if isinstance(subs, dict) else None
+    if isinstance(info, dict) and artifacts and artifacts.get("bucket") and info.get("object"):
+        try:
+            response_type = "application/x-subrip" if fmt_norm == "srt" else "text/vtt"
+            url = _gcs_presign_get_url(
+                bucket=str(artifacts.get("bucket")),
+                obj=str(info.get("object")),
+                response_type=response_type,
+            )
+            return redirect(url, code=302)
+        except Exception:
+            pass
+
+    path = _subtitles_local_path(video_id, lang=lang_norm, fmt=fmt_norm)
+    if not path.exists():
+        return jsonify({"error": "Subtitles not found"}), 404
+    content_type = "application/x-subrip" if fmt_norm == "srt" else "text/vtt"
+    return _serve_text_file(path, content_type)
+
+
+@app.get("/translate/languages")
+def translate_languages() -> Any:
+    base_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
+    if not base_url:
+        return jsonify({"ok": False, "languages": [], "error": "LibreTranslate URL is not configured"}), 200
+    try:
+        langs = _libretranslate_languages_raw(base_url)
+        return jsonify({"ok": True, "languages": langs}), 200
+    except Exception as exc:
+        return jsonify({"ok": False, "languages": [], "error": str(exc)[:240]}), 200
 
 
 @app.route("/video-file/<video_id>", methods=["GET"])
