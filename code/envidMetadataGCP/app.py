@@ -1632,8 +1632,8 @@ def _job_steps_default() -> List[Dict[str, Any]]:
         {"id": "transcribe", "label": "Audio Transcription", "status": "not_started", "percent": 0, "message": None},
         {"id": "synopsis_generation", "label": "Synopsis Generation", "status": "not_started", "percent": 0, "message": None},
         {"id": "scene_by_scene_metadata", "label": "Scene by scene metadata", "status": "not_started", "percent": 0, "message": None},
-        {"id": "famous_location_detection", "label": "Famous location detection", "status": "not_started", "percent": 0, "message": None},
         {"id": "translate_output", "label": "Translation of Metadata", "status": "not_started", "percent": 0, "message": None},
+        {"id": "famous_location_detection", "label": "Famous location detection", "status": "not_started", "percent": 0, "message": None},
         {"id": "opening_closing_credit_detection", "label": "Opening/Closing credit detection", "status": "not_started", "percent": 0, "message": None},
         {"id": "celebrity_detection", "label": "Celebrity detection", "status": "not_started", "percent": 0, "message": None},
         {"id": "celebrity_bio_image", "label": "Celebrity bio & Image", "status": "not_started", "percent": 0, "message": None},
@@ -4954,39 +4954,35 @@ def _process_gcs_video_job_cloud_only(
                 if enable_key_scene:
                     _job_step_update(job_id, "key_scene_detection", status="failed", percent=100, message=str(exc)[:240])
 
-        if enable_text_on_screen and use_local_ocr:
-            local_ocr_started = True
-            if run_all_sequential:
-                _run_local_ocr_task()
-            else:
+        if not run_all_sequential:
+            if enable_text_on_screen and use_local_ocr:
+                local_ocr_started = True
                 parallel_futures["local_ocr"] = _ensure_parallel_executor().submit(_run_local_ocr_task)
 
-        if enable_moderation and use_local_moderation:
-            local_moderation_started = True
-            if run_all_sequential:
-                _run_local_moderation_task()
-            else:
+            if enable_moderation and use_local_moderation:
+                local_moderation_started = True
                 parallel_futures["local_moderation"] = _ensure_parallel_executor().submit(_run_local_moderation_task)
 
-        if (enable_scene_by_scene or enable_key_scene or enable_high_point) and (use_transnetv2_for_scenes or use_pyscenedetect_for_scenes):
-            scenes_started = True
-            if run_all_sequential or sequential_scene_then_whisper:
-                _run_scene_detect_task()
-            else:
-                parallel_futures["scene_detect"] = _ensure_parallel_executor().submit(_run_scene_detect_task)
+            if (enable_scene_by_scene or enable_key_scene or enable_high_point) and (use_transnetv2_for_scenes or use_pyscenedetect_for_scenes):
+                scenes_started = True
+                if sequential_scene_then_whisper:
+                    _run_scene_detect_task()
+                else:
+                    parallel_futures["scene_detect"] = _ensure_parallel_executor().submit(_run_scene_detect_task)
 
-        if enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is None:
-            _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Whisper not installed")
-        elif enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is not None:
-            whisper_started = True
-            if run_all_sequential or sequential_scene_then_whisper:
-                _run_whisper_transcription()
-            else:
-                parallel_futures["whisper"] = _ensure_parallel_executor().submit(_run_whisper_transcription)
+            if enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is None:
+                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Whisper not installed")
+            elif enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is not None:
+                whisper_started = True
+                if sequential_scene_then_whisper:
+                    _run_whisper_transcription()
+                else:
+                    parallel_futures["whisper"] = _ensure_parallel_executor().submit(_run_whisper_transcription)
 
         if enable_vi and gcp_video_intelligence is not None and want_any_vi:
             try:
                 _job_update(job_id, progress=12, message="Video Intelligence")
+                sequential_vi = bool(run_all_sequential)
 
                 # Mark VI-backed steps based on user selection.
                 if enable_label_detection:
@@ -5010,9 +5006,13 @@ def _process_gcs_video_job_cloud_only(
                         _job_step_update(
                             job_id,
                             "label_detection",
-                            status="running",
+                            status="running" if not sequential_vi else "not_started",
                             percent=0,
-                            message=f"Running (Google Video Intelligence; mode={vi_label_mode})",
+                            message=(
+                                f"Running (Google Video Intelligence; mode={vi_label_mode})"
+                                if not sequential_vi
+                                else "Queued (sequential)"
+                            ),
                         )
                 else:
                     _job_step_update(job_id, "label_detection", status="skipped", percent=100, message="Disabled")
@@ -5031,9 +5031,13 @@ def _process_gcs_video_job_cloud_only(
                         _job_step_update(
                             job_id,
                             "text_on_screen",
-                            status="running",
+                            status="running" if not sequential_vi else "not_started",
                             percent=0,
-                            message=f"Running (via gcp_video_intelligence; requested: {requested_models.get('text_model')})",
+                            message=(
+                                f"Running (via gcp_video_intelligence; requested: {requested_models.get('text_model')})"
+                                if not sequential_vi
+                                else "Queued (sequential)"
+                            ),
                         )
                 else:
                     _job_step_update(job_id, "text_on_screen", status="skipped", percent=100, message="Disabled")
@@ -5052,9 +5056,13 @@ def _process_gcs_video_job_cloud_only(
                         _job_step_update(
                             job_id,
                             "moderation",
-                            status="running",
+                            status="running" if not sequential_vi else "not_started",
                             percent=0,
-                            message=f"Running (via gcp_video_intelligence; requested: {requested_models.get('moderation_model')})",
+                            message=(
+                                f"Running (via gcp_video_intelligence; requested: {requested_models.get('moderation_model')})"
+                                if not sequential_vi
+                                else "Queued (sequential)"
+                            ),
                         )
                 else:
                     _job_step_update(job_id, "moderation", status="skipped", percent=100, message="Disabled")
@@ -5303,13 +5311,37 @@ def _process_gcs_video_job_cloud_only(
                     video_intelligence["people"] = people
 
                 if enable_label_detection and use_vi_label_detection:
+                    if sequential_vi:
+                        _job_step_update(
+                            job_id,
+                            "label_detection",
+                            status="running",
+                            percent=50,
+                            message=f"Running (Google Video Intelligence; mode={vi_label_mode})",
+                        )
                     _job_step_update(job_id, "label_detection", status="completed", percent=100, message=f"{len(labels)} labels")
-                if enable_text_on_screen:
-                    if not use_local_ocr:
-                        _job_step_update(job_id, "text_on_screen", status="completed", percent=100, message=f"{len(texts)} text entries")
-                if enable_moderation:
-                    if not use_local_moderation:
-                        _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(moderation_frames)} frames")
+
+                if enable_moderation and not use_local_moderation:
+                    if sequential_vi:
+                        _job_step_update(
+                            job_id,
+                            "moderation",
+                            status="running",
+                            percent=50,
+                            message=f"Running (via gcp_video_intelligence; requested: {requested_models.get('moderation_model')})",
+                        )
+                    _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(moderation_frames)} frames")
+
+                if enable_text_on_screen and not use_local_ocr:
+                    if sequential_vi:
+                        _job_step_update(
+                            job_id,
+                            "text_on_screen",
+                            status="running",
+                            percent=50,
+                            message=f"Running (via gcp_video_intelligence; requested: {requested_models.get('text_model')})",
+                        )
+                    _job_step_update(job_id, "text_on_screen", status="completed", percent=100, message=f"{len(texts)} text entries")
             except Exception as exc:
                 app.logger.warning("Video Intelligence failed: %s", exc)
                 for step, enabled in [
@@ -5330,6 +5362,25 @@ def _process_gcs_video_job_cloud_only(
                     _job_step_update(job_id, step, status="skipped", percent=100, message=msg)
                 else:
                     _job_step_update(job_id, step, status="skipped", percent=100, message="Disabled")
+
+        if run_all_sequential:
+            if enable_moderation and use_local_moderation:
+                local_moderation_started = True
+                _run_local_moderation_task()
+
+            if enable_text_on_screen and use_local_ocr:
+                local_ocr_started = True
+                _run_local_ocr_task()
+
+            if (enable_scene_by_scene or enable_key_scene or enable_high_point) and (use_transnetv2_for_scenes or use_pyscenedetect_for_scenes):
+                scenes_started = True
+                _run_scene_detect_task()
+
+            if enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is None:
+                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Whisper not installed")
+            elif enable_transcribe and (transcribe_effective_mode == "whisper") and openai_whisper is not None:
+                whisper_started = True
+                _run_whisper_transcription()
 
         if parallel_executor is not None:
             whisper_timeout = float(os.getenv("ENVID_METADATA_WHISPER_TIMEOUT_SECONDS") or 5400.0)
@@ -5649,11 +5700,9 @@ def _process_gcs_video_job_cloud_only(
                     except Exception:
                         pass
 
-        # Famous locations (best-effort): optionally translate transcript to English then run entity extraction.
-        if enable_famous_locations:
-            _job_step_update(job_id, "famous_location_detection", status="running", percent=0, message="Running")
-        else:
-            _job_step_update(job_id, "famous_location_detection", status="skipped", percent=100, message="Disabled")
+        # Famous locations are not implemented in the slim stack; always skip.
+        enable_famous_locations = False
+        _job_step_update(job_id, "famous_location_detection", status="skipped", percent=100, message="Disabled")
         translated_en = ""
         en_segments: List[Dict[str, Any]] = []
         enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
@@ -5768,46 +5817,6 @@ def _process_gcs_video_job_cloud_only(
                 pass
 
         locations: List[Dict[str, Any]] = []
-        try:
-            if enable_famous_locations and gcp_language is not None and (translated_en or transcript):
-                doc = gcp_language.Document(content=(translated_en or transcript)[:4800], type_=gcp_language.Document.Type.PLAIN_TEXT)
-                lang_client = gcp_language.LanguageServiceClient()
-                ents = lang_client.analyze_entities(request={"document": doc}).entities
-                out: List[Dict[str, Any]] = []
-                for e in ents or []:
-                    try:
-                        if getattr(e, "type_", None) != gcp_language.Entity.Type.LOCATION:
-                            continue
-                    except Exception:
-                        continue
-                    name = (getattr(e, "name", None) or "").strip()
-                    if not name:
-                        continue
-                    score = float(getattr(e, "salience", 0.0) or 0.0)
-                    out.append({"name": name, "score": score})
-                best: dict[str, float] = {}
-                for r in out:
-                    nm = r.get("name")
-                    if not nm:
-                        continue
-                    best[nm] = max(best.get(nm, 0.0), float(r.get("score") or 0.0))
-                ranked = [{"name": k, "score": v} for k, v in best.items()]
-                ranked.sort(key=lambda x: (x.get("score") or 0.0, x.get("name") or ""), reverse=True)
-                locations = ranked[:25]
-        except Exception as exc:
-            app.logger.warning("NLP locations failed: %s", exc)
-
-        if enable_famous_locations:
-            if locations:
-                _job_step_update(
-                    job_id,
-                    "famous_location_detection",
-                    status="completed",
-                    percent=100,
-                    message=f"{len(locations)} locations (requested: {requested_models.get('famous_location_detection_model')})",
-                )
-            else:
-                _job_step_update(job_id, "famous_location_detection", status="skipped", percent=100, message="No locations")
 
         synopses_by_age: Dict[str, Any] = {}
         try:
