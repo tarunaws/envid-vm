@@ -4434,7 +4434,13 @@ def _process_gcs_video_job_cloud_only(
             try:
                 app.logger.info("Whisper transcription started")
                 _job_update(job_id, progress=32, message="Whisper")
-                whisper_size = "large-v3"
+                requested_size = (os.getenv("ENVID_WHISPER_MODEL_SIZE") or "").strip().lower()
+                if requested_size in {"tiny", "base", "small", "medium", "large-v2", "large-v3"}:
+                    whisper_size = requested_size
+                elif requested_size in {"large"}:
+                    whisper_size = "large-v3"
+                else:
+                    whisper_size = "large-v3"
                 _job_step_update(job_id, "transcribe", status="running", percent=5, message=f"Running (OpenAI Whisper/{whisper_size})")
 
                 model = openai_whisper.load_model(whisper_size)
