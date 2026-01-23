@@ -639,6 +639,14 @@ def _transcript_is_reasonable(text: str, language_code: str | None) -> bool:
     return True
 
 
+def _synopsis_similarity(a: str, b: str) -> float:
+    a_words = re.findall(r"[\wऀ-ॿ]+", a or "")
+    b_words = re.findall(r"[\wऀ-ॿ]+", b or "")
+    if not a_words or not b_words:
+        return 0.0
+    return difflib.SequenceMatcher(None, a_words, b_words).ratio()
+
+
 def _apply_segment_corrections(
     *,
     text: str,
@@ -666,19 +674,13 @@ def _apply_segment_corrections(
         "punctuation_applied": False,
     }
 
-    if nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
-        normalized, _ = _openrouter_llama_normalize_transcript(text=out, language_code=language_code)
-        if normalized and normalized != out:
-            out = normalized
-            meta["nlp_applied"] = True
-
     if grammar_enabled:
         corrected, _ = _languagetool_correct_text(text=out, language=language_code)
         if corrected and corrected != out:
             out = corrected
             meta["grammar_applied"] = True
 
-    # Apply dictionary correction (language-aware) before deterministic punctuation.
+    # Apply dictionary correction (language-aware) before punctuation.
     if hindi_dictionary_enabled:
         corrected = _dictionary_correct_text(text=out, language_code=language_code)
         if corrected and corrected != out:
@@ -692,6 +694,12 @@ def _apply_segment_corrections(
         if corrected and corrected != out:
             out = corrected
             meta["punctuation_applied"] = True
+
+    if nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
+        normalized, _ = _openrouter_llama_normalize_transcript(text=out, language_code=language_code)
+        if normalized and normalized != out:
+            out = normalized
+            meta["nlp_applied"] = True
 
     if punctuation_enabled and not meta["punctuation_applied"]:
         force_terminal = _env_truthy(os.getenv("ENVID_TRANSCRIPT_FORCE_PUNCTUATION_END"), default=False)
@@ -808,6 +816,12 @@ def _openrouter_llama_normalize_transcript(*, text: str, language_code: str | No
     timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 15.0)
 
     lang = (language_code or "").strip() or "unknown"
+    extra = ""
+    if strict:
+        extra = (
+            "CRITICAL: Use only facts from the transcript. If information is unclear or missing, say so briefly.\n"
+            "Avoid generic filler. Be specific to transcript details.\n"
+        )
     prompt = (
         "You are a transcript normalizer.\n"
         "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
@@ -861,7 +875,7 @@ def _openrouter_llama_normalize_transcript(*, text: str, language_code: str | No
         return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
 
 
-def _openrouter_llama_generate_synopses(*, text: str, language_code: str | None) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+def _openrouter_llama_generate_synopses(*, text: str, language_code: str | None, strict: bool = False) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Generate age-group synopses using OpenRouter (Meta Llama).
 
     Returns (synopses_or_none, meta).
@@ -885,9 +899,22 @@ def _openrouter_llama_generate_synopses(*, text: str, language_code: str | None)
     timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 20.0)
 
     lang = (language_code or "").strip() or "unknown"
+                
+    
     prompt = (
         "You are a synopsis generator.\n"
+        "Summarize the story STRICTLY from the transcript.\n"
+        "Capture main characters, setting, key events, and outcome if present.\n"
+        "Do NOT invent facts or add content not in the transcript.\n"
+        "Avoid generic phrasing; use concrete details from the transcript.\n"
+        f"{extra}"
         "Create short and long synopses for three age groups.\n"
+        "Each group must be DISTINCT in tone and content.\n"
+        "Kids: simple, gentle, no mature themes.\n"
+        "Teens: balanced, slightly more detail.\n"
+        "Adults: most detailed and nuanced.\n"
+        "Short must be 1-2 sentences. Long must be 3-6 sentences.\n"
+        "Do NOT reuse the same sentences across groups or between short/long.\n"
         "Return STRICT JSON only with keys: kids, teens, adults.\n"
         "Each value must be an object with keys: short, long.\n"
         "Do not add any extra keys or commentary.\n"
@@ -1029,11 +1056,14 @@ def _openrouter_llama_scene_summaries(
     if not scene_inputs:
         return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
 
+                
+    
     prompt = (
         "You are a scene-by-scene summarizer.\n"
         "Summarize each scene in 1-2 short sentences.\n"
         "Use ONLY the provided scene context.\n"
-        "Return STRICT JSON only: {\"scenes\": [{\"index\": <int>, \"summary\": <string>}]}\n"
+        "Summaries must be UNIQUE per scene; do not repeat the same sentence.\n"
+        "Return STRICT JSON only: {\"scenes\": [{\"index\": <int>, \"summary\": <string>}] }\n"
         "Do not add any extra keys or commentary.\n"
         "Write in the SAME LANGUAGE as the transcript. Do NOT translate.\n\n"
         f"Language hint: {lang}\n\n"
@@ -1125,15 +1155,25 @@ def _synopsis_is_reasonable(text: str, language_code: str | None, *, min_words: 
 def _validate_synopses_payload(payload: dict[str, Any], language_code: str | None) -> bool:
     if not isinstance(payload, dict):
         return False
+    items: dict[str, dict[str, str]] = {}
     for group in ("kids", "teens", "adults"):
         item = payload.get(group)
         if not isinstance(item, dict):
             return False
-        short = item.get("short")
-        long = item.get("long")
-        if not _synopsis_is_reasonable(str(short or ""), language_code, min_words=6, max_words=120):
+        short = str(item.get("short") or "").strip()
+        long = str(item.get("long") or "").strip()
+        if not _synopsis_is_reasonable(short, language_code, min_words=6, max_words=120):
             return False
-        if not _synopsis_is_reasonable(str(long or ""), language_code, min_words=15, max_words=300):
+        if not _synopsis_is_reasonable(long, language_code, min_words=15, max_words=300):
+            return False
+        if _synopsis_similarity(short, long) > 0.82:
+            return False
+        items[group] = {"short": short, "long": long}
+    pairs = [("kids", "teens"), ("kids", "adults"), ("teens", "adults")]
+    for a, b in pairs:
+        if _synopsis_similarity(items[a]["short"], items[b]["short"]) > 0.82:
+            return False
+        if _synopsis_similarity(items[a]["long"], items[b]["long"]) > 0.82:
             return False
     return True
 
@@ -1156,15 +1196,18 @@ def _fallback_synopses_from_text(text: str, language_code: str | None) -> dict[s
         count = min(max_words, max(min_words, len(words)))
         return " ".join(words[:count]).strip()
 
-    short = _slice(12, 50)
-    long = _slice(35, 180)
+    kids_short = _slice(8, 35)
+    kids_long = _slice(18, 80)
+    teens_short = _slice(12, 50)
+    teens_long = _slice(28, 120)
+    adults_short = _slice(15, 70)
+    adults_long = _slice(40, 180)
     payload = {
-        "kids": {"short": short, "long": long},
-        "teens": {"short": short, "long": long},
-        "adults": {"short": short, "long": long},
+        "kids": {"short": kids_short, "long": kids_long},
+        "teens": {"short": teens_short, "long": teens_long},
+        "adults": {"short": adults_short, "long": adults_long},
     }
-    if _validate_synopses_payload(payload, language_code):
-        return payload
+    return payload
     return None
 
 
@@ -1607,6 +1650,7 @@ def _load_language_confusions(lang: str) -> dict[str, str]:
                     conf.update({str(k): str(v) for k, v in parsed.items() if k and v})
             except Exception:
                 pass
+        conf.setdefault("जपड़ा", "जकड़ा")
 
     _LANG_CONFUSION_MAP[lang] = conf
     return conf
@@ -3610,6 +3654,30 @@ def _local_label_detection_service_labels_from_video(
     return out
 
 
+def _ocr_text_reasonable(text: str) -> bool:
+    raw = str(text or "").strip()
+    min_len = _parse_int(os.getenv("ENVID_METADATA_OCR_MIN_LEN"), default=2, min_value=1, max_value=20)
+    if len(raw) < min_len:
+        return False
+    letters = sum(1 for ch in raw if ch.isalpha())
+    alpha_ratio = letters / max(1, len(raw))
+    min_alpha = _safe_float(os.getenv("ENVID_METADATA_OCR_MIN_ALPHA_RATIO"), 0.3)
+    if alpha_ratio < min_alpha:
+        return False
+    devanagari = sum(1 for ch in raw if "ऀ" <= ch <= "ॿ")
+    if devanagari > 0:
+        min_dev = _safe_float(os.getenv("ENVID_METADATA_OCR_MIN_DEVANAGARI_RATIO"), 0.4)
+        if devanagari / max(1, letters) < min_dev:
+            return False
+    nonword = sum(1 for ch in raw if not ch.isalnum() and not ch.isspace())
+    max_nonword = _safe_float(os.getenv("ENVID_METADATA_OCR_MAX_NONWORD_RATIO"), 0.6)
+    if nonword / max(1, len(raw)) > max_nonword:
+        return False
+    if len(set(raw)) <= 1 and len(raw) > 3:
+        return False
+    return True
+
+
 def _aggregate_text_segments(
     *,
     hits: List[Tuple[str, float, float, float]],
@@ -3623,6 +3691,8 @@ def _aggregate_text_segments(
         if not key:
             continue
         if conf < min_conf:
+            continue
+        if not _ocr_text_reasonable(key):
             continue
         by_text.setdefault(key, []).append({"start": float(st), "end": float(en), "confidence": float(conf)})
 
@@ -6136,7 +6206,21 @@ def _process_gcs_video_job_cloud_only(
                         synopses_by_age = data
                         effective_models["synopsis_generation"] = meta.get("model") or "openrouter"
                     else:
-                        effective_models["synopsis_generation"] = "validation_failed"
+                        retry_data, retry_meta = _openrouter_llama_generate_synopses(
+                            text=(transcript or video_description or ""),
+                            language_code=(transcript_language_code or "hi"),
+                            strict=True,
+                        )
+                        if isinstance(retry_data, dict) and _validate_synopses_payload(
+                            retry_data, transcript_language_code or "hi"
+                        ):
+                            synopses_by_age = retry_data
+                            effective_models["synopsis_generation"] = (
+                                retry_meta.get("model") or "openrouter_retry"
+                            )
+                        else:
+                            effective_models["synopsis_generation"] = "validation_failed"
+
                 if not synopses_by_age:
                     fallback = _fallback_synopses_from_text(
                         transcript or video_description or "",

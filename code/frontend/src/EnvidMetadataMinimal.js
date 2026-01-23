@@ -1220,7 +1220,12 @@ export default function EnvidMetadataMinimal() {
   }, []);
 
   useEffect(() => {
-    if (!activeJob?.jobId && !uploading) {
+    const showStats =
+      Boolean(activeJob?.jobId) ||
+      uploading ||
+      (videoSource === local ? Boolean(selectedFile) : Boolean(String(gcsRawVideoObject || ).trim()));
+
+    if (!showStats) {
       setSystemStats(null);
       return undefined;
     }
@@ -1229,7 +1234,7 @@ export default function EnvidMetadataMinimal() {
     const fetchStats = async () => {
       try {
         const sr = await axios.get(`${BACKEND_URL}/system/stats`);
-        if (!cancelled && sr?.data?.status === 'ok') {
+        if (!cancelled && sr?.data?.status === ok) {
           setSystemStats(sr.data);
         }
       } catch (err) {
@@ -1243,7 +1248,7 @@ export default function EnvidMetadataMinimal() {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [activeJob?.jobId, uploading]);
+  }, [activeJob?.jobId, uploading, videoSource, selectedFile, gcsRawVideoObject]);
 
   const togglePlayerFullscreen = async () => {
     const el = playerContainerRef.current;
@@ -1974,7 +1979,7 @@ export default function EnvidMetadataMinimal() {
               {activeJob?.kind ? `${activeJob.kind} job` : 'job'}
               {activeJob?.jobId ? ` • ${String(activeJob.jobId).slice(0, 8)}…` : ''}
             </StatusMeta>
-            {(activeJob?.jobId || uploading) && (
+            {showStatusPanel && (
               <SystemStatsRow>
                 <SystemStatPill>VM CPU: {cpuPercentLabel}</SystemStatPill>
                 <SystemStatPill>VM GPU: {gpuPercentLabel}</SystemStatPill>
