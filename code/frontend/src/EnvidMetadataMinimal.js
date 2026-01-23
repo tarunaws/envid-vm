@@ -2267,10 +2267,8 @@ export default function EnvidMetadataMinimal() {
                 padding: 14,
               }}
             >
-              <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Task Selection</div>
-
+              <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Target Translation</div>
               <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-                <div style={{ fontWeight: 800, color: '#e6e8f2' }}>Target translation languages</div>
                 <details
                   style={{
                     border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -2336,6 +2334,18 @@ export default function EnvidMetadataMinimal() {
                   <div style={{ fontSize: 12, color: '#ff6b6b' }}>{translateLanguagesError}</div>
                 ) : null}
               </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 14,
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: 14,
+                padding: 14,
+              }}
+            >
+              <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Task Selection</div>
 
               <div style={{ display: 'grid', gap: 10 }}>
                 {[
