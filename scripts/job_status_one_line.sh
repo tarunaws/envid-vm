@@ -67,7 +67,7 @@ print(current_step.get("percent") or 0)
   read -r current_task < <(sed -n '3p' /tmp/job_status_parsed.txt)
   read -r current_progress < <(sed -n '4p' /tmp/job_status_parsed.txt)
 
-  if ! read -r cpu gpu < <(gcloud compute ssh "$VM_NAME" --project="$PROJECT_ID" --zone="$ZONE" --command "PID=\$(pgrep -f '/home/tarun-envid/envid-metadata/code/envidMetadataGCP/app.py' | head -n 1); if [ -n \"\$PID\" ]; then ps -p \"\$PID\" -o %cpu --no-headers | awk '{print int(\$1)}'; else echo 0; fi; if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | awk '{print int(\$1)}'; else echo 0; fi" | tr '\n' ' '); then
+  if ! read -r cpu gpu < <(gcloud compute ssh "$VM_NAME" --project="$PROJECT_ID" --zone="$ZONE" --command "PID_FILE='/home/tarun-envid/envid-metadata/envid-metadata-multimodal.pid'; PID=\$(cat \"\$PID_FILE\" 2>/dev/null || true); if [ -z \"\$PID\" ]; then PID=\$(pgrep -f 'envidMetadataGCP/app.py' | head -n 1); fi; if [ -n \"\$PID\" ]; then CPU=\$(ps -p \"\$PID\" -o %cpu= | awk '{printf \"%.0f\", \$1}'); else CPU=0; fi; if command -v nvidia-smi >/dev/null 2>&1; then GPU=\$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | awk '{printf \"%.0f\", \$1}'); else GPU=0; fi; printf \"%s %s\\n\" \"\$CPU\" \"\$GPU\"" ); then
     cpu=0
     gpu=0
   fi
