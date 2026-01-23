@@ -4787,9 +4787,12 @@ def _process_gcs_video_job_cloud_only(
 
                 # Apple Silicon: keep fp16 off to avoid slow Metal emulation paths.
                 is_apple_mps = whisper_device == "mps"
+                fp16_enabled = _env_truthy(os.getenv("ENVID_WHISPER_FP16"), default=(whisper_device == "cuda"))
+                if is_apple_mps:
+                    fp16_enabled = False
 
                 decode_kwargs: Dict[str, Any] = {
-                    "fp16": False,
+                    "fp16": bool(fp16_enabled),
                     "temperature": float(temperature),
                     "beam_size": int(beam_size),
                     "best_of": int(best_of),
@@ -4813,6 +4816,7 @@ def _process_gcs_video_job_cloud_only(
                     "temperature": float(temperature),
                     "beam_size": int(beam_size),
                     "best_of": int(best_of),
+                    "fp16": bool(fp16_enabled),
                     "condition_on_previous_text": bool(condition_prev),
                     "logprob_threshold": float(logprob_threshold_value) if logprob_threshold_value is not None else None,
                     "compression_ratio_threshold": float(compression_ratio_threshold_value) if compression_ratio_threshold_value is not None else None,
@@ -4852,13 +4856,13 @@ def _process_gcs_video_job_cloud_only(
                         return model.transcribe(str(path), **decode_kwargs)
                     except TypeError:
                         # Backward-compat with older openai-whisper signatures.
-                        safe_kwargs: Dict[str, Any] = {"fp16": False}
+                        safe_kwargs: Dict[str, Any] = {"fp16": bool(fp16_enabled)}
                         if whisper_language:
                             safe_kwargs["language"] = whisper_language
                         try:
                             return model.transcribe(str(path), **safe_kwargs)
                         except Exception:
-                            return model.transcribe(str(path), fp16=False)
+                            return model.transcribe(str(path), fp16=bool(fp16_enabled))
 
                 def _extract_wav_chunk(*, src: Path, out: Path, start_s: float, dur_s: float) -> None:
                     ss = max(0.0, float(start_s))
