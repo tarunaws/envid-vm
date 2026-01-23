@@ -1284,6 +1284,30 @@ def _parse_allowed_gcs_video_source(raw: str) -> Tuple[str, str]:
     return bucket, obj
 
 
+def _parse_any_gcs_video_source(raw: str) -> Tuple[str, str]:
+    v = (raw or "").strip()
+    if not v:
+        raise ValueError("Missing gcs_object (or gcs_uri)")
+
+    bucket = _gcs_bucket_name()
+    if v.lower().startswith("gs://"):
+        parts = v.split("/", 3)
+        if len(parts) < 4 or not parts[2] or not parts[3]:
+            raise ValueError("Invalid gs:// URI")
+        bucket = parts[2]
+        obj = parts[3]
+    else:
+        obj = v.lstrip("/")
+
+    if obj.endswith("/"):
+        raise ValueError("Object cannot be a folder")
+
+    ext = (Path(obj).suffix or "").lower()
+    if ext not in {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mxf"}:
+        raise ValueError("Only video files are allowed (.mp4, .mov, .m4v, .mkv, .avi, .webm, .mxf)")
+    return bucket, obj
+
+
 def _looks_like_uuid(value: str) -> bool:
     try:
         uuid.UUID(str(value))
@@ -4288,11 +4312,98 @@ def _process_gcs_video_job_cloud_only(
         normalized_path = temp_dir / f"video_normalized{ext}"
         if normalize_enabled:
             try:
-                _job_step_update(job_id, "transcode_normalize", status="running", percent=0, message="Running")
-                _job_update(job_id, progress=6, message="Transcode normalize")
+                ffmpeg_gpu_enabled = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_FFMPEG_GPU"), default=True)
+                ffmpeg_gpu_available = ffmpeg_gpu_enabled and (
+                    shutil.which("nvidia-smi") is not None or Path("/usr/bin/nvidia-smi").exists()
+                )
+                progress_span = int(os.getenv("ENVID_METADATA_TRANSCODE_PROGRESS_SPAN", "4"))
+                progress_base = int(os.getenv("ENVID_METADATA_TRANSCODE_PROGRESS_BASE", "6"))
+                progress_span = max(1, min(20, progress_span))
+                progress_base = max(0, min(90, progress_base))
+                transcode_label = "Running (GPU)" if ffmpeg_gpu_available else "Running (CPU)"
+                _job_step_update(
+                    job_id,
+                    "transcode_normalize",
+                    status="running",
+                    percent=1,
+                    message=transcode_label,
+                )
+                _job_update(job_id, progress=progress_base, message="Transcode normalize")
+
+                def _parse_out_time(value: str) -> float | None:
+                    value = value.strip()
+                    if not value:
+                        return None
+                    if value.isdigit():
+                        return float(value)
+                    if ":" in value:
+                        try:
+                            parts = value.split(":")
+                            seconds = float(parts[-1])
+                            minutes = int(parts[-2]) if len(parts) > 1 else 0
+                            hours = int(parts[-3]) if len(parts) > 2 else 0
+                            return hours * 3600 + minutes * 60 + seconds
+                        except Exception:
+                            return None
+                    return None
+
+                def _run_ffmpeg_with_progress(cmd: list[str]) -> None:
+                    if not duration_seconds:
+                        subprocess.run(cmd, capture_output=True, check=True)
+                        return
+
+                    cmd_with_progress = [*cmd[:-1], "-progress", "pipe:1", "-nostats", cmd[-1]]
+                    last_pct = -1
+                    pct_step = 5
+                    proc = subprocess.Popen(
+                        cmd_with_progress,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1,
+                    )
+                    assert proc.stdout is not None
+                    for line in proc.stdout:
+                        out_ms = None
+                        out_seconds = None
+                        if line.startswith("out_time_ms="):
+                            try:
+                                out_ms = int(line.split("=", 1)[1].strip())
+                            except ValueError:
+                                out_ms = None
+                        elif line.startswith("out_time_us="):
+                            try:
+                                out_ms = int(line.split("=", 1)[1].strip()) / 1000
+                            except ValueError:
+                                out_ms = None
+                        elif line.startswith("out_time="):
+                            out_seconds = _parse_out_time(line.split("=", 1)[1])
+
+                        if out_ms is None and out_seconds is None:
+                            continue
+                        if out_ms is not None:
+                            pct = int(min(99, max(1, (out_ms / (duration_seconds * 1_000_000)) * 100)))
+                        else:
+                            pct = int(min(99, max(1, (out_seconds / duration_seconds) * 100)))
+                        if pct >= last_pct + pct_step or pct in (1, 99):
+                            _job_step_update(
+                                job_id,
+                                "transcode_normalize",
+                                status="running",
+                                percent=pct,
+                                message=transcode_label,
+                            )
+                            overall_pct = min(progress_base + progress_span, progress_base + int((pct / 100) * progress_span))
+                            _job_update(job_id, progress=overall_pct, message="Transcode normalize")
+                            last_pct = pct
+                    return_code = proc.wait()
+                    if return_code != 0:
+                        raise subprocess.CalledProcessError(return_code, cmd_with_progress)
+
                 # Target ~1.5mbps video bitrate; keep audio modest.
-                cmd = [
+                cmd_cpu = [
                     FFMPEG_PATH,
+                    "-y",
                     "-i",
                     str(local_path),
                     "-c:v",
@@ -4312,15 +4423,53 @@ def _process_gcs_video_job_cloud_only(
                     "-movflags",
                     "+faststart",
                     str(normalized_path),
-                    "-y",
                 ]
-                subprocess.run(cmd, capture_output=True, check=True)
+                cmd_gpu = [
+                    FFMPEG_PATH,
+                    "-y",
+                    "-i",
+                    str(local_path),
+                    "-c:v",
+                    "h264_nvenc",
+                    "-preset",
+                    "p4",
+                    "-b:v",
+                    "1500k",
+                    "-maxrate",
+                    "1500k",
+                    "-bufsize",
+                    "3000k",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "128k",
+                    "-movflags",
+                    "+faststart",
+                    str(normalized_path),
+                ]
+
+                cmd = cmd_gpu if ffmpeg_gpu_available else cmd_cpu
+                app.logger.info("Transcode normalize using %s", "GPU" if ffmpeg_gpu_available else "CPU")
+                _run_ffmpeg_with_progress(cmd)
                 if normalized_path.exists() and normalized_path.stat().st_size > 0:
                     local_path = normalized_path
                 _job_step_update(job_id, "transcode_normalize", status="completed", percent=100, message="Completed")
             except Exception as exc:
-                app.logger.warning("Transcode normalize failed: %s", exc)
-                _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Failed; using original")
+                if ffmpeg_gpu_available:
+                    app.logger.warning("Transcode normalize (GPU) failed; retrying CPU: %s", exc)
+                    try:
+                        _run_ffmpeg_with_progress(cmd_cpu)
+                        if normalized_path.exists() and normalized_path.stat().st_size > 0:
+                            local_path = normalized_path
+                        _job_step_update(job_id, "transcode_normalize", status="completed", percent=100, message="Completed")
+                    except Exception as exc2:
+                        app.logger.warning("Transcode normalize failed: %s", exc2)
+                        _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Failed; using original")
+                else:
+                    app.logger.warning("Transcode normalize failed: %s", exc)
+                    _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Failed; using original")
         else:
             _job_step_update(job_id, "transcode_normalize", status="skipped", percent=100, message="Disabled")
 
@@ -6728,26 +6877,33 @@ def process_gcs_video_cloud() -> Any:
         raw = f"gs://{gcs_bucket}/{raw.lstrip('/')}"
     if not raw:
         return jsonify({"error": "Missing gcs_object (or gcs_uri)"}), 400
+
     try:
-        bucket, obj = _parse_allowed_gcs_video_source(raw)
+        source_bucket, source_obj = _parse_any_gcs_video_source(raw)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
 
-    video_title = (payload.get("title") or Path(obj).name or "GCS Video").strip()
+    video_title = (payload.get("title") or Path(source_obj).name or "GCS Video").strip()
     video_description = (payload.get("description") or "").strip()
     task_selection = _parse_task_selection(payload.get("task_selection"))
     requested_job_id = (payload.get("job_id") or payload.get("id") or "").strip()
     job_id = requested_job_id if _looks_like_uuid(requested_job_id) else str(uuid.uuid4())
 
     _job_init(job_id, title=video_title)
-    _job_update(job_id, status="processing", progress=1, message="GCS video queued", gcs_video_uri=f"gs://{bucket}/{obj}")
+    _job_update(
+        job_id,
+        status="processing",
+        progress=1,
+        message="GCS video queued",
+        gcs_video_uri=f"gs://{source_bucket}/{source_obj}",
+    )
 
     threading.Thread(
         target=_process_gcs_video_job_cloud_only,
         kwargs={
             "job_id": job_id,
-            "gcs_bucket": bucket,
-            "gcs_object": obj,
+            "gcs_bucket": source_bucket,
+            "gcs_object": source_obj,
             "video_title": video_title,
             "video_description": video_description,
             "frame_interval_seconds": 0,

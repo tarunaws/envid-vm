@@ -24,6 +24,31 @@ format_duration() {
   printf "%sm%ss" "$mins" "$secs"
 }
 
+read_local_cpu_gpu() {
+  local pid_file="$1"
+  local alt_pid_file="$2"
+  local pid
+  pid=$(cat "$pid_file" 2>/dev/null || true)
+  if [ -z "$pid" ] && [ -f "$alt_pid_file" ]; then
+    pid=$(cat "$alt_pid_file" 2>/dev/null || true)
+  fi
+  if [ -z "$pid" ]; then
+    pid=$(pgrep -f 'envidMetadataGCP/app.py' | head -n 1 || true)
+  fi
+  if [ -n "$pid" ]; then
+    ps -p "$pid" -o %cpu= | awk '{printf "%.0f", $1}'
+  else
+    printf "0"
+  fi
+  printf " "
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | awk '{printf "%.0f", $1}'
+  else
+    printf "0"
+  fi
+  printf "\n"
+}
+
 while true; do
   now_ts=$(date +%s)
   elapsed=$((now_ts - start_ts))
@@ -48,18 +73,24 @@ except Exception:
     print(0)
     raise SystemExit(0)
 
-steps={s.get("id"):s for s in payload.get("steps",[])}
+steps=payload.get("steps",[])
 current_step=None
-for s in payload.get("steps",[]):
+for s in steps:
     if s.get("status") == "running":
         current_step=s
         break
 if current_step is None:
-    current_step=payload.get("steps",[-1])[-1] if payload.get("steps") else {}
+    candidates=[s for s in steps if s.get("status") not in (None, "not_started")]
+    current_step=candidates[-1] if candidates else (steps[-1] if steps else {})
+label=current_step.get("label") or current_step.get("name") or current_step.get("id") or "unknown"
+overall_progress=payload.get("progress",0) or 0
+percent=current_step.get("percent")
+if percent is None or (percent == 0 and overall_progress):
+    percent=overall_progress
 print(payload.get("status","unknown"))
-print(payload.get("progress",0) or 0)
-print(current_step.get("name") or current_step.get("id") or "unknown")
-print(current_step.get("percent") or 0)
+print(overall_progress)
+print(label)
+print(percent or 0)
 ' <<< "$status_json" > /tmp/job_status_parsed.txt
 
   read -r overall_status < /tmp/job_status_parsed.txt
@@ -67,8 +98,24 @@ print(current_step.get("percent") or 0)
   read -r current_task < <(sed -n '3p' /tmp/job_status_parsed.txt)
   read -r current_progress < <(sed -n '4p' /tmp/job_status_parsed.txt)
 
-  if ! read -r cpu gpu < <(gcloud compute ssh "$VM_NAME" --project="$PROJECT_ID" --zone="$ZONE" --command "PID_FILE='/home/tarun-envid/envid-metadata/envid-metadata-multimodal.pid'; PID=\$(cat \"\$PID_FILE\" 2>/dev/null || true); if [ -z \"\$PID\" ]; then PID=\$(pgrep -f 'envidMetadataGCP/app.py' | head -n 1); fi; if [ -n \"\$PID\" ]; then CPU=\$(ps -p \"\$PID\" -o %cpu= | awk '{printf \"%.0f\", \$1}'); else CPU=0; fi; if command -v nvidia-smi >/dev/null 2>&1; then GPU=\$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | awk '{printf \"%.0f\", \$1}'); else GPU=0; fi; printf \"%s %s\\n\" \"\$CPU\" \"\$GPU\"" ); then
+  pid_file="/home/tarun-envid/envid-metadata/envid-metadata-multimodal.pid"
+  alt_pid_file="/home/tarun-envid/envid-metadata/code/envid-metadata-multimodal.pid"
+  if [ "${ENVID_STATUS_USE_SSH:-1}" = "0" ] || ! command -v gcloud >/dev/null 2>&1; then
+    if ! read -r cpu gpu < <(read_local_cpu_gpu "$pid_file" "$alt_pid_file"); then
+      cpu=0
+      gpu=0
+    fi
+  else
+    if ! read -r cpu gpu < <(gcloud compute ssh "$VM_NAME" --project="$PROJECT_ID" --zone="$ZONE" --quiet --command "PID_FILE='$pid_file'; ALT_PID_FILE='$alt_pid_file'; PID=\$(cat \"\$PID_FILE\" 2>/dev/null || true); if [ -z \"\$PID\" ] && [ -f \"\$ALT_PID_FILE\" ]; then PID=\$(cat \"\$ALT_PID_FILE\" 2>/dev/null || true); fi; if [ -z \"\$PID\" ]; then PID=\$(pgrep -f 'envidMetadataGCP/app.py' | head -n 1); fi; if [ -n \"\$PID\" ]; then CPU=\$(ps -p \"\$PID\" -o %cpu= | awk '{printf \"%.0f\", \$1}'); else CPU=0; fi; if command -v nvidia-smi >/dev/null 2>&1; then GPU=\$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | awk '{printf \"%.0f\", \$1}'); else GPU=0; fi; printf \"%s %s\\n\" \"\$CPU\" \"\$GPU\""); then
+      cpu=0
+      gpu=0
+    fi
+  fi
+
+  if ! [[ "$cpu" =~ ^[0-9]+$ ]]; then
     cpu=0
+  fi
+  if ! [[ "$gpu" =~ ^[0-9]+$ ]]; then
     gpu=0
   fi
 

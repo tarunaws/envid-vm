@@ -1,7 +1,10 @@
-FROM python:3.11-slim
+FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+
+ENV DEBIAN_FRONTEND=noninteractive \
+  TZ=Etc/UTC
 
 # ffmpeg + ffprobe for TransNetV2 video decoding
 RUN apt-get update \
@@ -10,9 +13,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Install torch CPU wheels first (large)
+# PyTorch (CUDA) is preinstalled in the base image.
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt

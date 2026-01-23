@@ -1,13 +1,16 @@
-FROM python:3.11-slim
+FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC
 
 WORKDIR /app
 
 # System deps for Pillow; keep minimal.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libjpeg62-turbo \
+    libjpeg-turbo8 \
     zlib1g \
     libxcb1 \
     libglib2.0-0 \
@@ -15,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --no-cache-dir onnxruntime-gpu
 
 COPY app.py /app/app.py
 
