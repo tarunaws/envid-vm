@@ -2609,14 +2609,14 @@ export default function EnvidMetadataMinimal() {
                                 >
                                   Copy
                                 </TinyButton>
+                              ) : null}
+                            </Row>
                             {taskSummary ? (
                               <>
                                 <br />
                                 <span style={{ color: 'rgba(230, 232, 242, 0.7)' }}>{taskSummary}</span>
                               </>
                             ) : null}
-                              ) : null}
-                            </Row>
                             <br />
                             {status ? `Status: ${status}` : 'Status: —'}
                             {activeJob?.kind === 'reprocess' && String(activeJob?.videoId) === String(videoId) ? (
