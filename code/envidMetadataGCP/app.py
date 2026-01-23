@@ -693,6 +693,14 @@ def _apply_segment_corrections(
             out = corrected
             meta["punctuation_applied"] = True
 
+    if punctuation_enabled and not meta["punctuation_applied"]:
+        force_terminal = _env_truthy(os.getenv("ENVID_TRANSCRIPT_FORCE_PUNCTUATION_END"), default=False)
+        if force_terminal and out:
+            tail = out[-1]
+            if tail not in ".!?।":
+                out = f"{out}{'।' if _is_hindi_language(language_code) else '.'}"
+                meta["punctuation_applied"] = True
+
     return out.strip(), meta
 
 
