@@ -224,6 +224,13 @@ const StatusMeta = styled.div`
   font-size: 12px;
 `;
 
+const StatusMetaRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+`;
+
 const SystemStatsRow = styled.div`
   display: flex;
   gap: 10px;
@@ -1212,6 +1219,32 @@ export default function EnvidMetadataMinimal() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!activeJob?.jobId && !uploading) {
+      setSystemStats(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const fetchStats = async () => {
+      try {
+        const sr = await axios.get(`${BACKEND_URL}/system/stats`);
+        if (!cancelled && sr?.data?.status === 'ok') {
+          setSystemStats(sr.data);
+        }
+      } catch (err) {
+        // Ignore stats errors; keep last value.
+      }
+    };
+
+    fetchStats();
+    const intervalId = setInterval(fetchStats, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeJob?.jobId, uploading]);
+
   const togglePlayerFullscreen = async () => {
     const el = playerContainerRef.current;
     if (!el) return;
@@ -1668,21 +1701,6 @@ export default function EnvidMetadataMinimal() {
         const job = jr.data;
         setUploadJob(job);
 
-        const statusValue = String(job?.status || '').toLowerCase();
-        const isActiveStatus = ['queued', 'processing', 'running', 'started'].includes(statusValue);
-        if (isActiveStatus) {
-          try {
-            const sr = await axios.get(`${BACKEND_URL}/system/stats`);
-            if (sr?.data?.status === 'ok') {
-              setSystemStats(sr.data);
-            }
-          } catch (err) {
-            // Ignore system stats errors; keep last value.
-          }
-        } else if (systemStats) {
-          setSystemStats(null);
-        }
-
         if (typeof job?.progress === 'number') {
           setUploadProgress(Math.max(0, Math.min(100, job.progress)));
         }
@@ -1693,7 +1711,6 @@ export default function EnvidMetadataMinimal() {
           setMessage({ type: 'success', text: 'Video indexed successfully.' });
 
           setActiveJob(null);
-          setSystemStats(null);
 
           setSelectedFile(null);
           setGcsRawVideoObject('');
@@ -1712,7 +1729,6 @@ export default function EnvidMetadataMinimal() {
           setMessage({ type: 'error', text: job?.error || 'Failed to process video' });
 
           setActiveJob(null);
-          setSystemStats(null);
           setUploading(false);
           setClientUploadProgress(0);
           setUploadProgress(0);
@@ -1953,10 +1969,18 @@ export default function EnvidMetadataMinimal() {
       <StatusPanel>
         <StatusTitleRow>
           <StatusTitle>Processing Status</StatusTitle>
-          <StatusMeta>
-            {activeJob?.kind ? `${activeJob.kind} job` : 'job'}
-            {activeJob?.jobId ? ` • ${String(activeJob.jobId).slice(0, 8)}…` : ''}
-          </StatusMeta>
+          <StatusMetaRight>
+            <StatusMeta>
+              {activeJob?.kind ? `${activeJob.kind} job` : 'job'}
+              {activeJob?.jobId ? ` • ${String(activeJob.jobId).slice(0, 8)}…` : ''}
+            </StatusMeta>
+            {(activeJob?.jobId || uploading) && (
+              <SystemStatsRow>
+                <SystemStatPill>VM CPU: {cpuPercentLabel}</SystemStatPill>
+                <SystemStatPill>VM GPU: {gpuPercentLabel}</SystemStatPill>
+              </SystemStatsRow>
+            )}
+          </StatusMetaRight>
         </StatusTitleRow>
 
         {uploadJob?.message ? (
@@ -1967,12 +1991,6 @@ export default function EnvidMetadataMinimal() {
           </div>
         ) : null}
 
-        {systemStats && (
-          <SystemStatsRow>
-            <SystemStatPill>VM CPU: {cpuPercentLabel}</SystemStatPill>
-            <SystemStatPill>VM GPU: {gpuPercentLabel}</SystemStatPill>
-          </SystemStatsRow>
-        )}
 
         {serverUploadStatus && (
           <div style={{ marginBottom: 12 }}>
