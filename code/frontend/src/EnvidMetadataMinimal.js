@@ -947,6 +947,21 @@ function formatSeconds(seconds) {
   return hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`;
 }
 
+function formatTaskDurationSummary(taskDurations, totalSeconds) {
+  if (!taskDurations || typeof taskDurations !== 'object') return '';
+  const entries = Object.entries(taskDurations)
+    .map(([key, value]) => ({ key, value: Number(value) }))
+    .filter((item) => Number.isFinite(item.value) && item.value > 0 && item.key !== 'overall');
+
+  if (!entries.length && !Number.isFinite(Number(totalSeconds))) return '';
+
+  entries.sort((a, b) => b.value - a.value);
+  const top = entries.slice(0, 6).map((item) => `${item.key} ${formatSeconds(item.value)}`);
+  const totalLabel = Number.isFinite(Number(totalSeconds)) ? `Total ${formatSeconds(totalSeconds)}` : '';
+  const parts = [...top, totalLabel].filter(Boolean);
+  return parts.length ? `Task time: ${parts.join(' · ')}` : '';
+}
+
 function formatContainerFormat(raw) {
   const s = (raw || '').toString().trim();
   if (!s) return { label: '—', title: null };
@@ -2277,8 +2292,25 @@ export default function EnvidMetadataMinimal() {
                     background: 'rgba(255, 255, 255, 0.04)',
                   }}
                 >
-                  <summary style={{ cursor: 'pointer', fontWeight: 700, color: '#e6e8f2' }}>
-                    Select target languages ({targetTranslateLanguages.length} selected)
+                  <summary
+                    style={{
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      color: '#e6e8f2',
+                      listStyle: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 10,
+                      fontSize: 14,
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                    }}
+                  >
+                    <span>Select target languages ({targetTranslateLanguages.length} selected)</span>
+                    <span style={{ opacity: 0.7 }}>▾</span>
                   </summary>
                   <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                     <Row style={{ gap: 8 }}>
@@ -2517,6 +2549,10 @@ export default function EnvidMetadataMinimal() {
                     const status = video?.status || video?.processing_status || video?.state;
                     const thumbSrc = asJpegDataUri(video?.thumbnail);
                     const frameCount = Number(video?.frame_count ?? video?.frameCount ?? 0) || 0;
+                    const taskSummary = formatTaskDurationSummary(
+                      video?.task_durations,
+                      video?.task_duration_total_seconds
+                    );
 
                     return (
                       <CarouselItem
@@ -2573,6 +2609,12 @@ export default function EnvidMetadataMinimal() {
                                 >
                                   Copy
                                 </TinyButton>
+                            {taskSummary ? (
+                              <>
+                                <br />
+                                <span style={{ color: 'rgba(230, 232, 242, 0.7)' }}>{taskSummary}</span>
+                              </>
+                            ) : null}
                               ) : null}
                             </Row>
                             <br />

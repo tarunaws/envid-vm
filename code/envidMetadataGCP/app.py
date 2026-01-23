@@ -1742,6 +1742,47 @@ def _job_step_update(job_id: str, step_id: str, *, status: str | None = None, pe
         job["updated_at"] = datetime.utcnow().isoformat()
 
 
+def _parse_iso_ts(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        raw = str(value).strip()
+        if not raw:
+            return None
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        return datetime.fromisoformat(raw)
+    except Exception:
+        return None
+
+
+def _job_step_durations(job_id: str) -> tuple[dict[str, float], float]:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id) or {}
+    steps = job.get("steps") if isinstance(job, dict) else None
+    if not isinstance(steps, list):
+        return {}, 0.0
+
+    durations: dict[str, float] = {}
+    total = 0.0
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        step_id = str(step.get("id") or "").strip()
+        if not step_id:
+            continue
+        st = _parse_iso_ts(step.get("started_at"))
+        en = _parse_iso_ts(step.get("completed_at"))
+        if not st or not en:
+            continue
+        dur = (en - st).total_seconds()
+        if dur <= 0:
+            continue
+        durations[step_id] = dur
+        total += dur
+    return durations, total
+
+
 def _probe_technical_metadata(video_path: Path) -> dict[str, Any]:
     if not shutil.which(FFPROBE_PATH):
         return {"available": False, "error": f"ffprobe not found (FFPROBE_PATH={FFPROBE_PATH})"}
@@ -4109,54 +4150,13 @@ def _process_gcs_video_job_cloud_only(
         if vi_label_mode not in {"segment", "shot", "frame"}:
             vi_label_mode = "frame"
 
-        # Label detection engine selection (fixed to GCP Video Intelligence).
+        # Label detection engine selection (hard-coded to GCP Video Intelligence).
         requested_label_model_raw = (requested_models.get("label_detection_model") or "").strip()
         requested_label_model = "gcp_video_intelligence"
-
-        label_engine = "disabled"
+        label_engine = "gcp_video_intelligence"
         use_yolo_labels = False
-        use_vi_label_detection = False
         use_local_label_detection_service = False
-        label_engine_supported = True
-        if requested_label_model in {"yolo_ultralytics", "yolo", "yolov8", "yolov11"}:
-            use_yolo_labels = True
-            label_engine = "yolo_ultralytics"
-        elif requested_label_model in {"detectron2", "mmdetection"}:
-            label_engine = requested_label_model
-            use_local_label_detection_service = True
-        elif requested_label_model in {"gcp_video_intelligence", "gcp_vi", "video_intelligence", "vi"}:
-            label_engine = "gcp_video_intelligence"
-            use_vi_label_detection = True
-        elif requested_label_model in {"vi_segment", "segment"}:
-            label_engine = "gcp_video_intelligence"
-            use_vi_label_detection = True
-            vi_label_mode = "segment"
-        elif requested_label_model in {"vi_shot", "shot"}:
-            label_engine = "gcp_video_intelligence"
-            use_vi_label_detection = True
-            vi_label_mode = "shot"
-        elif requested_label_model in {"vi_frame", "frame"}:
-            label_engine = "gcp_video_intelligence"
-            use_vi_label_detection = True
-            vi_label_mode = "frame"
-        elif requested_label_model in {"", "auto"}:
-            label_engine_supported = False
-        else:
-            label_engine_supported = False
-
-        if enable_label_detection and not label_engine_supported:
-            _job_step_update(
-                job_id,
-                "label_detection",
-                status="failed",
-                percent=100,
-                message="label_detection_model is required (no default). Choose: yolo_ultralytics, detectron2, mmdetection.",
-            )
-            # Disable label detection so other pipelines can continue.
-            enable_label_detection = False
-            use_yolo_labels = False
-            use_vi_label_detection = False
-            use_local_label_detection_service = False
+        use_vi_label_detection = True
 
         # Key scene model selection (fixed to TransNetV2 + CLIP).
         # NOTE: For key scenes/high points we avoid any implicit fallback between engines.
@@ -6423,6 +6423,7 @@ def _process_gcs_video_job_cloud_only(
                 translations["by_language"][lang] = by_lang
 
         _job_step_update(job_id, "save_as_json", status="running", percent=0, message="Saving")
+        task_durations, task_duration_total = _job_step_durations(job_id)
         video_entry: Dict[str, Any] = {
             "id": job_id,
             "title": video_title,
@@ -6462,6 +6463,8 @@ def _process_gcs_video_job_cloud_only(
                 "effective_models": effective_models,
             },
             "opening_closing_credit_detection": opening_closing,
+            "task_durations": task_durations,
+            "task_duration_total_seconds": float(task_duration_total),
         }
 
         categorized = _build_categorized_metadata_json(video_entry)
