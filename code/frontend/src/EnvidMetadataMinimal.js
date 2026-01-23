@@ -2271,61 +2271,64 @@ export default function EnvidMetadataMinimal() {
 
               <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
                 <div style={{ fontWeight: 800, color: '#e6e8f2' }}>Target translation languages</div>
-                <div
+                <details
                   style={{
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: 10,
                     padding: 10,
                     background: 'rgba(255, 255, 255, 0.04)',
-                    display: 'grid',
-                    gap: 8,
                   }}
                 >
-                  <Row style={{ gap: 8 }}>
-                    <SecondaryButton
-                      type="button"
-                      onClick={() => {
-                        const all = translateLanguageOptions.map((lang) => String(lang.code).toLowerCase());
-                        setTargetTranslateLanguages(all);
-                      }}
-                      disabled={uploading || translateLanguagesLoading}
-                    >
-                      Select All
-                    </SecondaryButton>
-                    <SecondaryButton
-                      type="button"
-                      onClick={() => setTargetTranslateLanguages([])}
-                      disabled={uploading || translateLanguagesLoading}
-                    >
-                      Clear
-                    </SecondaryButton>
-                  </Row>
-                  <div style={{ display: 'grid', gap: 6 }}>
-                    {translateLanguageOptions.map((lang) => {
-                      const code = String(lang.code || '').toLowerCase();
-                      const checked = targetTranslateLanguages.includes(code);
-                      return (
-                        <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={uploading || translateLanguagesLoading}
-                            onChange={() => {
-                              setTargetTranslateLanguages((prev) => {
-                                const current = Array.isArray(prev) ? prev : [];
-                                if (current.includes(code)) return current.filter((c) => c !== code);
-                                return [...current, code];
-                              });
-                            }}
-                          />
-                          <span>
-                            {lang.name} ({code})
-                          </span>
-                        </label>
-                      );
-                    })}
+                  <summary style={{ cursor: 'pointer', fontWeight: 700, color: '#e6e8f2' }}>
+                    Select target languages ({targetTranslateLanguages.length} selected)
+                  </summary>
+                  <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                    <Row style={{ gap: 8 }}>
+                      <SecondaryButton
+                        type="button"
+                        onClick={() => {
+                          const all = translateLanguageOptions.map((lang) => String(lang.code).toLowerCase());
+                          setTargetTranslateLanguages(all);
+                        }}
+                        disabled={uploading || translateLanguagesLoading}
+                      >
+                        Select All
+                      </SecondaryButton>
+                      <SecondaryButton
+                        type="button"
+                        onClick={() => setTargetTranslateLanguages([])}
+                        disabled={uploading || translateLanguagesLoading}
+                      >
+                        Clear
+                      </SecondaryButton>
+                    </Row>
+                    <div style={{ display: 'grid', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+                      {translateLanguageOptions.map((lang) => {
+                        const code = String(lang.code || '').toLowerCase();
+                        const checked = targetTranslateLanguages.includes(code);
+                        return (
+                          <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={uploading || translateLanguagesLoading}
+                              onChange={() => {
+                                setTargetTranslateLanguages((prev) => {
+                                  const current = Array.isArray(prev) ? prev : [];
+                                  if (current.includes(code)) return current.filter((c) => c !== code);
+                                  return [...current, code];
+                                });
+                              }}
+                            />
+                            <span>
+                              {lang.name} ({code})
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                </details>
                 <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>
                   Original and English are included by default. Choose one or more target languages for translation.
                 </div>
