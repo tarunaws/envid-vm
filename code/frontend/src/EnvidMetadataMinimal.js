@@ -13,11 +13,13 @@ const PageWrapper = styled.div`
   background: radial-gradient(1200px circle at 20% 10%, rgba(102, 126, 234, 0.18) 0%, rgba(0, 0, 0, 0) 55%),
     linear-gradient(135deg, #0b1020 0%, #05070f 100%);
   padding: 24px;
+  overflow-x: hidden;
 `;
 
 const Container = styled.div`
   max-width: 980px;
   margin: 0 auto;
+  width: 100%;
 `;
 
 const Header = styled.div`
@@ -45,6 +47,7 @@ const Section = styled.div`
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
+  max-width: 100%;
 `;
 
 const SectionTitle = styled.div`
@@ -156,6 +159,8 @@ const UploadArea = styled.div`
   padding: 26px;
   text-align: center;
   cursor: pointer;
+  max-width: 100%;
+  box-sizing: border-box;
 `;
 
 const ProgressBar = styled.div`
@@ -1072,7 +1077,7 @@ export default function EnvidMetadataMinimal() {
     celebrity_bio_image_model: 'auto',
   }));
 
-  const [targetTranslateLanguage, setTargetTranslateLanguage] = useState('');
+  const [targetTranslateLanguages, setTargetTranslateLanguages] = useState([]);
 
   const taskSelectionPayload = useMemo(() => {
     const sel = taskSelection || {};
@@ -1111,9 +1116,9 @@ export default function EnvidMetadataMinimal() {
       enable_celebrity_bio_image: Boolean(sel.enable_celebrity_bio_image),
       celebrity_bio_image_model: String(sel.celebrity_bio_image_model || '').trim() || 'auto',
 
-      translate_targets: targetTranslateLanguage ? [targetTranslateLanguage] : [],
+      translate_targets: Array.isArray(targetTranslateLanguages) ? targetTranslateLanguages : [],
     };
-  }, [taskSelection, targetTranslateLanguage]);
+  }, [taskSelection, targetTranslateLanguages]);
 
   const [videoSource, setVideoSource] = useState('gcs'); // 'local' | 'gcs'
   const [selectedFile, setSelectedFile] = useState(null);
@@ -1276,9 +1281,7 @@ export default function EnvidMetadataMinimal() {
       setSelectedMetaLoading(true);
       setSelectedMetaError(null);
       try {
-        const resp = await axios.get(`${BACKEND_URL}/video/${selectedVideoId}/metadata-json`, {
-          params: { category: 'combined' },
-        });
+        const resp = await axios.get(`${BACKEND_URL}/video/${selectedVideoId}/metadata-json`);
         if (cancelled) return;
         setSelectedMeta(resp.data || {});
       } catch (e) {
@@ -1670,8 +1673,8 @@ export default function EnvidMetadataMinimal() {
   const handleUpload = async () => {
     setMessage(null);
 
-    if (!targetTranslateLanguage) {
-      setMessage({ type: 'error', text: 'Select a target translation language before analyzing.' });
+    if (!Array.isArray(targetTranslateLanguages) || targetTranslateLanguages.length === 0) {
+      setMessage({ type: 'error', text: 'Select at least one target translation language before analyzing.' });
       return;
     }
 
@@ -1828,17 +1831,52 @@ export default function EnvidMetadataMinimal() {
   const subtitleLanguages = useMemo(() => {
     const langs = new Set();
     langs.add('orig');
-    if (selectedMeta?.translations?.languages && Array.isArray(selectedMeta.translations.languages)) {
-      selectedMeta.translations.languages.forEach((lang) => {
+    const translationBlock =
+      selectedMeta?.combined?.translations || selectedMeta?.translations || selectedMeta?.categories?.translations || null;
+    if (translationBlock?.languages && Array.isArray(translationBlock.languages)) {
+      translationBlock.languages.forEach((lang) => {
         if (lang) langs.add(String(lang).toLowerCase());
       });
     }
-    if (selectedMeta?.language_code) {
-      const lc = String(selectedMeta.language_code || '').toLowerCase();
-      if (lc) langs.add(lc);
+    const lc = String(selectedMeta?.combined?.transcript?.language_code || selectedMeta?.language_code || '').toLowerCase();
+    if (lc) {
+      langs.add(lc);
     }
     langs.add('en');
     return Array.from(langs);
+  }, [selectedMeta]);
+
+  const metadataLanguages = useMemo(() => {
+    const ordered = [];
+    const add = (lang) => {
+      const code = String(lang || '').trim().toLowerCase();
+      if (!code) return;
+      const normalized = code === 'original' ? 'orig' : code;
+      if (!ordered.includes(normalized)) ordered.push(normalized);
+    };
+
+    add('orig');
+    add('en');
+
+    const taskTargets =
+      selectedMeta?.task_selection_effective?.translate_targets ||
+      selectedMeta?.task_selection?.translate_targets ||
+      selectedMeta?.task_selection_requested?.translate_targets ||
+      [];
+    if (Array.isArray(taskTargets)) {
+      taskTargets.forEach((lang) => add(lang));
+    }
+
+    const translationBlock =
+      selectedMeta?.combined?.translations || selectedMeta?.translations || selectedMeta?.categories?.translations || null;
+    if (translationBlock?.languages && Array.isArray(translationBlock.languages)) {
+      translationBlock.languages.forEach((lang) => add(lang));
+    }
+
+    const lc = String(selectedMeta?.combined?.transcript?.language_code || selectedMeta?.language_code || '').toLowerCase();
+    if (lc) add(lc);
+
+    return ordered;
   }, [selectedMeta]);
 
   const serverUploadStatus = (() => {
@@ -2232,30 +2270,64 @@ export default function EnvidMetadataMinimal() {
               <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Task Selection</div>
 
               <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-                <div style={{ fontWeight: 800, color: '#e6e8f2' }}>Target translation language</div>
-                <select
-                  value={targetTranslateLanguage}
-                  onChange={(e) => setTargetTranslateLanguage(e.target.value)}
-                  disabled={uploading || translateLanguagesLoading}
+                <div style={{ fontWeight: 800, color: '#e6e8f2' }}>Target translation languages</div>
+                <div
                   style={{
-                    padding: '10px 12px',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: 10,
-                    fontSize: 14,
-                    width: '100%',
+                    padding: 10,
                     background: 'rgba(255, 255, 255, 0.04)',
-                    color: '#e6e8f2',
+                    display: 'grid',
+                    gap: 8,
                   }}
                 >
-                  <option value="">Select a target language…</option>
-                  {translateLanguageOptions.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.name} ({lang.code})
-                    </option>
-                  ))}
-                </select>
+                  <Row style={{ gap: 8 }}>
+                    <SecondaryButton
+                      type="button"
+                      onClick={() => {
+                        const all = translateLanguageOptions.map((lang) => String(lang.code).toLowerCase());
+                        setTargetTranslateLanguages(all);
+                      }}
+                      disabled={uploading || translateLanguagesLoading}
+                    >
+                      Select All
+                    </SecondaryButton>
+                    <SecondaryButton
+                      type="button"
+                      onClick={() => setTargetTranslateLanguages([])}
+                      disabled={uploading || translateLanguagesLoading}
+                    >
+                      Clear
+                    </SecondaryButton>
+                  </Row>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {translateLanguageOptions.map((lang) => {
+                      const code = String(lang.code || '').toLowerCase();
+                      const checked = targetTranslateLanguages.includes(code);
+                      return (
+                        <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={uploading || translateLanguagesLoading}
+                            onChange={() => {
+                              setTargetTranslateLanguages((prev) => {
+                                const current = Array.isArray(prev) ? prev : [];
+                                if (current.includes(code)) return current.filter((c) => c !== code);
+                                return [...current, code];
+                              });
+                            }}
+                          />
+                          <span>
+                            {lang.name} ({code})
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>
-                  Original and English are included by default. Choose a target language for translation.
+                  Original and English are included by default. Choose one or more target languages for translation.
                 </div>
                 {translateLanguagesError ? (
                   <div style={{ fontSize: 12, color: '#ff6b6b' }}>{translateLanguagesError}</div>
@@ -2573,17 +2645,16 @@ export default function EnvidMetadataMinimal() {
                     </SecondaryButton>
                     <SecondaryButton
                       type="button"
-                      onClick={() => window.open(`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?category=combined`, '_blank', 'noopener,noreferrer')}
+                      onClick={() =>
+                        window.open(
+                          `${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=orig&download=1`,
+                          '_blank',
+                          'noopener,noreferrer'
+                        )
+                      }
                       disabled={selectedMetaLoading}
                     >
-                      Download JSON
-                    </SecondaryButton>
-                    <SecondaryButton
-                      type="button"
-                      onClick={() => window.open(`${BACKEND_URL}/video/${selectedVideoId}/metadata-json.zip`, '_blank', 'noopener,noreferrer')}
-                      disabled={selectedMetaLoading}
-                    >
-                      Download ZIP
+                      Download Full Metadata (Original)
                     </SecondaryButton>
                     <SecondaryButton
                       type="button"
@@ -2732,14 +2803,24 @@ export default function EnvidMetadataMinimal() {
 
                                 <div>
                                   <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontWeight: 900, marginBottom: 6 }}>Metadata</div>
-                                  <Row style={{ gap: 10 }}>
-                                    <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?category=combined&download=1`} target="_blank" rel="noreferrer">
-                                      Combined JSON
-                                    </LinkA>
-                                    <LinkA href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json.zip`} target="_blank" rel="noreferrer">
-                                      Categories ZIP
-                                    </LinkA>
-                                  </Row>
+                                  <div style={{ display: 'grid', gap: 8 }}>
+                                    {metadataLanguages.map((lang) => {
+                                      const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
+                                      const suffix = lang === 'orig' ? '' : ` (${lang.toUpperCase()})`;
+                                      return (
+                                        <Row key={lang} style={{ gap: 10, flexWrap: 'wrap' }}>
+                                          <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>{label}</div>
+                                          <LinkA
+                                            href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=${lang}&download=1`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            Download Full Metadata JSON{suffix}
+                                          </LinkA>
+                                        </Row>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </div>
                             </CardBody>
