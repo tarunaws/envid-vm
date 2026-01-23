@@ -10,3 +10,4 @@ __pycache__/
 contact_logs/
 history/*/original.png
 history/*/thumbnail.png
+!.env.multimodal.vm.local
