@@ -224,6 +224,26 @@ const StatusMeta = styled.div`
   font-size: 12px;
 `;
 
+const SystemStatsRow = styled.div`
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0 12px 0;
+`;
+
+const SystemStatPill = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(230, 232, 242, 0.9);
+  background: rgba(102, 126, 234, 0.16);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+`;
+
 const StepList = styled.div`
   display: grid;
   gap: 10px;
@@ -1161,6 +1181,7 @@ export default function EnvidMetadataMinimal() {
   const [clientUploadProgress, setClientUploadProgress] = useState(0);
   const [uploadJob, setUploadJob] = useState(null);
   const [activeJob, setActiveJob] = useState(null); // { kind: 'upload'|'reprocess', jobId: string, videoId?: string }
+  const [systemStats, setSystemStats] = useState(null);
 
   const [allVideos, setAllVideos] = useState([]);
 
@@ -1647,6 +1668,21 @@ export default function EnvidMetadataMinimal() {
         const job = jr.data;
         setUploadJob(job);
 
+        const statusValue = String(job?.status || '').toLowerCase();
+        const isActiveStatus = ['queued', 'processing', 'running', 'started'].includes(statusValue);
+        if (isActiveStatus) {
+          try {
+            const sr = await axios.get(`${BACKEND_URL}/system/stats`);
+            if (sr?.data?.status === 'ok') {
+              setSystemStats(sr.data);
+            }
+          } catch (err) {
+            // Ignore system stats errors; keep last value.
+          }
+        } else if (systemStats) {
+          setSystemStats(null);
+        }
+
         if (typeof job?.progress === 'number') {
           setUploadProgress(Math.max(0, Math.min(100, job.progress)));
         }
@@ -1657,6 +1693,7 @@ export default function EnvidMetadataMinimal() {
           setMessage({ type: 'success', text: 'Video indexed successfully.' });
 
           setActiveJob(null);
+          setSystemStats(null);
 
           setSelectedFile(null);
           setGcsRawVideoObject('');
@@ -1675,6 +1712,7 @@ export default function EnvidMetadataMinimal() {
           setMessage({ type: 'error', text: job?.error || 'Failed to process video' });
 
           setActiveJob(null);
+          setSystemStats(null);
           setUploading(false);
           setClientUploadProgress(0);
           setUploadProgress(0);
@@ -1833,6 +1871,13 @@ export default function EnvidMetadataMinimal() {
 
   const showStatusPanel = Boolean(activeJob?.jobId) || uploading || hasSelectedInput;
 
+  const cpuPercentLabel = Number.isFinite(systemStats?.cpu_percent)
+    ? `${Math.round(systemStats.cpu_percent)}%`
+    : '—';
+  const gpuPercentLabel = Number.isFinite(systemStats?.gpu_percent)
+    ? `${Math.round(systemStats.gpu_percent)}%`
+    : '—';
+
   const subtitleLanguageLabels = useMemo(() => {
     const map = new Map();
     translateLanguageOptions.forEach((lang) => {
@@ -1921,6 +1966,13 @@ export default function EnvidMetadataMinimal() {
             Ready. Press “Upload & Analyze” to start.
           </div>
         ) : null}
+
+        {systemStats && (
+          <SystemStatsRow>
+            <SystemStatPill>VM CPU: {cpuPercentLabel}</SystemStatPill>
+            <SystemStatPill>VM GPU: {gpuPercentLabel}</SystemStatPill>
+          </SystemStatsRow>
+        )}
 
         {serverUploadStatus && (
           <div style={{ marginBottom: 12 }}>

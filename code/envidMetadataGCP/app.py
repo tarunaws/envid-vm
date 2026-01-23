@@ -6675,6 +6675,67 @@ def _gcp_auth_status() -> dict[str, Any]:
     }
 
 
+_CPU_SAMPLE_LOCK = threading.Lock()
+_CPU_LAST_SAMPLE: tuple[float, float] | None = None
+
+
+def _read_cpu_sample() -> tuple[float, float] | None:
+    try:
+        with open("/proc/stat", "r", encoding="utf-8") as handle:
+            line = handle.readline()
+        if not line.startswith("cpu "):
+            return None
+        parts = [float(x) for x in line.strip().split()[1:]]
+        if len(parts) < 4:
+            return None
+        idle = parts[3] + (parts[4] if len(parts) > 4 else 0.0)
+        total = sum(parts)
+        return total, idle
+    except Exception:
+        return None
+
+
+def _cpu_percent() -> float | None:
+    global _CPU_LAST_SAMPLE
+    sample_1 = _read_cpu_sample()
+    if not sample_1:
+        return None
+    time.sleep(0.12)
+    sample_2 = _read_cpu_sample()
+    if not sample_2:
+        return None
+    total_1, idle_1 = sample_1
+    total_2, idle_2 = sample_2
+    delta_total = total_2 - total_1
+    delta_idle = idle_2 - idle_1
+    if delta_total <= 0:
+        return None
+    used = 100.0 * (1.0 - (delta_idle / delta_total))
+    return max(0.0, min(100.0, used))
+
+
+def _gpu_percent() -> float | None:
+    try:
+        if not (shutil.which("nvidia-smi") or Path("/usr/bin/nvidia-smi").exists()):
+            return None
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return None
+        raw = (proc.stdout or "").strip().splitlines()
+        if not raw:
+            return None
+        value = float(raw[0].strip())
+        return max(0.0, min(100.0, value))
+    except Exception:
+        return None
+
+
 @app.route("/health", methods=["GET"])
 def health() -> Any:
     resolved_bucket = None
@@ -6691,6 +6752,22 @@ def health() -> Any:
             "gcp_location": _gcp_location(),
             "gcs_bucket": resolved_bucket,
             "gcp_gcs_bucket": resolved_bucket,
+        }
+    )
+
+
+@app.route("/system/stats", methods=["GET"])
+def system_stats() -> Any:
+    cpu_value = None
+    with _CPU_SAMPLE_LOCK:
+        cpu_value = _cpu_percent()
+    gpu_value = _gpu_percent()
+    return jsonify(
+        {
+            "status": "ok",
+            "cpu_percent": cpu_value,
+            "gpu_percent": gpu_value,
+            "timestamp": datetime.utcnow().isoformat(),
         }
     )
 
