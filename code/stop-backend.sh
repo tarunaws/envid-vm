@@ -111,8 +111,6 @@ stop_local_label_detection_docker_if_enabled
 # ✅ Local OCR service (PaddleOCR)
 stop_service "local-ocr-paddle"
 
-# ✅ Local key scene best-combo sidecar (TransNetV2 + CLIP clustering)
-stop_service "local-keyscene-best"
 
 # ✅ Envid Metadata (Multimodal only)
 stop_service "envid-metadata-multimodal"
