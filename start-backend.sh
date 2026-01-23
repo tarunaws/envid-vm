@@ -20,8 +20,21 @@ ENV_LOCAL_FILE="$PROJECT_ROOT/.env.local"
 ENV_MULTIMODAL_LOCAL_FILE="$PROJECT_ROOT/.env.multimodal.local"
 ENV_MULTIMODAL_SECRETS_FILE="$PROJECT_ROOT/.env.multimodal.secrets.local"
 
+# Allow separate env overrides per environment (laptop vs VM).
+ENV_TARGET="${ENVID_ENV_TARGET:-}"
+if [ -z "$ENV_TARGET" ]; then
+  if [ "$(uname -s)" = "Darwin" ]; then
+    ENV_TARGET="laptop"
+  else
+    ENV_TARGET="vm"
+  fi
+fi
+
+ENV_MULTIMODAL_TARGET_FILE="$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.local"
+ENV_MULTIMODAL_TARGET_SECRETS_FILE="$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.secrets.local"
+
 # Ensure services can import shared/ utilities.
-export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/code:${PYTHONPATH:-}"
 
 # Ensure common tool locations are on PATH without clobbering the user's PATH.
 maybe_prepend_path() {
@@ -115,14 +128,14 @@ start_service() {
       done
 
       # Re-assert shared imports even if env files override variables.
-      export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+      export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/code:${PYTHONPATH:-}"
       nohup env PYTHONUNBUFFERED=1 PYTHONPATH="$PYTHONPATH" ENVID_METADATA_PORT="$port" $VENV_PYTHON $service_file > "$PROJECT_ROOT/$service_name.log" 2>&1 &
       echo $! > "$PROJECT_ROOT/$service_name.pid"
     )
     pid=$(cat "$PROJECT_ROOT/$service_name.pid" 2>/dev/null || true)
   else
     cd "$PROJECT_ROOT/$service_dir"
-    export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+    export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/code:${PYTHONPATH:-}"
     nohup env PYTHONUNBUFFERED=1 PYTHONPATH="$PYTHONPATH" ENVID_METADATA_PORT="$port" $VENV_PYTHON $service_file > "$PROJECT_ROOT/$service_name.log" 2>&1 &
     pid=$!
     echo $pid > "$PROJECT_ROOT/$service_name.pid"
@@ -190,7 +203,7 @@ ensure_docker_ready() {
 
 start_local_moderation_service() {
   local service_name="local-moderation-nudenet"
-  local runner="$PROJECT_ROOT/localModerationNudeNet/run_local_venv.sh"
+  local runner="$PROJECT_ROOT/code/localModerationNudeNet/run_local_venv.sh"
   local port="${ENVID_LOCAL_MODERATION_PORT:-5081}"
   local url="${ENVID_METADATA_LOCAL_MODERATION_URL:-http://localhost:${port}}"
   local pid_file="$PROJECT_ROOT/${service_name}.pid"
@@ -238,7 +251,7 @@ start_local_moderation_service() {
 
 start_local_moderation_nsfwjs_service() {
   local service_name="local-moderation-nsfwjs"
-  local node_runner="$PROJECT_ROOT/localModerationNSFWJS/run_local_node.sh"
+  local node_runner="$PROJECT_ROOT/code/localModerationNSFWJS/run_local_node.sh"
   local port="${ENVID_LOCAL_MODERATION_NSFWJS_PORT:-5082}"
   local url="${ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL:-http://localhost:${port}}"
   local pid_file="$PROJECT_ROOT/${service_name}.pid"
@@ -265,7 +278,7 @@ start_local_moderation_nsfwjs_service() {
     echo "🐳 Starting $service_name via Docker on port $port..."
 
     (
-      cd "$PROJECT_ROOT/localModerationNSFWJS" || exit 0
+      cd "$PROJECT_ROOT/code/localModerationNSFWJS" || exit 0
 
       # Clean up any previous container.
       docker rm -f "$service_name" >/dev/null 2>&1 || true
@@ -316,7 +329,7 @@ start_local_moderation_nsfwjs_service() {
 
 start_local_label_detection_service() {
   local service_name="local-label-detection"
-  local runner="$PROJECT_ROOT/localLabelDetection/run_local_venv.sh"
+  local runner="$PROJECT_ROOT/code/localLabelDetection/run_local_venv.sh"
   local port="${ENVID_LOCAL_LABEL_DETECTION_PORT:-5083}"
   local url="${ENVID_METADATA_LOCAL_LABEL_DETECTION_URL:-http://localhost:${port}}"
   local pid_file="$PROJECT_ROOT/${service_name}.pid"
@@ -326,7 +339,7 @@ start_local_label_detection_service() {
   # Enable with: ENVID_LOCAL_LABEL_DETECTION_RUNTIME=docker
   local runtime="${ENVID_LOCAL_LABEL_DETECTION_RUNTIME:-venv}"
   if [[ -z "${ENVID_LOCAL_LABEL_DETECTION_RUNTIME:-}" && "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
-    if [[ -f "$PROJECT_ROOT/localLabelDetection/docker-compose.amd64.yml" || -f "$PROJECT_ROOT/localLabelDetection/docker-compose.yml" ]]; then
+    if [[ -f "$PROJECT_ROOT/code/localLabelDetection/docker-compose.amd64.yml" || -f "$PROJECT_ROOT/code/localLabelDetection/docker-compose.yml" ]]; then
       runtime="docker"
       echo "ℹ️  Apple Silicon detected; defaulting local label detection runtime to docker (override with ENVID_LOCAL_LABEL_DETECTION_RUNTIME=venv)"
     fi
@@ -373,19 +386,19 @@ start_local_label_detection_service() {
     local compose_file="${ENVID_LOCAL_LABEL_DETECTION_DOCKER_COMPOSE_FILE:-}"
     if [[ -z "$compose_file" ]]; then
       compose_file="docker-compose.yml"
-      if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" && -f "$PROJECT_ROOT/localLabelDetection/docker-compose.amd64.yml" ]]; then
+      if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" && -f "$PROJECT_ROOT/code/localLabelDetection/docker-compose.amd64.yml" ]]; then
         compose_file="docker-compose.amd64.yml"
         echo "ℹ️  Apple Silicon detected; defaulting localLabelDetection to $compose_file (override via ENVID_LOCAL_LABEL_DETECTION_DOCKER_COMPOSE_FILE)"
       fi
     fi
-    if [[ ! -f "$PROJECT_ROOT/localLabelDetection/$compose_file" ]]; then
+    if [[ ! -f "$PROJECT_ROOT/code/localLabelDetection/$compose_file" ]]; then
       echo "⚠️  $compose_file not found for localLabelDetection; cannot run via docker"
       return 0
     fi
 
     echo "🐳 Starting $service_name via docker compose on port $port..."
     (
-      cd "$PROJECT_ROOT/localLabelDetection" || exit 0
+      cd "$PROJECT_ROOT/code/localLabelDetection" || exit 0
 
       # Clean up any stale container names from previous runs (common when switching compose files/platforms).
       docker compose -f "$compose_file" down --remove-orphans >/dev/null 2>&1 || true
@@ -456,7 +469,7 @@ start_local_ocr_paddle_service() {
 
   echo "🐳 Starting $service_name via Docker on port $port..."
   (
-    cd "$PROJECT_ROOT/localOcrPaddle" || exit 0
+    cd "$PROJECT_ROOT/code/localOcrPaddle" || exit 0
 
     docker rm -f "$service_name" >/dev/null 2>&1 || true
     docker build -t "$service_name:dev" .
@@ -551,7 +564,7 @@ PY
 
   echo "🐳 Starting $service_name via Docker on port $port..."
   (
-    cd "$PROJECT_ROOT/localKeySceneBest" || exit 0
+    cd "$PROJECT_ROOT/code/localKeySceneBest" || exit 0
 
     docker rm -f "$service_name" >/dev/null 2>&1 || true
     docker build -t "$service_name:dev" .
@@ -563,8 +576,8 @@ PY
       -e CLIP_PRETRAINED="${ENVID_CLIP_PRETRAINED:-laion2b_s34b_b79k}" \
       -e TRANSNETV2_MODEL_DIR="${TRANSNETV2_MODEL_DIR:-/weights/transnetv2-weights}" \
       -e XDG_CACHE_HOME="/cache" \
-      -v "$PROJECT_ROOT/localKeySceneBest/weights:/weights:ro" \
-      -v "$PROJECT_ROOT/localKeySceneBest/.cache:/cache" \
+      -v "$PROJECT_ROOT/code/localKeySceneBest/weights:/weights:ro" \
+      -v "$PROJECT_ROOT/code/localKeySceneBest/.cache:/cache" \
       "$service_name:dev")"
     echo "$container_id" > "$pid_file"
     echo "✅ $service_name started (container: $container_id)"
@@ -580,7 +593,7 @@ start_local_moderation_nsfwjs_service
 start_local_label_detection_service
 start_local_ocr_paddle_service
 start_local_keyscene_best_service
-start_service "envid-metadata-multimodal" "envidMetadataGCP" "app.py" "5016" "$ENV_MULTIMODAL_LOCAL_FILE,$ENV_MULTIMODAL_SECRETS_FILE"
+start_service "envid-metadata-multimodal" "code/envidMetadataGCP" "app.py" "5016" "$ENV_MULTIMODAL_LOCAL_FILE,$ENV_MULTIMODAL_TARGET_FILE,$ENV_MULTIMODAL_SECRETS_FILE,$ENV_MULTIMODAL_TARGET_SECRETS_FILE"
 
 # Other services intentionally disabled.
 # Uncomment as needed.

@@ -20,6 +20,19 @@ ENV_LOCAL_FILE="$PROJECT_ROOT/.env.local"
 ENV_MULTIMODAL_LOCAL_FILE="$PROJECT_ROOT/.env.multimodal.local"
 ENV_MULTIMODAL_SECRETS_FILE="$PROJECT_ROOT/.env.multimodal.secrets.local"
 
+# Allow separate env overrides per environment (laptop vs VM).
+ENV_TARGET="${ENVID_ENV_TARGET:-}"
+if [ -z "$ENV_TARGET" ]; then
+  if [ "$(uname -s)" = "Darwin" ]; then
+    ENV_TARGET="laptop"
+  else
+    ENV_TARGET="vm"
+  fi
+fi
+
+ENV_MULTIMODAL_TARGET_FILE="$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.local"
+ENV_MULTIMODAL_TARGET_SECRETS_FILE="$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.secrets.local"
+
 # Ensure services can import shared/ utilities.
 export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
 
