@@ -1,0 +1,22 @@
+Probing mmcv wheel from: https://download.openmmlab.com/mmcv/dist/cpu/torch2.2.0/index.html
+debconf: delaying package configuration, since apt-utils is not installed
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+
+[notice] A new release of pip is available: 23.0.1 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+mmcv_version 2.2.0
+Traceback (most recent call last):
+  File "<stdin>", line 8, in <module>
+  File "/usr/local/lib/python3.10/importlib/util.py", line 94, in find_spec
+    parent = __import__(parent_name, fromlist=['__path__'])
+  File "/usr/local/lib/python3.10/site-packages/mmcv/ops/__init__.py", line 2, in <module>
+    from mmcv.utils import IS_MLU_AVAILABLE
+  File "/usr/local/lib/python3.10/site-packages/mmcv/utils/__init__.py", line 2, in <module>
+    from .device_type import (IS_CUDA_AVAILABLE, IS_MLU_AVAILABLE,
+  File "/usr/local/lib/python3.10/site-packages/mmcv/utils/device_type.py", line 2, in <module>
+    from mmengine.device import (is_cuda_available, is_mlu_available,
+  File "/usr/local/lib/python3.10/site-packages/mmengine/device/__init__.py", line 2, in <module>
+    from .utils import (get_device, get_max_cuda_memory, get_max_musa_memory,
+  File "/usr/local/lib/python3.10/site-packages/mmengine/device/utils.py", line 5, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'

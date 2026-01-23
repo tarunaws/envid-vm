@@ -1,0 +1,192 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 674B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.50kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 DONE 0.5s
+
+#4 [1/8] FROM docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2
+#4 resolve docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2 0.0s done
+#4 DONE 0.0s
+
+#5 [2/8] WORKDIR /app
+#5 CACHED
+
+#6 [internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 64B done
+#7 DONE 0.0s
+
+#8 [3/8] RUN apt-get update && apt-get install -y --no-install-recommends     git     build-essential     cmake     pkg-config     libglib2.0-0     libgl1  && rm -rf /var/lib/apt/lists/*
+#8 0.182 Hit:1 http://deb.debian.org/debian trixie InRelease
+#8 0.199 Get:2 http://deb.debian.org/debian trixie-updates InRelease [47.3 kB]
+#8 0.668 Get:3 http://deb.debian.org/debian-security trixie-security InRelease [43.4 kB]
+#8 0.747 Get:4 http://deb.debian.org/debian trixie/main arm64 Packages [9607 kB]
+#8 3.672 Get:5 http://deb.debian.org/debian trixie-updates/main arm64 Packages [5404 B]
+#8 3.684 Get:6 http://deb.debian.org/debian-security trixie-security/main arm64 Packages [96.3 kB]
+#8 4.180 Fetched 9800 kB in 4s (2399 kB/s)
+#8 4.180 Reading package lists...
+#8 4.386 Reading package lists...
+#8 4.586 Building dependency tree...
+#8 4.631 Reading state information...
+#8 4.713 The following additional packages will be installed:
+#8 4.713   binutils binutils-aarch64-linux-gnu binutils-common bzip2 cmake-data cpp
+#8 4.713   cpp-14 cpp-14-aarch64-linux-gnu cpp-aarch64-linux-gnu dpkg-dev g++ g++-14
+#8 4.713   g++-14-aarch64-linux-gnu g++-aarch64-linux-gnu gcc gcc-14
+#8 4.713   gcc-14-aarch64-linux-gnu gcc-aarch64-linux-gnu git-man libarchive13t64
+#8 4.713   libasan8 libatomic1 libbinutils libbrotli1 libc-dev-bin libc6-dev libcc1-0
+#8 4.713   libcom-err2 libcrypt-dev libctf-nobfd0 libctf0 libcurl3t64-gnutls
+#8 4.713   libcurl4t64 libdpkg-perl libdrm-amdgpu1 libdrm-common libdrm2 libedit2
+#8 4.713   libelf1t64 liberror-perl libexpat1 libgbm1 libgcc-14-dev libgdbm-compat4t64
+#8 4.713   libgl1-mesa-dri libglvnd0 libglx-mesa0 libglx0 libgnutls30t64 libgomp1
+#8 4.713   libgprofng0 libgssapi-krb5-2 libhwasan0 libidn2-0 libisl23 libitm1
+#8 4.713   libjansson4 libjsoncpp26 libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0
+#8 4.713   libldap2 libllvm19 liblsan0 libmpc3 libmpfr6 libnghttp2-14 libnghttp3-9
+#8 4.713   libngtcp2-16 libngtcp2-crypto-gnutls8 libp11-kit0 libperl5.40 libpkgconf3
+#8 4.713   libproc2-0 libpsl5t64 librhash1 librtmp1 libsasl2-2 libsasl2-modules-db
+#8 4.713   libsensors-config libsensors5 libsframe1 libssh2-1t64 libstdc++-14-dev
+#8 4.713   libtasn1-6 libtsan2 libubsan1 libunistring5 libuv1t64 libvulkan1
+#8 4.713   libwayland-server0 libx11-6 libx11-data libx11-xcb1 libxau6 libxcb-dri3-0
+#8 4.713   libxcb-glx0 libxcb-present0 libxcb-randr0 libxcb-shm0 libxcb-sync1
+#8 4.713   libxcb-xfixes0 libxcb1 libxdmcp6 libxext6 libxml2 libxshmfence1 libxxf86vm1
+#8 4.713   libz3-4 linux-libc-dev make mesa-libgallium patch perl perl-modules-5.40
+#8 4.713   pkgconf pkgconf-bin procps rpcsvc-proto xz-utils
+#8 4.713 Suggested packages:
+#8 4.713   binutils-doc gprofng-gui binutils-gold bzip2-doc cmake-doc cmake-format
+#8 4.713   elpa-cmake-mode ninja-build cpp-doc gcc-14-locales cpp-14-doc debian-keyring
+#8 4.713   debian-tag2upload-keyring gcc-14-doc gcc-multilib manpages-dev autoconf
+#8 4.713   automake libtool flex bison gdb gcc-doc gdb-aarch64-linux-gnu gettext-base
+#8 4.713   git-doc git-email git-gui gitk gitweb git-cvs git-mediawiki git-svn lrzip
+#8 4.713   libc-devtools glibc-doc sq | sqop | rsop | gosop | pgpainless-cli | gpg-sq
+#8 4.713   | gnupg sensible-utils bzr low-memory-monitor gnutls-bin krb5-doc krb5-user
+#8 4.713   lm-sensors libstdc++-14-doc make-doc ed diffutils-doc perl-doc
+#8 4.713   libterm-readline-gnu-perl | libterm-readline-perl-perl
+#8 4.713   libtap-harness-archive-perl
+#8 4.713 Recommended packages:
+#8 4.713   fakeroot sq | sqop | rsop | gosop | pgpainless-cli | gpg-sq | gnupg
+#8 4.713   libalgorithm-merge-perl less ssh-client manpages manpages-dev
+#8 4.713   libfile-fcntllock-perl liblocale-gettext-perl libglib2.0-data
+#8 4.713   shared-mime-info xdg-user-dirs krb5-locales libldap-common publicsuffix
+#8 4.713   libsasl2-modules mesa-vulkan-drivers | vulkan-icd psmisc
+#8 4.713   linux-sysctl-defaults
+#8 5.010 The following NEW packages will be installed:
+#8 5.010   binutils binutils-aarch64-linux-gnu binutils-common build-essential bzip2
+#8 5.010   cmake cmake-data cpp cpp-14 cpp-14-aarch64-linux-gnu cpp-aarch64-linux-gnu
+#8 5.010   dpkg-dev g++ g++-14 g++-14-aarch64-linux-gnu g++-aarch64-linux-gnu gcc
+#8 5.010   gcc-14 gcc-14-aarch64-linux-gnu gcc-aarch64-linux-gnu git git-man
+#8 5.010   libarchive13t64 libasan8 libatomic1 libbinutils libbrotli1 libc-dev-bin
+#8 5.010   libc6-dev libcc1-0 libcom-err2 libcrypt-dev libctf-nobfd0 libctf0
+#8 5.010   libcurl3t64-gnutls libcurl4t64 libdpkg-perl libdrm-amdgpu1 libdrm-common
+#8 5.010   libdrm2 libedit2 libelf1t64 liberror-perl libexpat1 libgbm1 libgcc-14-dev
+#8 5.010   libgdbm-compat4t64 libgl1 libgl1-mesa-dri libglib2.0-0t64 libglvnd0
+#8 5.010   libglx-mesa0 libglx0 libgnutls30t64 libgomp1 libgprofng0 libgssapi-krb5-2
+#8 5.010   libhwasan0 libidn2-0 libisl23 libitm1 libjansson4 libjsoncpp26 libk5crypto3
+#8 5.010   libkeyutils1 libkrb5-3 libkrb5support0 libldap2 libllvm19 liblsan0 libmpc3
+#8 5.010   libmpfr6 libnghttp2-14 libnghttp3-9 libngtcp2-16 libngtcp2-crypto-gnutls8
+#8 5.010   libp11-kit0 libperl5.40 libpkgconf3 libproc2-0 libpsl5t64 librhash1 librtmp1
+#8 5.010   libsasl2-2 libsasl2-modules-db libsensors-config libsensors5 libsframe1
+#8 5.010   libssh2-1t64 libstdc++-14-dev libtasn1-6 libtsan2 libubsan1 libunistring5
+#8 5.010   libuv1t64 libvulkan1 libwayland-server0 libx11-6 libx11-data libx11-xcb1
+#8 5.010   libxau6 libxcb-dri3-0 libxcb-glx0 libxcb-present0 libxcb-randr0 libxcb-shm0
+#8 5.010   libxcb-sync1 libxcb-xfixes0 libxcb1 libxdmcp6 libxext6 libxml2 libxshmfence1
+#8 5.010   libxxf86vm1 libz3-4 linux-libc-dev make mesa-libgallium patch perl
+#8 5.010   perl-modules-5.40 pkg-config pkgconf pkgconf-bin procps rpcsvc-proto
+#8 5.010   xz-utils
+#8 5.084 0 upgraded, 127 newly installed, 0 to remove and 0 not upgraded.
+#8 5.084 Need to get 147 MB of archives.
+#8 5.084 After this operation, 652 MB of additional disk space will be used.
+#8 5.084 Get:1 http://deb.debian.org/debian trixie/main arm64 libexpat1 arm64 2.7.1-2 [93.3 kB]
+#8 5.150 Get:2 http://deb.debian.org/debian trixie/main arm64 libproc2-0 arm64 2:4.0.4-9 [62.8 kB]
+#8 5.157 Get:3 http://deb.debian.org/debian trixie/main arm64 procps arm64 2:4.0.4-9 [871 kB]
+#8 5.428 Get:4 http://deb.debian.org/debian trixie/main arm64 bzip2 arm64 1.0.8-6 [39.5 kB]
+#8 5.428 Get:5 http://deb.debian.org/debian trixie/main arm64 perl-modules-5.40 all 5.40.1-6 [3019 kB]
+#8 6.145 Get:6 http://deb.debian.org/debian trixie/main arm64 libgdbm-compat4t64 arm64 1.24-2 [50.3 kB]
+#8 6.145 Get:7 http://deb.debian.org/debian trixie/main arm64 libperl5.40 arm64 5.40.1-6 [4142 kB]
+#8 7.396 Get:8 http://deb.debian.org/debian trixie/main arm64 perl arm64 5.40.1-6 [267 kB]
+#8 7.449 Get:9 http://deb.debian.org/debian trixie/main arm64 xz-utils arm64 5.8.1-1 [657 kB]
+#8 7.673 Get:10 http://deb.debian.org/debian trixie/main arm64 libsframe1 arm64 2.44-3 [77.8 kB]
+#8 7.674 Get:11 http://deb.debian.org/debian trixie/main arm64 binutils-common arm64 2.44-3 [2509 kB]
+#8 8.323 Get:12 http://deb.debian.org/debian trixie/main arm64 libbinutils arm64 2.44-3 [660 kB]
+#8 8.458 Get:13 http://deb.debian.org/debian trixie/main arm64 libgprofng0 arm64 2.44-3 [668 kB]
+#8 8.619 Get:14 http://deb.debian.org/debian trixie/main arm64 libctf-nobfd0 arm64 2.44-3 [152 kB]
+#8 8.724 Get:15 http://deb.debian.org/debian trixie/main arm64 libctf0 arm64 2.44-3 [84.2 kB]
+#8 8.725 Get:16 http://deb.debian.org/debian trixie/main arm64 libjansson4 arm64 2.14-2+b3 [39.2 kB]
+#8 8.744 Get:17 http://deb.debian.org/debian trixie/main arm64 binutils-aarch64-linux-gnu arm64 2.44-3 [820 kB]
+#8 8.983 Get:18 http://deb.debian.org/debian trixie/main arm64 binutils arm64 2.44-3 [262 kB]
+#8 9.030 Get:19 http://deb.debian.org/debian trixie/main arm64 libc-dev-bin arm64 2.41-12+deb13u1 [57.6 kB]
+#8 9.039 Get:20 http://deb.debian.org/debian trixie/main arm64 linux-libc-dev all 6.12.63-1 [2720 kB]
+#8 9.983 Get:21 http://deb.debian.org/debian trixie/main arm64 libcrypt-dev arm64 1:4.4.38-1 [123 kB]
+#8 9.991 Get:22 http://deb.debian.org/debian trixie/main arm64 rpcsvc-proto arm64 1.4.3-1+b1 [60.5 kB]
+#8 10.00 Get:23 http://deb.debian.org/debian trixie/main arm64 libc6-dev arm64 2.41-12+deb13u1 [1623 kB]
+#8 10.40 Get:24 http://deb.debian.org/debian trixie/main arm64 libisl23 arm64 0.27-1 [601 kB]
+#8 10.52 Get:25 http://deb.debian.org/debian trixie/main arm64 libmpfr6 arm64 4.2.2-1 [685 kB]
+#8 10.70 Get:26 http://deb.debian.org/debian trixie/main arm64 libmpc3 arm64 1.3.1-1+b3 [50.5 kB]
+#8 10.73 Get:27 http://deb.debian.org/debian trixie/main arm64 cpp-14-aarch64-linux-gnu arm64 14.2.0-19 [9169 kB]
+#8 13.74 Get:28 http://deb.debian.org/debian trixie/main arm64 cpp-14 arm64 14.2.0-19 [1276 B]
+#8 13.74 Get:29 http://deb.debian.org/debian trixie/main arm64 cpp-aarch64-linux-gnu arm64 4:14.2.0-1 [4832 B]
+#8 13.74 Get:30 http://deb.debian.org/debian trixie/main arm64 cpp arm64 4:14.2.0-1 [1568 B]
+#8 13.75 Get:31 http://deb.debian.org/debian trixie/main arm64 libcc1-0 arm64 14.2.0-19 [42.2 kB]
+#8 13.78 Get:32 http://deb.debian.org/debian trixie/main arm64 libgomp1 arm64 14.2.0-19 [124 kB]
+#8 13.82 Get:33 http://deb.debian.org/debian trixie/main arm64 libitm1 arm64 14.2.0-19 [24.2 kB]
+#8 13.82 Get:34 http://deb.debian.org/debian trixie/main arm64 libatomic1 arm64 14.2.0-19 [10.1 kB]
+#8 13.83 Get:35 http://deb.debian.org/debian trixie/main arm64 libasan8 arm64 14.2.0-19 [2578 kB]
+#8 14.76 Get:36 http://deb.debian.org/debian trixie/main arm64 liblsan0 arm64 14.2.0-19 [1161 kB]
+#8 15.11 Get:37 http://deb.debian.org/debian trixie/main arm64 libtsan2 arm64 14.2.0-19 [2383 kB]
+#8 15.88 Get:38 http://deb.debian.org/debian trixie/main arm64 libubsan1 arm64 14.2.0-19 [1039 kB]
+#8 16.26 Get:39 http://deb.debian.org/debian trixie/main arm64 libhwasan0 arm64 14.2.0-19 [1442 kB]
+#8 16.69 Get:40 http://deb.debian.org/debian trixie/main arm64 libgcc-14-dev arm64 14.2.0-19 [2359 kB]
+#8 17.38 Get:41 http://deb.debian.org/debian trixie/main arm64 gcc-14-aarch64-linux-gnu arm64 14.2.0-19 [17.7 MB]
+#8 23.95 Get:42 http://deb.debian.org/debian trixie/main arm64 gcc-14 arm64 14.2.0-19 [529 kB]
+#8 24.08 Get:43 http://deb.debian.org/debian trixie/main arm64 gcc-aarch64-linux-gnu arm64 4:14.2.0-1 [1440 B]
+#8 24.08 Get:44 http://deb.debian.org/debian trixie/main arm64 gcc arm64 4:14.2.0-1 [5136 B]
+#8 24.08 Get:45 http://deb.debian.org/debian trixie/main arm64 libstdc++-14-dev arm64 14.2.0-19 [2295 kB]
+#8 24.74 Get:46 http://deb.debian.org/debian trixie/main arm64 g++-14-aarch64-linux-gnu arm64 14.2.0-19 [10.1 MB]
+#8 29.55 Get:47 http://deb.debian.org/debian trixie/main arm64 g++-14 arm64 14.2.0-19 [22.5 kB]
+#8 29.57 Get:48 http://deb.debian.org/debian trixie/main arm64 g++-aarch64-linux-gnu arm64 4:14.2.0-1 [1200 B]
+#8 29.57 Get:49 http://deb.debian.org/debian trixie/main arm64 g++ arm64 4:14.2.0-1 [1332 B]
+#8 29.58 Get:50 http://deb.debian.org/debian trixie/main arm64 make arm64 4.4.1-2 [452 kB]
+#8 30.22 Get:51 http://deb.debian.org/debian trixie/main arm64 libdpkg-perl all 1.22.21 [650 kB]
+#8 31.00 Get:52 http://deb.debian.org/debian trixie/main arm64 patch arm64 2.8-2 [128 kB]
+#8 31.27 Get:53 http://deb.debian.org/debian trixie/main arm64 dpkg-dev all 1.22.21 [1338 kB]
+#8 32.50 Get:54 http://deb.debian.org/debian trixie/main arm64 build-essential arm64 12.12 [4624 B]
+#8 32.50 Get:55 http://deb.debian.org/debian trixie/main arm64 cmake-data all 3.31.6-2 [2268 kB]
+#8 37.07 Get:56 http://deb.debian.org/debian trixie/main arm64 libxml2 arm64 2.12.7+dfsg+really2.9.14-2.1+deb13u2 [630 kB]
+#8 37.81 Get:57 http://deb.debian.org/debian trixie/main arm64 libarchive13t64 arm64 3.7.4-4 [323 kB]
+#8 37.99 Get:58 http://deb.debian.org/debian trixie/main arm64 libbrotli1 arm64 1.1.0-2+b7 [308 kB]
+#8 38.37 Get:59 http://deb.debian.org/debian trixie/main arm64 libkrb5support0 arm64 1.21.3-5 [32.4 kB]
+#8 38.41 Get:60 http://deb.debian.org/debian trixie/main arm64 libcom-err2 arm64 1.47.2-3+b7 [24.9 kB]
+#8 38.45 Get:61 http://deb.debian.org/debian trixie/main arm64 libk5crypto3 arm64 1.21.3-5 [81.2 kB]
+#8 38.52 Get:62 http://deb.debian.org/debian trixie/main arm64 libkeyutils1 arm64 1.6.3-6 [9716 B]
+#8 38.60 Get:63 http://deb.debian.org/debian trixie/main arm64 libkrb5-3 arm64 1.21.3-5 [308 kB]
+#8 38.91 Get:64 http://deb.debian.org/debian trixie/main arm64 libgssapi-krb5-2 arm64 1.21.3-5 [127 kB]
+#8 39.13 Get:65 http://deb.debian.org/debian trixie/main arm64 libunistring5 arm64 1.3-2 [453 kB]
+#8 39.65 Get:66 http://deb.debian.org/debian trixie/main arm64 libidn2-0 arm64 2.3.8-2 [107 kB]
+#8 39.73 Get:67 http://deb.debian.org/debian trixie/main arm64 libsasl2-modules-db arm64 2.1.28+dfsg1-9 [20.1 kB]
+#8 39.75 Get:68 http://deb.debian.org/debian trixie/main arm64 libsasl2-2 arm64 2.1.28+dfsg1-9 [55.6 kB]
+#8 39.79 Get:69 http://deb.debian.org/debian trixie/main arm64 libldap2 arm64 2.6.10+dfsg-1 [179 kB]
+#8 39.93 Get:70 http://deb.debian.org/debian trixie/main arm64 libnghttp2-14 arm64 1.64.0-1.1 [71.4 kB]
+#8 39.98 Get:71 http://deb.debian.org/debian trixie/main arm64 libnghttp3-9 arm64 1.8.0-1 [63.2 kB]
+#8 40.03 Get:72 http://deb.debian.org/debian trixie/main arm64 libpsl5t64 arm64 0.21.2-1.1+b1 [57.1 kB]
+#8 40.18 Get:73 http://deb.debian.org/debian trixie/main arm64 libp11-kit0 arm64 0.25.5-3 [409 kB]
+#8 40.88 Get:74 http://deb.debian.org/debian trixie/main arm64 libtasn1-6 arm64 4.20.0-2 [47.3 kB]
+#8 40.96 Get:75 http://deb.debian.org/debian trixie/main arm64 libgnutls30t64 arm64 3.8.9-3+deb13u1 [1375 kB]
+#8 46.56 Get:76 http://deb.debian.org/debian trixie/main arm64 librtmp1 arm64 2.4+20151223.gitfa8646d.1-2+b5 [56.8 kB]
+#8 47.10 Get:77 http://deb.debian.org/debian trixie/main arm64 libssh2-1t64 arm64 1.11.1-1 [235 kB]
+#8 48.90 Get:78 http://deb.debian.org/debian trixie/main arm64 libcurl4t64 arm64 8.14.1-2+deb13u2 [359 kB]
+#8 49.74 Get:79 http://deb.debian.org/debian trixie/main arm64 libjsoncpp26 arm64 1.9.6-3 [72.9 kB]
+#8 49.78 Get:80 http://deb.debian.org/debian trixie/main arm64 librhash1 arm64 1.4.5-1 [129 kB]
+#8 49.86 Get:81 http://deb.debian.org/debian trixie/main arm64 libuv1t64 arm64 1.50.0-2 [148 kB]
+#8 49.92 Get:82 http://deb.debian.org/debian trixie/main arm64 cmake arm64 3.31.6-2 [9906 kB]
+#8 54.58 Get:83 http://deb.debian.org/debian trixie/main arm64 libngtcp2-16 arm64 1.11.0-1 [121 kB]
+#8 54.59 Get:84 http://deb.debian.org/debian trixie/main arm64 libngtcp2-crypto-gnutls8 arm64 1.11.0-1 [28.2 kB]
+#8 54.60 Get:85 http://deb.debian.org/debian trixie/main arm64 libcurl3t64-gnutls arm64 8.14.1-2+deb13u2 [354 kB]
+#8 54.65 Get:86 http://deb.debian.org/debian trixie/main arm64 liberror-perl all 0.17030-1 [26.9 kB]
+#8 54.65 Get:87 http://deb.debian.org/debian trixie/main arm64 git-man all 1:2.47.3-0+deb13u1 [2205 kB]
+#8 55.02 Get:88 http://deb.debian.org/debian trixie/main arm64 git arm64 1:2.47.3-0+deb13u1 [8666 kB]

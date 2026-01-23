@@ -1,0 +1,1429 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 650B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.76kB 0.0s done
+#2 DONE 0.1s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim-bookworm
+#3 DONE 1.0s
+
+#4 [1/8] FROM docker.io/library/python:3.11-slim-bookworm@sha256:bcbbec29f7a3f9cbee891e3cd69d7fe4dec7e281daf36cbd415ddd8ee2ba0077
+#4 resolve docker.io/library/python:3.11-slim-bookworm@sha256:bcbbec29f7a3f9cbee891e3cd69d7fe4dec7e281daf36cbd415ddd8ee2ba0077 0.0s done
+#4 sha256:dbcfe85e46a0c5f45c4185af237ab454dfa2c1c0f94811f2af97e7c8f1cee9cf 249B / 249B 0.7s done
+#4 sha256:56d7a2f5a9cdc6ceb9692730ce94a25a5e2cf4152f3b03f9ef501823184bd1ea 3.35MB / 3.35MB 2.6s done
+#4 sha256:33bdc9671af8942d96d2f78f67aeec06580065dde1272decac3732689ec7c0e8 28.11MB / 28.11MB 3.4s done
+#4 extracting sha256:33bdc9671af8942d96d2f78f67aeec06580065dde1272decac3732689ec7c0e8 0.3s done
+#4 extracting sha256:56d7a2f5a9cdc6ceb9692730ce94a25a5e2cf4152f3b03f9ef501823184bd1ea 0.0s done
+#4 sha256:b74aeb75d2f90efd7c94554d2d260e087a1ea7a889df88c21458948eb5bc56c1 15.87MB / 15.87MB 4.9s done
+#4 extracting sha256:b74aeb75d2f90efd7c94554d2d260e087a1ea7a889df88c21458948eb5bc56c1 0.2s done
+#4 extracting sha256:dbcfe85e46a0c5f45c4185af237ab454dfa2c1c0f94811f2af97e7c8f1cee9cf done
+#4 DONE 5.1s
+
+#5 [2/8] WORKDIR /app
+#5 DONE 0.0s
+
+#6 [3/8] RUN set -eux;     for i in 1 2 3; do         apt-get update -o Acquire::Retries=5 &&         apt-get install -o Acquire::Retries=5 -y --no-install-recommends             libglib2.0-0             libgl1         && rm -rf /var/lib/apt/lists/*         && break;         echo "apt-get failed (attempt $i); retrying in 5s...";         sleep 5;     done
+#6 1.392 + apt-get update -o Acquire::Retries=5
+#6 1.968 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#6 2.423 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#6 3.094 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+#6 3.193 Get:4 http://deb.debian.org/debian bookworm/main arm64 Packages [8691 kB]
+#6 5.922 Get:5 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [6936 B]
+#6 5.940 Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [287 kB]
+#6 6.662 Fetched 9239 kB in 5s (1794 kB/s)
+#6 6.662 Reading package lists...
+#6 7.081 + apt-get install -o Acquire::Retries=5 -y --no-install-recommends libglib2.0-0 libgl1
+#6 7.100 Reading package lists...
+#6 7.544 Building dependency tree...
+#6 7.667 Reading state information...
+#6 7.855 The following additional packages will be installed:
+#6 7.855   libbsd0 libdrm-amdgpu1 libdrm-common libdrm-nouveau2 libdrm-radeon1 libdrm2
+#6 7.855   libedit2 libelf1 libexpat1 libgl1-mesa-dri libglapi-mesa libglvnd0
+#6 7.855   libglx-mesa0 libglx0 libicu72 libllvm15 libsensors-config libsensors5
+#6 7.855   libx11-6 libx11-data libx11-xcb1 libxau6 libxcb-dri2-0 libxcb-dri3-0
+#6 7.855   libxcb-glx0 libxcb-present0 libxcb-randr0 libxcb-shm0 libxcb-sync1
+#6 7.855   libxcb-xfixes0 libxcb1 libxdmcp6 libxext6 libxfixes3 libxml2 libxshmfence1
+#6 7.855   libxxf86vm1 libz3-4
+#6 7.855 Suggested packages:
+#6 7.855   low-memory-monitor lm-sensors
+#6 7.855 Recommended packages:
+#6 7.855   libglib2.0-data shared-mime-info xdg-user-dirs
+#6 8.057 The following NEW packages will be installed:
+#6 8.057   libbsd0 libdrm-amdgpu1 libdrm-common libdrm-nouveau2 libdrm-radeon1 libdrm2
+#6 8.057   libedit2 libelf1 libexpat1 libgl1 libgl1-mesa-dri libglapi-mesa libglib2.0-0
+#6 8.057   libglvnd0 libglx-mesa0 libglx0 libicu72 libllvm15 libsensors-config
+#6 8.057   libsensors5 libx11-6 libx11-data libx11-xcb1 libxau6 libxcb-dri2-0
+#6 8.057   libxcb-dri3-0 libxcb-glx0 libxcb-present0 libxcb-randr0 libxcb-shm0
+#6 8.057   libxcb-sync1 libxcb-xfixes0 libxcb1 libxdmcp6 libxext6 libxfixes3 libxml2
+#6 8.061   libxshmfence1 libxxf86vm1 libz3-4
+#6 8.499 0 upgraded, 40 newly installed, 0 to remove and 0 not upgraded.
+#6 8.499 Need to get 47.7 MB of archives.
+#6 8.499 After this operation, 214 MB of additional disk space will be used.
+#6 8.499 Get:1 http://deb.debian.org/debian bookworm/main arm64 libbsd0 arm64 0.11.7-2 [115 kB]
+#6 8.750 Get:2 http://deb.debian.org/debian bookworm/main arm64 libdrm-common all 2.4.114-1 [7112 B]
+#6 8.752 Get:3 http://deb.debian.org/debian bookworm/main arm64 libdrm2 arm64 2.4.114-1+b1 [36.7 kB]
+#6 8.769 Get:4 http://deb.debian.org/debian bookworm/main arm64 libdrm-amdgpu1 arm64 2.4.114-1+b1 [20.4 kB]
+#6 8.769 Get:5 http://deb.debian.org/debian bookworm/main arm64 libdrm-nouveau2 arm64 2.4.114-1+b1 [18.4 kB]
+#6 8.777 Get:6 http://deb.debian.org/debian bookworm/main arm64 libdrm-radeon1 arm64 2.4.114-1+b1 [20.9 kB]
+#6 8.778 Get:7 http://deb.debian.org/debian bookworm/main arm64 libedit2 arm64 3.1-20221030-2 [88.1 kB]
+#6 8.799 Get:8 http://deb.debian.org/debian bookworm/main arm64 libelf1 arm64 0.188-2.1 [173 kB]
+#6 8.947 Get:9 http://deb.debian.org/debian bookworm/main arm64 libexpat1 arm64 2.5.0-1+deb12u2 [86.3 kB]
+#6 8.948 Get:10 http://deb.debian.org/debian bookworm/main arm64 libglvnd0 arm64 1.6.0-1 [41.4 kB]
+#6 8.948 Get:11 http://deb.debian.org/debian bookworm/main arm64 libxau6 arm64 1:1.0.9-1 [19.7 kB]
+#6 8.949 Get:12 http://deb.debian.org/debian bookworm/main arm64 libxdmcp6 arm64 1:1.1.2-3 [25.4 kB]
+#6 8.950 Get:13 http://deb.debian.org/debian bookworm/main arm64 libxcb1 arm64 1.15-1 [143 kB]
+#6 8.972 Get:14 http://deb.debian.org/debian bookworm/main arm64 libx11-data all 2:1.8.4-2+deb12u2 [292 kB]
+#6 9.103 Get:15 http://deb.debian.org/debian bookworm/main arm64 libx11-6 arm64 2:1.8.4-2+deb12u2 [735 kB]
+#6 9.318 Get:16 http://deb.debian.org/debian bookworm/main arm64 libglapi-mesa arm64 22.3.6-1+deb12u1 [44.7 kB]
+#6 9.334 Get:17 http://deb.debian.org/debian bookworm/main arm64 libx11-xcb1 arm64 2:1.8.4-2+deb12u2 [192 kB]
+#6 9.475 Get:18 http://deb.debian.org/debian bookworm/main arm64 libxcb-dri2-0 arm64 1.15-1 [107 kB]
+#6 9.477 Get:19 http://deb.debian.org/debian bookworm/main arm64 libxcb-dri3-0 arm64 1.15-1 [107 kB]
+#6 9.483 Get:20 http://deb.debian.org/debian bookworm/main arm64 libxcb-glx0 arm64 1.15-1 [123 kB]
+#6 9.483 Get:21 http://deb.debian.org/debian bookworm/main arm64 libxcb-present0 arm64 1.15-1 [106 kB]
+#6 9.613 Get:22 http://deb.debian.org/debian bookworm/main arm64 libxcb-randr0 arm64 1.15-1 [117 kB]
+#6 9.636 Get:23 http://deb.debian.org/debian bookworm/main arm64 libxcb-shm0 arm64 1.15-1 [106 kB]
+#6 9.654 Get:24 http://deb.debian.org/debian bookworm/main arm64 libxcb-sync1 arm64 1.15-1 [109 kB]
+#6 9.654 Get:25 http://deb.debian.org/debian bookworm/main arm64 libxcb-xfixes0 arm64 1.15-1 [110 kB]
+#6 9.654 Get:26 http://deb.debian.org/debian bookworm/main arm64 libxext6 arm64 2:1.3.4-1+b1 [51.7 kB]
+#6 9.654 Get:27 http://deb.debian.org/debian bookworm/main arm64 libxfixes3 arm64 1:6.0.0-2 [22.9 kB]
+#6 9.654 Get:28 http://deb.debian.org/debian bookworm/main arm64 libxshmfence1 arm64 1.3-1 [8712 B]
+#6 9.654 Get:29 http://deb.debian.org/debian bookworm/main arm64 libxxf86vm1 arm64 1:1.1.4-1+b2 [20.1 kB]
+#6 9.655 Get:30 http://deb.debian.org/debian bookworm/main arm64 libicu72 arm64 72.1-3+deb12u1 [9202 kB]
+#6 10.20 Get:31 http://deb.debian.org/debian bookworm/main arm64 libxml2 arm64 2.9.14+dfsg-1.3~deb12u5 [620 kB]
+#6 10.21 Get:32 http://deb.debian.org/debian bookworm/main arm64 libz3-4 arm64 4.8.12-3.1 [6282 kB]
+#6 10.55 Get:33 http://deb.debian.org/debian bookworm/main arm64 libllvm15 arm64 1:15.0.6-4+b1 [20.7 MB]
+#6 11.68 Get:34 http://deb.debian.org/debian bookworm/main arm64 libsensors-config all 1:3.6.0-7.1 [14.3 kB]
+#6 11.68 Get:35 http://deb.debian.org/debian bookworm/main arm64 libsensors5 arm64 1:3.6.0-7.1 [33.3 kB]
+#6 11.68 Get:36 http://deb.debian.org/debian bookworm/main arm64 libgl1-mesa-dri arm64 22.3.6-1+deb12u1 [6278 kB]
+#6 11.94 Get:37 http://deb.debian.org/debian bookworm/main arm64 libglx-mesa0 arm64 22.3.6-1+deb12u1 [146 kB]
+#6 11.95 Get:38 http://deb.debian.org/debian bookworm/main arm64 libglx0 arm64 1.6.0-1 [30.8 kB]
+#6 11.95 Get:39 http://deb.debian.org/debian bookworm/main arm64 libgl1 arm64 1.6.0-1 [90.2 kB]
+#6 11.96 Get:40 http://deb.debian.org/debian bookworm/main arm64 libglib2.0-0 arm64 2.74.6-2+deb12u8 [1314 kB]
+#6 12.37 debconf: delaying package configuration, since apt-utils is not installed
+#6 12.41 Fetched 47.7 MB in 4s (11.8 MB/s)
+#6 12.45 Selecting previously unselected package libbsd0:arm64.
+#6 12.45 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6689 files and directories currently installed.)
+#6 12.48 Preparing to unpack .../00-libbsd0_0.11.7-2_arm64.deb ...
+#6 12.49 Unpacking libbsd0:arm64 (0.11.7-2) ...
+#6 12.52 Selecting previously unselected package libdrm-common.
+#6 12.52 Preparing to unpack .../01-libdrm-common_2.4.114-1_all.deb ...
+#6 12.52 Unpacking libdrm-common (2.4.114-1) ...
+#6 12.55 Selecting previously unselected package libdrm2:arm64.
+#6 12.55 Preparing to unpack .../02-libdrm2_2.4.114-1+b1_arm64.deb ...
+#6 12.56 Unpacking libdrm2:arm64 (2.4.114-1+b1) ...
+#6 12.59 Selecting previously unselected package libdrm-amdgpu1:arm64.
+#6 12.59 Preparing to unpack .../03-libdrm-amdgpu1_2.4.114-1+b1_arm64.deb ...
+#6 12.60 Unpacking libdrm-amdgpu1:arm64 (2.4.114-1+b1) ...
+#6 12.62 Selecting previously unselected package libdrm-nouveau2:arm64.
+#6 12.62 Preparing to unpack .../04-libdrm-nouveau2_2.4.114-1+b1_arm64.deb ...
+#6 12.62 Unpacking libdrm-nouveau2:arm64 (2.4.114-1+b1) ...
+#6 12.66 Selecting previously unselected package libdrm-radeon1:arm64.
+#6 12.66 Preparing to unpack .../05-libdrm-radeon1_2.4.114-1+b1_arm64.deb ...
+#6 12.67 Unpacking libdrm-radeon1:arm64 (2.4.114-1+b1) ...
+#6 12.71 Selecting previously unselected package libedit2:arm64.
+#6 12.71 Preparing to unpack .../06-libedit2_3.1-20221030-2_arm64.deb ...
+#6 12.72 Unpacking libedit2:arm64 (3.1-20221030-2) ...
+#6 12.74 Selecting previously unselected package libelf1:arm64.
+#6 12.74 Preparing to unpack .../07-libelf1_0.188-2.1_arm64.deb ...
+#6 12.74 Unpacking libelf1:arm64 (0.188-2.1) ...
+#6 12.78 Selecting previously unselected package libexpat1:arm64.
+#6 12.78 Preparing to unpack .../08-libexpat1_2.5.0-1+deb12u2_arm64.deb ...
+#6 12.78 Unpacking libexpat1:arm64 (2.5.0-1+deb12u2) ...
+#6 12.81 Selecting previously unselected package libglvnd0:arm64.
+#6 12.81 Preparing to unpack .../09-libglvnd0_1.6.0-1_arm64.deb ...
+#6 12.82 Unpacking libglvnd0:arm64 (1.6.0-1) ...
+#6 12.86 Selecting previously unselected package libxau6:arm64.
+#6 12.86 Preparing to unpack .../10-libxau6_1%3a1.0.9-1_arm64.deb ...
+#6 12.87 Unpacking libxau6:arm64 (1:1.0.9-1) ...
+#6 12.89 Selecting previously unselected package libxdmcp6:arm64.
+#6 12.89 Preparing to unpack .../11-libxdmcp6_1%3a1.1.2-3_arm64.deb ...
+#6 12.89 Unpacking libxdmcp6:arm64 (1:1.1.2-3) ...
+#6 12.91 Selecting previously unselected package libxcb1:arm64.
+#6 12.91 Preparing to unpack .../12-libxcb1_1.15-1_arm64.deb ...
+#6 12.92 Unpacking libxcb1:arm64 (1.15-1) ...
+#6 12.95 Selecting previously unselected package libx11-data.
+#6 12.95 Preparing to unpack .../13-libx11-data_2%3a1.8.4-2+deb12u2_all.deb ...
+#6 12.95 Unpacking libx11-data (2:1.8.4-2+deb12u2) ...
+#6 13.00 Selecting previously unselected package libx11-6:arm64.
+#6 13.01 Preparing to unpack .../14-libx11-6_2%3a1.8.4-2+deb12u2_arm64.deb ...
+#6 13.01 Unpacking libx11-6:arm64 (2:1.8.4-2+deb12u2) ...
+#6 13.10 Selecting previously unselected package libglapi-mesa:arm64.
+#6 13.10 Preparing to unpack .../15-libglapi-mesa_22.3.6-1+deb12u1_arm64.deb ...
+#6 13.10 Unpacking libglapi-mesa:arm64 (22.3.6-1+deb12u1) ...
+#6 13.12 Selecting previously unselected package libx11-xcb1:arm64.
+#6 13.12 Preparing to unpack .../16-libx11-xcb1_2%3a1.8.4-2+deb12u2_arm64.deb ...
+#6 13.13 Unpacking libx11-xcb1:arm64 (2:1.8.4-2+deb12u2) ...
+#6 13.16 Selecting previously unselected package libxcb-dri2-0:arm64.
+#6 13.16 Preparing to unpack .../17-libxcb-dri2-0_1.15-1_arm64.deb ...
+#6 13.16 Unpacking libxcb-dri2-0:arm64 (1.15-1) ...
+#6 13.19 Selecting previously unselected package libxcb-dri3-0:arm64.
+#6 13.19 Preparing to unpack .../18-libxcb-dri3-0_1.15-1_arm64.deb ...
+#6 13.20 Unpacking libxcb-dri3-0:arm64 (1.15-1) ...
+#6 13.25 Selecting previously unselected package libxcb-glx0:arm64.
+#6 13.25 Preparing to unpack .../19-libxcb-glx0_1.15-1_arm64.deb ...
+#6 13.26 Unpacking libxcb-glx0:arm64 (1.15-1) ...
+#6 13.30 Selecting previously unselected package libxcb-present0:arm64.
+#6 13.30 Preparing to unpack .../20-libxcb-present0_1.15-1_arm64.deb ...
+#6 13.30 Unpacking libxcb-present0:arm64 (1.15-1) ...
+#6 13.49 Selecting previously unselected package libxcb-randr0:arm64.
+#6 13.49 Preparing to unpack .../21-libxcb-randr0_1.15-1_arm64.deb ...
+#6 13.49 Unpacking libxcb-randr0:arm64 (1.15-1) ...
+#6 13.54 Selecting previously unselected package libxcb-shm0:arm64.
+#6 13.54 Preparing to unpack .../22-libxcb-shm0_1.15-1_arm64.deb ...
+#6 13.55 Unpacking libxcb-shm0:arm64 (1.15-1) ...
+#6 13.59 Selecting previously unselected package libxcb-sync1:arm64.
+#6 13.59 Preparing to unpack .../23-libxcb-sync1_1.15-1_arm64.deb ...
+#6 13.59 Unpacking libxcb-sync1:arm64 (1.15-1) ...
+#6 13.62 Selecting previously unselected package libxcb-xfixes0:arm64.
+#6 13.62 Preparing to unpack .../24-libxcb-xfixes0_1.15-1_arm64.deb ...
+#6 13.62 Unpacking libxcb-xfixes0:arm64 (1.15-1) ...
+#6 13.65 Selecting previously unselected package libxext6:arm64.
+#6 13.65 Preparing to unpack .../25-libxext6_2%3a1.3.4-1+b1_arm64.deb ...
+#6 13.65 Unpacking libxext6:arm64 (2:1.3.4-1+b1) ...
+#6 13.68 Selecting previously unselected package libxfixes3:arm64.
+#6 13.68 Preparing to unpack .../26-libxfixes3_1%3a6.0.0-2_arm64.deb ...
+#6 13.68 Unpacking libxfixes3:arm64 (1:6.0.0-2) ...
+#6 13.72 Selecting previously unselected package libxshmfence1:arm64.
+#6 13.72 Preparing to unpack .../27-libxshmfence1_1.3-1_arm64.deb ...
+#6 13.72 Unpacking libxshmfence1:arm64 (1.3-1) ...
+#6 13.75 Selecting previously unselected package libxxf86vm1:arm64.
+#6 13.75 Preparing to unpack .../28-libxxf86vm1_1%3a1.1.4-1+b2_arm64.deb ...
+#6 13.75 Unpacking libxxf86vm1:arm64 (1:1.1.4-1+b2) ...
+#6 13.78 Selecting previously unselected package libicu72:arm64.
+#6 13.78 Preparing to unpack .../29-libicu72_72.1-3+deb12u1_arm64.deb ...
+#6 13.78 Unpacking libicu72:arm64 (72.1-3+deb12u1) ...
+#6 14.24 Selecting previously unselected package libxml2:arm64.
+#6 14.24 Preparing to unpack .../30-libxml2_2.9.14+dfsg-1.3~deb12u5_arm64.deb ...
+#6 14.24 Unpacking libxml2:arm64 (2.9.14+dfsg-1.3~deb12u5) ...
+#6 14.29 Selecting previously unselected package libz3-4:arm64.
+#6 14.29 Preparing to unpack .../31-libz3-4_4.8.12-3.1_arm64.deb ...
+#6 14.30 Unpacking libz3-4:arm64 (4.8.12-3.1) ...
+#6 14.65 Selecting previously unselected package libllvm15:arm64.
+#6 14.65 Preparing to unpack .../32-libllvm15_1%3a15.0.6-4+b1_arm64.deb ...
+#6 14.65 Unpacking libllvm15:arm64 (1:15.0.6-4+b1) ...
+#6 15.64 Selecting previously unselected package libsensors-config.
+#6 15.64 Preparing to unpack .../33-libsensors-config_1%3a3.6.0-7.1_all.deb ...
+#6 15.65 Unpacking libsensors-config (1:3.6.0-7.1) ...
+#6 15.76 Selecting previously unselected package libsensors5:arm64.
+#6 15.76 Preparing to unpack .../34-libsensors5_1%3a3.6.0-7.1_arm64.deb ...
+#6 15.80 Unpacking libsensors5:arm64 (1:3.6.0-7.1) ...
+#6 15.84 Selecting previously unselected package libgl1-mesa-dri:arm64.
+#6 15.84 Preparing to unpack .../35-libgl1-mesa-dri_22.3.6-1+deb12u1_arm64.deb ...
+#6 15.85 Unpacking libgl1-mesa-dri:arm64 (22.3.6-1+deb12u1) ...
+#6 16.16 Selecting previously unselected package libglx-mesa0:arm64.
+#6 16.16 Preparing to unpack .../36-libglx-mesa0_22.3.6-1+deb12u1_arm64.deb ...
+#6 16.16 Unpacking libglx-mesa0:arm64 (22.3.6-1+deb12u1) ...
+#6 16.18 Selecting previously unselected package libglx0:arm64.
+#6 16.18 Preparing to unpack .../37-libglx0_1.6.0-1_arm64.deb ...
+#6 16.18 Unpacking libglx0:arm64 (1.6.0-1) ...
+#6 16.21 Selecting previously unselected package libgl1:arm64.
+#6 16.21 Preparing to unpack .../38-libgl1_1.6.0-1_arm64.deb ...
+#6 16.21 Unpacking libgl1:arm64 (1.6.0-1) ...
+#6 16.24 Selecting previously unselected package libglib2.0-0:arm64.
+#6 16.24 Preparing to unpack .../39-libglib2.0-0_2.74.6-2+deb12u8_arm64.deb ...
+#6 16.24 Unpacking libglib2.0-0:arm64 (2.74.6-2+deb12u8) ...
+#6 16.33 Setting up libexpat1:arm64 (2.5.0-1+deb12u2) ...
+#6 16.34 Setting up libxau6:arm64 (1:1.0.9-1) ...
+#6 16.35 Setting up libicu72:arm64 (72.1-3+deb12u1) ...
+#6 16.36 Setting up libglib2.0-0:arm64 (2.74.6-2+deb12u8) ...
+#6 16.37 No schema files found: doing nothing.
+#6 16.38 Setting up libglvnd0:arm64 (1.6.0-1) ...
+#6 16.38 Setting up libsensors-config (1:3.6.0-7.1) ...
+#6 16.39 Setting up libz3-4:arm64 (4.8.12-3.1) ...
+#6 16.40 Setting up libx11-data (2:1.8.4-2+deb12u2) ...
+#6 16.40 Setting up libsensors5:arm64 (1:3.6.0-7.1) ...
+#6 16.41 Setting up libglapi-mesa:arm64 (22.3.6-1+deb12u1) ...
+#6 16.42 Setting up libxshmfence1:arm64 (1.3-1) ...
+#6 16.42 Setting up libbsd0:arm64 (0.11.7-2) ...
+#6 16.43 Setting up libdrm-common (2.4.114-1) ...
+#6 16.44 Setting up libelf1:arm64 (0.188-2.1) ...
+#6 16.44 Setting up libxml2:arm64 (2.9.14+dfsg-1.3~deb12u5) ...
+#6 16.45 Setting up libxdmcp6:arm64 (1:1.1.2-3) ...
+#6 16.46 Setting up libxcb1:arm64 (1.15-1) ...
+#6 16.46 Setting up libxcb-xfixes0:arm64 (1.15-1) ...
+#6 16.47 Setting up libxcb-glx0:arm64 (1.15-1) ...
+#6 16.47 Setting up libedit2:arm64 (3.1-20221030-2) ...
+#6 16.48 Setting up libxcb-shm0:arm64 (1.15-1) ...
+#6 16.49 Setting up libxcb-present0:arm64 (1.15-1) ...
+#6 16.49 Setting up libxcb-sync1:arm64 (1.15-1) ...
+#6 16.50 Setting up libxcb-dri2-0:arm64 (1.15-1) ...
+#6 16.50 Setting up libdrm2:arm64 (2.4.114-1+b1) ...
+#6 16.51 Setting up libxcb-randr0:arm64 (1.15-1) ...
+#6 16.51 Setting up libllvm15:arm64 (1:15.0.6-4+b1) ...
+#6 16.52 Setting up libx11-6:arm64 (2:1.8.4-2+deb12u2) ...
+#6 16.53 Setting up libdrm-amdgpu1:arm64 (2.4.114-1+b1) ...
+#6 16.53 Setting up libxcb-dri3-0:arm64 (1.15-1) ...
+#6 16.54 Setting up libx11-xcb1:arm64 (2:1.8.4-2+deb12u2) ...
+#6 16.54 Setting up libdrm-nouveau2:arm64 (2.4.114-1+b1) ...
+#6 16.54 Setting up libdrm-radeon1:arm64 (2.4.114-1+b1) ...
+#6 16.55 Setting up libgl1-mesa-dri:arm64 (22.3.6-1+deb12u1) ...
+#6 16.56 Setting up libxext6:arm64 (2:1.3.4-1+b1) ...
+#6 16.56 Setting up libxxf86vm1:arm64 (1:1.1.4-1+b2) ...
+#6 16.57 Setting up libxfixes3:arm64 (1:6.0.0-2) ...
+#6 16.57 Setting up libglx-mesa0:arm64 (22.3.6-1+deb12u1) ...
+#6 16.57 Setting up libglx0:arm64 (1.6.0-1) ...
+#6 16.58 Setting up libgl1:arm64 (1.6.0-1) ...
+#6 16.58 Processing triggers for libc-bin (2.36-9+deb12u13) ...
+#6 16.62 + rm -rf /var/lib/apt/lists/auxfiles /var/lib/apt/lists/deb.debian.org_debian-security_dists_bookworm-security_InRelease /var/lib/apt/lists/deb.debian.org_debian-security_dists_bookworm-security_main_binary-arm64_Packages.lz4 /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm-updates_InRelease /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm-updates_main_binary-arm64_Packages.lz4 /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm_InRelease /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm_main_binary-arm64_Packages.lz4 /var/lib/apt/lists/lock /var/lib/apt/lists/partial
+#6 16.62 + break
+#6 DONE 16.9s
+
+#7 [4/8] COPY requirements.txt /app/requirements.txt
+#7 DONE 0.0s
+
+#8 [internal] load .dockerignore
+#8 transferring context: 2B done
+#8 DONE 0.0s
+
+#9 [internal] load build context
+#9 transferring context: 64B done
+#9 DONE 0.0s
+
+#10 [5/8] RUN pip install --no-cache-dir     --extra-index-url https://download.pytorch.org/whl/cpu     -f https://download.pytorch.org/whl/cpu/torch_stable.html     torch==2.2.2 torchvision==0.17.2
+#10 1.030 Looking in indexes: https://pypi.org/simple, https://download.pytorch.org/whl/cpu
+#10 1.030 Looking in links: https://download.pytorch.org/whl/cpu/torch_stable.html
+#10 3.989 Collecting torch==2.2.2
+#10 4.619   Downloading https://download.pytorch.org/whl/cpu/torch-2.2.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (86.6 MB)
+#10 9.118      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 86.6/86.6 MB 34.6 MB/s eta 0:00:00
+#10 11.96 Collecting torchvision==0.17.2
+#10 12.06   Downloading torchvision-0.17.2-cp311-cp311-manylinux2014_aarch64.whl.metadata (6.6 kB)
+#10 13.46 Collecting filelock (from torch==2.2.2)
+#10 13.47   Downloading filelock-3.20.3-py3-none-any.whl.metadata (2.1 kB)
+#10 14.68 Collecting typing-extensions>=4.8.0 (from torch==2.2.2)
+#10 14.70   Downloading https://download.pytorch.org/whl/typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+#10 16.47 Collecting sympy (from torch==2.2.2)
+#10 16.60   Downloading sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+#10 17.77 Collecting networkx (from torch==2.2.2)
+#10 17.79   Downloading networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+#10 19.75 Collecting jinja2 (from torch==2.2.2)
+#10 19.76   Downloading https://download.pytorch.org/whl/jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+#10 21.93 Collecting fsspec (from torch==2.2.2)
+#10 21.95   Downloading fsspec-2026.1.0-py3-none-any.whl.metadata (10 kB)
+#10 24.59 Collecting numpy (from torchvision==0.17.2)
+#10 24.60   Downloading numpy-2.4.1-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (6.6 kB)
+#10 28.20 Collecting pillow!=8.3.*,>=5.3.0 (from torchvision==0.17.2)
+#10 28.21   Downloading pillow-12.1.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (8.8 kB)
+#10 30.23 Collecting MarkupSafe>=2.0 (from jinja2->torch==2.2.2)
+#10 30.25   Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.7 kB)
+#10 31.47 Collecting mpmath<1.4,>=1.1.0 (from sympy->torch==2.2.2)
+#10 31.48   Downloading mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+#10 31.50 Downloading torchvision-0.17.2-cp311-cp311-manylinux2014_aarch64.whl (14.0 MB)
+#10 32.19    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 14.0/14.0 MB 18.4 MB/s eta 0:00:00
+#10 32.20 Downloading pillow-12.1.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (6.3 MB)
+#10 32.54    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 19.1 MB/s eta 0:00:00
+#10 32.56 Downloading https://download.pytorch.org/whl/typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+#10 32.56    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.6/44.6 kB 417.7 MB/s eta 0:00:00
+#10 32.57 Downloading filelock-3.20.3-py3-none-any.whl (16 kB)
+#10 32.58 Downloading fsspec-2026.1.0-py3-none-any.whl (201 kB)
+#10 32.59    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 201.8/201.8 kB 29.8 MB/s eta 0:00:00
+#10 32.61 Downloading https://download.pytorch.org/whl/jinja2-3.1.6-py3-none-any.whl (134 kB)
+#10 32.61    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.9/134.9 kB 135.4 MB/s eta 0:00:00
+#10 32.62 Downloading networkx-3.6.1-py3-none-any.whl (2.1 MB)
+#10 32.67    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 39.0 MB/s eta 0:00:00
+#10 32.69 Downloading numpy-2.4.1-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (14.7 MB)
+#10 33.45    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 14.7/14.7 MB 19.1 MB/s eta 0:00:00
+#10 33.47 Downloading sympy-1.14.0-py3-none-any.whl (6.3 MB)
+#10 33.79    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 19.8 MB/s eta 0:00:00
+#10 33.80 Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (24 kB)
+#10 33.81 Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)
+#10 33.91    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 5.8 MB/s eta 0:00:00
+#10 34.06 Installing collected packages: mpmath, typing-extensions, sympy, pillow, numpy, networkx, MarkupSafe, fsspec, filelock, jinja2, torch, torchvision
+#10 41.87 Successfully installed MarkupSafe-3.0.3 filelock-3.20.3 fsspec-2026.1.0 jinja2-3.1.6 mpmath-1.3.0 networkx-3.6.1 numpy-2.4.1 pillow-12.1.0 sympy-1.14.0 torch-2.2.2 torchvision-0.17.2 typing-extensions-4.15.0
+#10 41.87 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#10 DONE 42.7s
+
+#11 [6/8] RUN pip install --no-cache-dir -r /app/requirements.txt
+#11 0.928 Collecting flask>=2.3 (from -r /app/requirements.txt (line 1))
+#11 0.994   Downloading flask-3.1.2-py3-none-any.whl.metadata (3.2 kB)
+#11 0.996 Requirement already satisfied: numpy>=1.26 in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 2)) (2.4.1)
+#11 0.996 Requirement already satisfied: pillow>=10.0 in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 3)) (12.1.0)
+#11 1.056 Collecting opencv-python-headless>=4.8 (from -r /app/requirements.txt (line 4))
+#11 1.151   Downloading opencv_python_headless-4.12.0.88-cp37-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (19 kB)
+#11 1.170 Requirement already satisfied: torch in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 7)) (2.2.2)
+#11 1.170 Requirement already satisfied: torchvision in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 8)) (0.17.2)
+#11 1.184 Collecting blinker>=1.9.0 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 1.197   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+#11 1.215 Collecting click>=8.1.3 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 1.227   Downloading click-8.3.1-py3-none-any.whl.metadata (2.6 kB)
+#11 1.242 Collecting itsdangerous>=2.2.0 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 1.253   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+#11 1.254 Requirement already satisfied: jinja2>=3.1.2 in /usr/local/lib/python3.11/site-packages (from flask>=2.3->-r /app/requirements.txt (line 1)) (3.1.6)
+#11 1.255 Requirement already satisfied: markupsafe>=2.1.1 in /usr/local/lib/python3.11/site-packages (from flask>=2.3->-r /app/requirements.txt (line 1)) (3.0.3)
+#11 1.277 Collecting werkzeug>=3.1.0 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 1.295   Downloading werkzeug-3.1.5-py3-none-any.whl.metadata (4.0 kB)
+#11 1.665 Collecting numpy>=1.26 (from -r /app/requirements.txt (line 2))
+#11 1.675   Downloading numpy-2.2.6-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (63 kB)
+#11 1.692      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 63.4/63.4 kB 4.3 MB/s eta 0:00:00
+#11 1.723 Requirement already satisfied: filelock in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (3.20.3)
+#11 1.723 Requirement already satisfied: typing-extensions>=4.8.0 in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (4.15.0)
+#11 1.724 Requirement already satisfied: sympy in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (1.14.0)
+#11 1.724 Requirement already satisfied: networkx in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (3.6.1)
+#11 1.725 Requirement already satisfied: fsspec in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (2026.1.0)
+#11 1.760 Requirement already satisfied: mpmath<1.4,>=1.1.0 in /usr/local/lib/python3.11/site-packages (from sympy->torch->-r /app/requirements.txt (line 7)) (1.3.0)
+#11 1.774 Downloading flask-3.1.2-py3-none-any.whl (103 kB)
+#11 1.787    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.3/103.3 kB 8.6 MB/s eta 0:00:00
+#11 1.800 Downloading opencv_python_headless-4.12.0.88-cp37-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (33.1 MB)
+#11 3.466    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 33.1/33.1 MB 18.7 MB/s eta 0:00:00
+#11 3.478 Downloading numpy-2.2.6-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (14.3 MB)
+#11 4.294    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 14.3/14.3 MB 19.3 MB/s eta 0:00:00
+#11 4.307 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#11 4.318 Downloading click-8.3.1-py3-none-any.whl (108 kB)
+#11 4.324    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 108.3/108.3 kB 22.4 MB/s eta 0:00:00
+#11 4.337 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#11 4.348 Downloading werkzeug-3.1.5-py3-none-any.whl (225 kB)
+#11 4.355    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 225.0/225.0 kB 37.7 MB/s eta 0:00:00
+#11 4.450 Installing collected packages: werkzeug, numpy, itsdangerous, click, blinker, opencv-python-headless, flask
+#11 4.504   Attempting uninstall: numpy
+#11 4.506     Found existing installation: numpy 2.4.1
+#11 4.558     Uninstalling numpy-2.4.1:
+#11 4.793       Successfully uninstalled numpy-2.4.1
+#11 5.890 Successfully installed blinker-1.9.0 click-8.3.1 flask-3.1.2 itsdangerous-2.2.0 numpy-2.2.6 opencv-python-headless-4.12.0.88 werkzeug-3.1.5
+#11 5.890 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#11 DONE 6.0s
+
+#12 [7/8] RUN pip install --no-cache-dir -U openmim  && (python -m mim install 'mmcv>=2.0.0,<2.2.0' || true)  && (pip install --no-cache-dir -U mmdet || true)  && (pip install --no-cache-dir     -f https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.2/index.html     detectron2 || true)
+#12 0.727 Collecting openmim
+#12 0.782   Downloading openmim-0.3.9-py2.py3-none-any.whl.metadata (16 kB)
+#12 0.888 Requirement already satisfied: Click in /usr/local/lib/python3.11/site-packages (from openmim) (8.3.1)
+#12 0.910 Collecting colorama (from openmim)
+#12 0.924   Downloading colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+#12 0.945 Collecting model-index (from openmim)
+#12 0.955   Downloading model_index-0.1.11-py3-none-any.whl.metadata (3.9 kB)
+#12 0.972 Collecting opendatalab (from openmim)
+#12 0.986   Downloading opendatalab-0.0.10-py3-none-any.whl.metadata (6.4 kB)
+#12 1.092 Collecting pandas (from openmim)
+#12 1.109   Downloading pandas-2.3.3-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl.metadata (91 kB)
+#12 1.221      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 91.2/91.2 kB 841.2 kB/s eta 0:00:00
+#12 1.231 Requirement already satisfied: pip>=19.3 in /usr/local/lib/python3.11/site-packages (from openmim) (24.0)
+#12 1.452 Collecting requests (from openmim)
+#12 1.468   Downloading requests-2.32.5-py3-none-any.whl.metadata (4.9 kB)
+#12 2.530 Collecting rich (from openmim)
+#12 2.619   Downloading rich-14.2.0-py3-none-any.whl.metadata (18 kB)
+#12 2.739 Collecting tabulate (from openmim)
+#12 2.782   Downloading tabulate-0.9.0-py3-none-any.whl.metadata (34 kB)
+#12 2.994 Collecting pyyaml (from model-index->openmim)
+#12 3.004   Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.4 kB)
+#12 3.041 Collecting markdown (from model-index->openmim)
+#12 3.055   Downloading markdown-3.10-py3-none-any.whl.metadata (5.1 kB)
+#12 3.072 Collecting ordered-set (from model-index->openmim)
+#12 3.085   Downloading ordered_set-4.1.0-py3-none-any.whl.metadata (5.3 kB)
+#12 3.214 Collecting pycryptodome (from opendatalab->openmim)
+#12 3.226   Downloading pycryptodome-3.23.0-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (3.4 kB)
+#12 3.280 Collecting tqdm (from opendatalab->openmim)
+#12 3.293   Downloading tqdm-4.67.1-py3-none-any.whl.metadata (57 kB)
+#12 3.305      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 57.7/57.7 kB 5.7 MB/s eta 0:00:00
+#12 3.331 Collecting openxlab (from opendatalab->openmim)
+#12 3.347   Downloading openxlab-0.1.3-py3-none-any.whl.metadata (3.8 kB)
+#12 3.441 Collecting charset_normalizer<4,>=2 (from requests->openmim)
+#12 3.533   Downloading charset_normalizer-3.4.4-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (37 kB)
+#12 3.566 Collecting idna<4,>=2.5 (from requests->openmim)
+#12 3.627   Downloading idna-3.11-py3-none-any.whl.metadata (8.4 kB)
+#12 3.680 Collecting urllib3<3,>=1.21.1 (from requests->openmim)
+#12 3.710   Downloading urllib3-2.6.3-py3-none-any.whl.metadata (6.9 kB)
+#12 3.737 Collecting certifi>=2017.4.17 (from requests->openmim)
+#12 3.750   Downloading certifi-2026.1.4-py3-none-any.whl.metadata (2.5 kB)
+#12 3.771 Requirement already satisfied: numpy>=1.23.2 in /usr/local/lib/python3.11/site-packages (from pandas->openmim) (2.2.6)
+#12 3.789 Collecting python-dateutil>=2.8.2 (from pandas->openmim)
+#12 3.801   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+#12 3.847 Collecting pytz>=2020.1 (from pandas->openmim)
+#12 3.858   Downloading pytz-2025.2-py2.py3-none-any.whl.metadata (22 kB)
+#12 3.877 Collecting tzdata>=2022.7 (from pandas->openmim)
+#12 3.889   Downloading tzdata-2025.3-py2.py3-none-any.whl.metadata (1.4 kB)
+#12 3.906 Collecting markdown-it-py>=2.2.0 (from rich->openmim)
+#12 3.920   Downloading markdown_it_py-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+#12 3.942 Collecting pygments<3.0.0,>=2.13.0 (from rich->openmim)
+#12 4.030   Downloading pygments-2.19.2-py3-none-any.whl.metadata (2.5 kB)
+#12 4.063 Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich->openmim)
+#12 4.077   Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+#12 4.098 Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas->openmim)
+#12 4.109   Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+#12 4.140 Collecting filelock~=3.14.0 (from openxlab->opendatalab->openmim)
+#12 4.150   Downloading filelock-3.14.0-py3-none-any.whl.metadata (2.8 kB)
+#12 4.166 Collecting oss2~=2.17.0 (from openxlab->opendatalab->openmim)
+#12 4.177   Downloading oss2-2.17.0.tar.gz (259 kB)
+#12 4.204      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 259.5/259.5 kB 11.1 MB/s eta 0:00:00
+#12 4.215   Preparing metadata (setup.py): started
+#12 4.483   Preparing metadata (setup.py): finished with status 'done'
+#12 4.566 Collecting packaging~=24.0 (from openxlab->opendatalab->openmim)
+#12 4.578   Downloading packaging-24.2-py3-none-any.whl.metadata (3.2 kB)
+#12 4.582 Collecting pytz>=2020.1 (from pandas->openmim)
+#12 4.594   Downloading pytz-2023.4-py2.py3-none-any.whl.metadata (22 kB)
+#12 4.598 Collecting requests (from openmim)
+#12 4.610   Downloading requests-2.28.2-py3-none-any.whl.metadata (4.6 kB)
+#12 4.615 Collecting rich (from openmim)
+#12 4.627   Downloading rich-13.4.2-py3-none-any.whl.metadata (18 kB)
+#12 4.738 Collecting setuptools~=60.2.0 (from openxlab->opendatalab->openmim)
+#12 4.749   Downloading setuptools-60.2.0-py3-none-any.whl.metadata (5.1 kB)
+#12 4.754 Collecting tqdm (from opendatalab->openmim)
+#12 4.768   Downloading tqdm-4.65.2-py3-none-any.whl.metadata (56 kB)
+#12 4.770      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 57.0/57.0 kB 43.5 MB/s eta 0:00:00
+#12 4.778 Collecting urllib3<1.27,>=1.21.1 (from requests->openmim)
+#12 4.790   Downloading urllib3-1.26.20-py2.py3-none-any.whl.metadata (50 kB)
+#12 4.791      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 50.1/50.1 kB 63.9 MB/s eta 0:00:00
+#12 4.835 Collecting crcmod>=1.7 (from oss2~=2.17.0->openxlab->opendatalab->openmim)
+#12 4.847   Downloading crcmod-1.7.tar.gz (89 kB)
+#12 4.852      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 89.7/89.7 kB 20.2 MB/s eta 0:00:00
+#12 4.857   Preparing metadata (setup.py): started
+#12 5.104   Preparing metadata (setup.py): finished with status 'done'
+#12 5.121 Collecting aliyun-python-sdk-kms>=2.4.1 (from oss2~=2.17.0->openxlab->opendatalab->openmim)
+#12 5.132   Downloading aliyun_python_sdk_kms-2.16.5-py2.py3-none-any.whl.metadata (1.5 kB)
+#12 5.150 Collecting aliyun-python-sdk-core>=2.13.12 (from oss2~=2.17.0->openxlab->opendatalab->openmim)
+#12 5.163   Downloading aliyun-python-sdk-core-2.16.0.tar.gz (449 kB)
+#12 5.199      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 449.6/449.6 kB 12.4 MB/s eta 0:00:00
+#12 5.219   Preparing metadata (setup.py): started
+#12 5.463   Preparing metadata (setup.py): finished with status 'done'
+#12 5.490 Collecting jmespath<1.0.0,>=0.9.3 (from aliyun-python-sdk-core>=2.13.12->oss2~=2.17.0->openxlab->opendatalab->openmim)
+#12 5.502   Downloading jmespath-0.10.0-py2.py3-none-any.whl.metadata (8.0 kB)
+#12 5.765 Collecting cryptography>=3.0.0 (from aliyun-python-sdk-core>=2.13.12->oss2~=2.17.0->openxlab->opendatalab->openmim)
+#12 5.778   Downloading cryptography-46.0.3-cp311-abi3-manylinux_2_34_aarch64.whl.metadata (5.7 kB)
+#12 5.870 Collecting cffi>=2.0.0 (from cryptography>=3.0.0->aliyun-python-sdk-core>=2.13.12->oss2~=2.17.0->openxlab->opendatalab->openmim)
+#12 5.881   Downloading cffi-2.0.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (2.6 kB)
+#12 5.901 Collecting pycparser (from cffi>=2.0.0->cryptography>=3.0.0->aliyun-python-sdk-core>=2.13.12->oss2~=2.17.0->openxlab->opendatalab->openmim)
+#12 5.911   Downloading pycparser-2.23-py3-none-any.whl.metadata (993 bytes)
+#12 5.925 Downloading openmim-0.3.9-py2.py3-none-any.whl (52 kB)
+#12 5.929    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 52.7/52.7 kB 154.4 MB/s eta 0:00:00
+#12 5.940 Downloading colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+#12 5.951 Downloading model_index-0.1.11-py3-none-any.whl (34 kB)
+#12 5.963 Downloading opendatalab-0.0.10-py3-none-any.whl (29 kB)
+#12 5.974 Downloading pandas-2.3.3-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl (12.2 MB)
+#12 6.721    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.2/12.2 MB 20.4 MB/s eta 0:00:00
+#12 6.733 Downloading tabulate-0.9.0-py3-none-any.whl (35 kB)
+#12 6.744 Downloading certifi-2026.1.4-py3-none-any.whl (152 kB)
+#12 6.745    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 152.9/152.9 kB 357.5 MB/s eta 0:00:00
+#12 6.758 Downloading charset_normalizer-3.4.4-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (147 kB)
+#12 6.760    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 147.3/147.3 kB 84.0 MB/s eta 0:00:00
+#12 6.772 Downloading idna-3.11-py3-none-any.whl (71 kB)
+#12 6.773    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 71.0/71.0 kB 123.4 MB/s eta 0:00:00
+#12 6.785 Downloading markdown_it_py-4.0.0-py3-none-any.whl (87 kB)
+#12 6.786    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 87.3/87.3 kB 356.9 MB/s eta 0:00:00
+#12 6.797 Downloading pygments-2.19.2-py3-none-any.whl (1.2 MB)
+#12 6.825    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 45.3 MB/s eta 0:00:00
+#12 6.834 Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#12 6.840    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 229.9/229.9 kB 48.1 MB/s eta 0:00:00
+#12 6.851 Downloading tzdata-2025.3-py2.py3-none-any.whl (348 kB)
+#12 6.858    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 348.5/348.5 kB 50.3 MB/s eta 0:00:00
+#12 6.870 Downloading markdown-3.10-py3-none-any.whl (107 kB)
+#12 6.873    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 107.7/107.7 kB 64.3 MB/s eta 0:00:00
+#12 6.885 Downloading openxlab-0.1.3-py3-none-any.whl (314 kB)
+#12 6.889    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 314.5/314.5 kB 98.7 MB/s eta 0:00:00
+#12 6.900 Downloading requests-2.28.2-py3-none-any.whl (62 kB)
+#12 6.903    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.8/62.8 kB 675.6 MB/s eta 0:00:00
+#12 6.912 Downloading rich-13.4.2-py3-none-any.whl (239 kB)
+#12 6.917    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 239.4/239.4 kB 669.6 MB/s eta 0:00:00
+#12 6.928 Downloading pytz-2023.4-py2.py3-none-any.whl (506 kB)
+#12 6.937    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 506.5/506.5 kB 62.4 MB/s eta 0:00:00
+#12 6.949 Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (775 kB)
+#12 6.968    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 775.6/775.6 kB 45.2 MB/s eta 0:00:00
+#12 6.978 Downloading tqdm-4.65.2-py3-none-any.whl (77 kB)
+#12 6.981    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 77.1/77.1 kB 30.0 MB/s eta 0:00:00
+#12 6.991 Downloading urllib3-1.26.20-py2.py3-none-any.whl (144 kB)
+#12 6.994    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 144.2/144.2 kB 776.2 MB/s eta 0:00:00
+#12 7.005 Downloading ordered_set-4.1.0-py3-none-any.whl (7.6 kB)
+#12 7.015 Downloading pycryptodome-3.23.0-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (2.2 MB)
+#12 7.063    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 48.6 MB/s eta 0:00:00
+#12 7.074 Downloading filelock-3.14.0-py3-none-any.whl (12 kB)
+#12 7.172 Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+#12 7.181 Downloading packaging-24.2-py3-none-any.whl (65 kB)
+#12 7.183    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 65.5/65.5 kB 87.7 MB/s eta 0:00:00
+#12 7.197 Downloading setuptools-60.2.0-py3-none-any.whl (953 kB)
+#12 7.214    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 953.1/953.1 kB 58.9 MB/s eta 0:00:00
+#12 7.226 Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+#12 7.235 Downloading aliyun_python_sdk_kms-2.16.5-py2.py3-none-any.whl (99 kB)
+#12 7.239    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 99.5/99.5 kB 85.9 MB/s eta 0:00:00
+#12 7.249 Downloading cryptography-46.0.3-cp311-abi3-manylinux_2_34_aarch64.whl (4.3 MB)
+#12 7.382    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.3/4.3 MB 32.8 MB/s eta 0:00:00
+#12 7.394 Downloading jmespath-0.10.0-py2.py3-none-any.whl (24 kB)
+#12 7.403 Downloading cffi-2.0.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (216 kB)
+#12 7.411    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 216.5/216.5 kB 32.4 MB/s eta 0:00:00
+#12 7.423 Downloading pycparser-2.23-py3-none-any.whl (118 kB)
+#12 7.427    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 118.1/118.1 kB 32.6 MB/s eta 0:00:00
+#12 7.452 Building wheels for collected packages: oss2, aliyun-python-sdk-core, crcmod
+#12 7.452   Building wheel for oss2 (setup.py): started
+#12 7.773   Building wheel for oss2 (setup.py): finished with status 'done'
+#12 7.773   Created wheel for oss2: filename=oss2-2.17.0-py3-none-any.whl size=112466 sha256=5efd44f629502c98f5fea3d1bc17cd3ab97612718de1ba8b7e3c861593a0e8c2
+#12 7.773   Stored in directory: /tmp/pip-ephem-wheel-cache-r2bosbao/wheels/42/79/aa/3671e313c27de35211d345d7a9d8ccb7dde515cf05edba75df
+#12 7.775   Building wheel for aliyun-python-sdk-core (setup.py): started
+#12 8.112   Building wheel for aliyun-python-sdk-core (setup.py): finished with status 'done'
+#12 8.113   Created wheel for aliyun-python-sdk-core: filename=aliyun_python_sdk_core-2.16.0-py3-none-any.whl size=535418 sha256=bab718fe9edc4f859866771e6662749529d12c48cc946f9d697e6f52ab4edb23
+#12 8.113   Stored in directory: /tmp/pip-ephem-wheel-cache-r2bosbao/wheels/2b/9a/95/60f111d2a488c5f7f7ed2a96ce407ea57ec7393ddfdec8c956
+#12 8.114   Building wheel for crcmod (setup.py): started
+#12 8.387   Building wheel for crcmod (setup.py): finished with status 'done'
+#12 8.387   Created wheel for crcmod: filename=crcmod-1.7-py3-none-any.whl size=18911 sha256=02ae33a79d7c045c943a5b7da7ff0e8ec18fa2b34237067f1905367fd6146551
+#12 8.387   Stored in directory: /tmp/pip-ephem-wheel-cache-r2bosbao/wheels/23/94/7a/8cb7d14597e6395ce969933f01aed9ea8fa5f5b4d4c8a61e99
+#12 8.388 Successfully built oss2 aliyun-python-sdk-core crcmod
+#12 8.520 Installing collected packages: pytz, crcmod, urllib3, tzdata, tqdm, tabulate, six, setuptools, pyyaml, pygments, pycryptodome, pycparser, packaging, ordered-set, mdurl, markdown, jmespath, idna, filelock, colorama, charset_normalizer, certifi, requests, python-dateutil, model-index, markdown-it-py, cffi, rich, pandas, cryptography, aliyun-python-sdk-core, aliyun-python-sdk-kms, oss2, openxlab, opendatalab, openmim
+#12 8.645   Attempting uninstall: setuptools
+#12 8.646     Found existing installation: setuptools 79.0.1
+#12 8.657     Uninstalling setuptools-79.0.1:
+#12 8.766       Successfully uninstalled setuptools-79.0.1
+#12 9.476   Attempting uninstall: filelock
+#12 9.481     Found existing installation: filelock 3.20.3
+#12 9.482     Uninstalling filelock-3.20.3:
+#12 9.485       Successfully uninstalled filelock-3.20.3
+#12 11.90 Successfully installed aliyun-python-sdk-core-2.16.0 aliyun-python-sdk-kms-2.16.5 certifi-2026.1.4 cffi-2.0.0 charset_normalizer-3.4.4 colorama-0.4.6 crcmod-1.7 cryptography-46.0.3 filelock-3.14.0 idna-3.11 jmespath-0.10.0 markdown-3.10 markdown-it-py-4.0.0 mdurl-0.1.2 model-index-0.1.11 opendatalab-0.0.10 openmim-0.3.9 openxlab-0.1.3 ordered-set-4.1.0 oss2-2.17.0 packaging-24.2 pandas-2.3.3 pycparser-2.23 pycryptodome-3.23.0 pygments-2.19.2 python-dateutil-2.9.0.post0 pytz-2023.4 pyyaml-6.0.3 requests-2.28.2 rich-13.4.2 setuptools-60.2.0 six-1.17.0 tabulate-0.9.0 tqdm-4.65.2 tzdata-2025.3 urllib3-1.26.20
+#12 11.90 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#12 13.29 
+#12 13.29 A module that was compiled using NumPy 1.x cannot be run in
+#12 13.29 NumPy 2.2.6 as it may crash. To support both 1.x and 2.x
+#12 13.29 versions of NumPy, modules must be compiled with NumPy 2.0.
+#12 13.29 Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+#12 13.29 
+#12 13.29 If you are a user of the module, the easiest solution will be to
+#12 13.29 downgrade to 'numpy<2' or try to upgrade the affected module.
+#12 13.29 We expect that some modules will need time to support NumPy 2.
+#12 13.29 
+#12 13.29 Traceback (most recent call last):  File "<frozen runpy>", line 198, in _run_module_as_main
+#12 13.29   File "<frozen runpy>", line 88, in _run_code
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/mim/__main__.py", line 6, in <module>
+#12 13.29     cli()
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+#12 13.29     return self.main(*args, **kwargs)
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+#12 13.29     rv = self.invoke(ctx)
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1873, in invoke
+#12 13.29     return _process_result(sub_ctx.command.invoke(sub_ctx))
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+#12 13.29     return ctx.invoke(self.callback, **ctx.params)
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+#12 13.29     return callback(*args, **kwargs)
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/mim/commands/install.py", line 72, in cli
+#12 13.29     exit_code = install(list(args), index_url=index_url, is_yes=is_yes)
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/mim/commands/install.py", line 128, in install
+#12 13.29     install_args += ['-f', get_mmcv_full_find_link(mmcv_base_url)]
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/mim/commands/install.py", line 165, in get_mmcv_full_find_link
+#12 13.29     torch_v, cuda_v = get_torch_cuda_version()
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/mim/utils/utils.py", line 338, in get_torch_cuda_version
+#12 13.29     import torch
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/torch/__init__.py", line 1477, in <module>
+#12 13.29     from .functional import *  # noqa: F403
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/torch/functional.py", line 9, in <module>
+#12 13.29     import torch.nn.functional as F
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/torch/nn/__init__.py", line 1, in <module>
+#12 13.29     from .modules import *  # noqa: F403
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/torch/nn/modules/__init__.py", line 35, in <module>
+#12 13.29     from .transformer import TransformerEncoder, TransformerDecoder, \
+#12 13.29   File "/usr/local/lib/python3.11/site-packages/torch/nn/modules/transformer.py", line 20, in <module>
+#12 13.29     device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+#12 13.29 /usr/local/lib/python3.11/site-packages/torch/nn/modules/transformer.py:20: UserWarning: Failed to initialize NumPy: 
+#12 13.29 A module that was compiled using NumPy 1.x cannot be run in
+#12 13.29 NumPy 2.2.6 as it may crash. To support both 1.x and 2.x
+#12 13.29 versions of NumPy, modules must be compiled with NumPy 2.0.
+#12 13.29 Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+#12 13.29 
+#12 13.29 If you are a user of the module, the easiest solution will be to
+#12 13.29 downgrade to 'numpy<2' or try to upgrade the affected module.
+#12 13.29 We expect that some modules will need time to support NumPy 2.
+#12 13.29 
+#12 13.29  (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:84.)
+#12 13.29   device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+#12 13.69 Looking in links: https://download.openmmlab.com/mmcv/dist/cpu/torch2.2.0/index.html
+#12 14.00 Collecting mmcv<2.2.0,>=2.0.0
+#12 14.07   Downloading mmcv-2.1.0.tar.gz (471 kB)
+#12 14.41      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 471.4/471.4 kB 1.4 MB/s eta 0:00:00
+#12 14.46   Preparing metadata (setup.py): started
+#12 15.50   Preparing metadata (setup.py): finished with status 'done'
+#12 15.65 Collecting addict (from mmcv<2.2.0,>=2.0.0)
+#12 15.66   Downloading addict-2.4.0-py3-none-any.whl.metadata (1.0 kB)
+#12 15.77 Collecting mmengine>=0.3.0 (from mmcv<2.2.0,>=2.0.0)
+#12 15.79   Downloading mmengine-0.10.7-py3-none-any.whl.metadata (20 kB)
+#12 15.81 Requirement already satisfied: numpy in /usr/local/lib/python3.11/site-packages (from mmcv<2.2.0,>=2.0.0) (2.2.6)
+#12 15.81 Requirement already satisfied: packaging in /usr/local/lib/python3.11/site-packages (from mmcv<2.2.0,>=2.0.0) (24.2)
+#12 15.81 Requirement already satisfied: Pillow in /usr/local/lib/python3.11/site-packages (from mmcv<2.2.0,>=2.0.0) (12.1.0)
+#12 15.81 Requirement already satisfied: pyyaml in /usr/local/lib/python3.11/site-packages (from mmcv<2.2.0,>=2.0.0) (6.0.3)
+#12 15.89 Collecting yapf (from mmcv<2.2.0,>=2.0.0)
+#12 15.95   Downloading yapf-0.43.0-py3-none-any.whl.metadata (46 kB)
+#12 15.96      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 46.8/46.8 kB 5.6 MB/s eta 0:00:00
+#12 16.34 Collecting matplotlib (from mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 16.36   Downloading matplotlib-3.10.8-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (52 kB)
+#12 16.38      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 52.8/52.8 kB 3.7 MB/s eta 0:00:00
+#12 16.39 Requirement already satisfied: rich in /usr/local/lib/python3.11/site-packages (from mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0) (13.4.2)
+#12 16.46 Collecting termcolor (from mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 16.48   Downloading termcolor-3.3.0-py3-none-any.whl.metadata (6.5 kB)
+#12 16.68 Collecting opencv-python>=3 (from mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 16.70   Downloading opencv_python-4.12.0.88-cp37-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (19 kB)
+#12 16.79 Collecting platformdirs>=3.5.1 (from yapf->mmcv<2.2.0,>=2.0.0)
+#12 16.80   Downloading platformdirs-4.5.1-py3-none-any.whl.metadata (12 kB)
+#12 17.23 Collecting contourpy>=1.0.1 (from matplotlib->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 17.24   Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl.metadata (5.5 kB)
+#12 17.66 Collecting cycler>=0.10 (from matplotlib->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 17.68   Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+#12 17.88 Collecting fonttools>=4.22.0 (from matplotlib->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 17.90   Downloading fonttools-4.61.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (114 kB)
+#12 17.93      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 114.2/114.2 kB 6.3 MB/s eta 0:00:00
+#12 18.38 Collecting kiwisolver>=1.3.1 (from matplotlib->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 18.40   Downloading kiwisolver-1.4.9-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl.metadata (6.3 kB)
+#12 18.49 Collecting pyparsing>=3 (from matplotlib->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0)
+#12 18.51   Downloading pyparsing-3.3.1-py3-none-any.whl.metadata (5.6 kB)
+#12 18.52 Requirement already satisfied: python-dateutil>=2.7 in /usr/local/lib/python3.11/site-packages (from matplotlib->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0) (2.9.0.post0)
+#12 18.52 Requirement already satisfied: markdown-it-py>=2.2.0 in /usr/local/lib/python3.11/site-packages (from rich->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0) (4.0.0)
+#12 18.52 Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /usr/local/lib/python3.11/site-packages (from rich->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0) (2.19.2)
+#12 18.54 Requirement already satisfied: mdurl~=0.1 in /usr/local/lib/python3.11/site-packages (from markdown-it-py>=2.2.0->rich->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0) (0.1.2)
+#12 18.55 Requirement already satisfied: six>=1.5 in /usr/local/lib/python3.11/site-packages (from python-dateutil>=2.7->matplotlib->mmengine>=0.3.0->mmcv<2.2.0,>=2.0.0) (1.17.0)
+#12 18.56 Downloading mmengine-0.10.7-py3-none-any.whl (452 kB)
+#12 18.76    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 452.7/452.7 kB 2.5 MB/s eta 0:00:00
+#12 18.78 Downloading addict-2.4.0-py3-none-any.whl (3.8 kB)
+#12 18.80 Downloading yapf-0.43.0-py3-none-any.whl (256 kB)
+#12 18.87    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 256.2/256.2 kB 4.1 MB/s eta 0:00:00
+#12 18.89 Downloading opencv_python-4.12.0.88-cp37-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (45.9 MB)
+#12 32.36    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.9/45.9 MB 3.2 MB/s eta 0:00:00
+#12 32.39 Downloading platformdirs-4.5.1-py3-none-any.whl (18 kB)
+#12 32.41 Downloading matplotlib-3.10.8-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (9.5 MB)
+#12 34.30    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.5/9.5 MB 5.1 MB/s eta 0:00:00
+#12 34.31 Downloading termcolor-3.3.0-py3-none-any.whl (7.7 kB)
+#12 34.33 Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl (329 kB)
+#12 34.35    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 329.2/329.2 kB 20.1 MB/s eta 0:00:00
+#12 34.44 Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+#12 34.46 Downloading fonttools-4.61.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (5.1 MB)
+#12 34.67    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.1/5.1 MB 24.6 MB/s eta 0:00:00
+#12 34.68 Downloading kiwisolver-1.4.9-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl (1.2 MB)
+#12 34.73    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 27.4 MB/s eta 0:00:00
+#12 34.74 Downloading pyparsing-3.3.1-py3-none-any.whl (121 kB)
+#12 34.76    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 121.8/121.8 kB 6.8 MB/s eta 0:00:00
+#12 34.83 Building wheels for collected packages: mmcv
+#12 34.83   Building wheel for mmcv (setup.py): started
+#12 36.46   Building wheel for mmcv (setup.py): finished with status 'error'
+#12 36.48   error: subprocess-exited-with-error
+#12 36.48   
+#12 36.48   × python setup.py bdist_wheel did not run successfully.
+#12 36.48   │ exit code: 1
+#12 36.48   ╰─> [650 lines of output]
+#12 36.48       
+#12 36.48       A module that was compiled using NumPy 1.x cannot be run in
+#12 36.48       NumPy 2.2.6 as it may crash. To support both 1.x and 2.x
+#12 36.48       versions of NumPy, modules must be compiled with NumPy 2.0.
+#12 36.48       Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+#12 36.48       
+#12 36.48       If you are a user of the module, the easiest solution will be to
+#12 36.48       downgrade to 'numpy<2' or try to upgrade the affected module.
+#12 36.48       We expect that some modules will need time to support NumPy 2.
+#12 36.48       
+#12 36.48       Traceback (most recent call last):  File "<string>", line 2, in <module>
+#12 36.48         File "<pip-setuptools-caller>", line 34, in <module>
+#12 36.48         File "/tmp/pip-install-m8v_xvzb/mmcv_baf9f9b545014223bd054d2045f42408/setup.py", line 10, in <module>
+#12 36.48           import torch
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/__init__.py", line 1477, in <module>
+#12 36.48           from .functional import *  # noqa: F403
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/functional.py", line 9, in <module>
+#12 36.48           import torch.nn.functional as F
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/nn/__init__.py", line 1, in <module>
+#12 36.48           from .modules import *  # noqa: F403
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/nn/modules/__init__.py", line 35, in <module>
+#12 36.48           from .transformer import TransformerEncoder, TransformerDecoder, \
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/nn/modules/transformer.py", line 20, in <module>
+#12 36.48           device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+#12 36.48       /usr/local/lib/python3.11/site-packages/torch/nn/modules/transformer.py:20: UserWarning: Failed to initialize NumPy:
+#12 36.48       A module that was compiled using NumPy 1.x cannot be run in
+#12 36.48       NumPy 2.2.6 as it may crash. To support both 1.x and 2.x
+#12 36.48       versions of NumPy, modules must be compiled with NumPy 2.0.
+#12 36.48       Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+#12 36.48       
+#12 36.48       If you are a user of the module, the easiest solution will be to
+#12 36.48       downgrade to 'numpy<2' or try to upgrade the affected module.
+#12 36.48       We expect that some modules will need time to support NumPy 2.
+#12 36.48       
+#12 36.48        (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:84.)
+#12 36.48         device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+#12 36.48       Compiling mmcv._ext only with CPU
+#12 36.48       running bdist_wheel
+#12 36.48       /usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py:500: UserWarning: Attempted to use ninja as the BuildExtension backend but we could not find ninja.. Falling back to using the slow distutils backend.
+#12 36.48         warnings.warn(msg.format('we could not find ninja.'))
+#12 36.48       running build
+#12 36.48       running build_py
+#12 36.48       creating build
+#12 36.48       creating build/lib.linux-aarch64-3.11
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv
+#12 36.48       copying mmcv/version.py -> build/lib.linux-aarch64-3.11/mmcv
+#12 36.48       copying mmcv/__init__.py -> build/lib.linux-aarch64-3.11/mmcv
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/utils
+#12 36.48       copying mmcv/utils/device_type.py -> build/lib.linux-aarch64-3.11/mmcv/utils
+#12 36.48       copying mmcv/utils/parrots_jit.py -> build/lib.linux-aarch64-3.11/mmcv/utils
+#12 36.48       copying mmcv/utils/ext_loader.py -> build/lib.linux-aarch64-3.11/mmcv/utils
+#12 36.48       copying mmcv/utils/env.py -> build/lib.linux-aarch64-3.11/mmcv/utils
+#12 36.48       copying mmcv/utils/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/utils
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/cnn
+#12 36.48       copying mmcv/cnn/alexnet.py -> build/lib.linux-aarch64-3.11/mmcv/cnn
+#12 36.48       copying mmcv/cnn/resnet.py -> build/lib.linux-aarch64-3.11/mmcv/cnn
+#12 36.48       copying mmcv/cnn/vgg.py -> build/lib.linux-aarch64-3.11/mmcv/cnn
+#12 36.48       copying mmcv/cnn/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/cnn
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/deprecated_wrappers.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/roi_pool.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/filtered_lrelu.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/assign_score_withk.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/points_in_boxes.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/corner_pool.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/rotated_feature_align.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/sync_bn.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/fused_bias_leakyrelu.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/sparse_conv.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/convex_iou.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/pixel_group.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/saconv.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/carafe.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/point_sample.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/conv2d_gradfix.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/gather_points.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/sparse_modules.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/merge_cells.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/bezier_align.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/riroi_align_rotated.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/ball_query.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/multi_scale_deform_attn.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/voxelize.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/bbox.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/cc_attention.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/sparse_pool.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/sparse_ops.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/contour_expand.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/tin_shift.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/furthest_point_sample.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/diff_iou_rotated.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/active_rotated_filter.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/scatter_points.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/psa_mask.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/sparse_functional.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/masked_conv.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/box_iou_quadri.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/nms.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/box_iou_rotated.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/modulated_deform_conv.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/deform_roi_pool.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/prroi_pool.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/border_align.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/focal_loss.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/roi_align.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/roipoint_pool3d.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/iou3d.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/min_area_polygons.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/sparse_structure.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/points_sampler.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/three_nn.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/knn.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/chamfer_distance.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/deform_conv.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/correlation.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/info.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/points_in_polygons.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/group_points.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/bias_act.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/upfirdn2d.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/roi_align_rotated.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/roiaware_pool3d.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       copying mmcv/ops/three_interpolate.py -> build/lib.linux-aarch64-3.11/mmcv/ops
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/image
+#12 36.48       copying mmcv/image/geometric.py -> build/lib.linux-aarch64-3.11/mmcv/image
+#12 36.48       copying mmcv/image/io.py -> build/lib.linux-aarch64-3.11/mmcv/image
+#12 36.48       copying mmcv/image/colorspace.py -> build/lib.linux-aarch64-3.11/mmcv/image
+#12 36.48       copying mmcv/image/photometric.py -> build/lib.linux-aarch64-3.11/mmcv/image
+#12 36.48       copying mmcv/image/misc.py -> build/lib.linux-aarch64-3.11/mmcv/image
+#12 36.48       copying mmcv/image/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/image
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/base.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/wrappers.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/utils.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/processing.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/loading.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/builder.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       copying mmcv/transforms/formatting.py -> build/lib.linux-aarch64-3.11/mmcv/transforms
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/video
+#12 36.48       copying mmcv/video/io.py -> build/lib.linux-aarch64-3.11/mmcv/video
+#12 36.48       copying mmcv/video/optflow.py -> build/lib.linux-aarch64-3.11/mmcv/video
+#12 36.48       copying mmcv/video/processing.py -> build/lib.linux-aarch64-3.11/mmcv/video
+#12 36.48       copying mmcv/video/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/video
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/arraymisc
+#12 36.48       copying mmcv/arraymisc/quantization.py -> build/lib.linux-aarch64-3.11/mmcv/arraymisc
+#12 36.48       copying mmcv/arraymisc/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/arraymisc
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/visualization
+#12 36.48       copying mmcv/visualization/image.py -> build/lib.linux-aarch64-3.11/mmcv/visualization
+#12 36.48       copying mmcv/visualization/optflow.py -> build/lib.linux-aarch64-3.11/mmcv/visualization
+#12 36.48       copying mmcv/visualization/color.py -> build/lib.linux-aarch64-3.11/mmcv/visualization
+#12 36.48       copying mmcv/visualization/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/visualization
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/cnn/utils
+#12 36.48       copying mmcv/cnn/utils/fuse_conv_bn.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/utils
+#12 36.48       copying mmcv/cnn/utils/flops_counter.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/utils
+#12 36.48       copying mmcv/cnn/utils/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/utils
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/activation.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/conv_ws.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/upsample.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/wrappers.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/scale.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/conv.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/hsigmoid.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/norm.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/depthwise_separable_conv_module.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/non_local.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/hswish.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/context_block.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/conv_module.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/generalized_attention.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/padding.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/plugin.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/conv2d_adaptive_padding.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/swish.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/transformer.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       copying mmcv/cnn/bricks/drop.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/bricks
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/cnn/rfsearch
+#12 36.48       copying mmcv/cnn/rfsearch/utils.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/rfsearch
+#12 36.48       copying mmcv/cnn/rfsearch/operator.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/rfsearch
+#12 36.48       copying mmcv/cnn/rfsearch/search.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/rfsearch
+#12 36.48       copying mmcv/cnn/rfsearch/__init__.py -> build/lib.linux-aarch64-3.11/mmcv/cnn/rfsearch
+#12 36.48       running egg_info
+#12 36.48       writing manifest file 'mmcv.egg-info/SOURCES.txt'
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/box_iou_rotated_utils.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/parrots_cpp_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/parrots_cuda_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/pytorch_cpp_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/pytorch_cuda_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/pytorch_device_registry.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/pytorch_mlu_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       copying mmcv/ops/csrc/common/pytorch_npu_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/active_rotated_filter_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/assign_score_withk_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/ball_query_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/bbox_overlaps_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/bezier_align_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/border_align_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/box_iou_quadri_cuda.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/box_iou_rotated_cuda.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/carafe_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/carafe_naive_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/chamfer_distance_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/common_cuda_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/convex_iou_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/correlation_cuda.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/deform_conv_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/deform_roi_pool_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/diff_iou_rotated_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/furthest_point_sample_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/gather_points_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/group_points_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/iou3d_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/knn_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/masked_conv2d_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/min_area_polygons_cuda.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/modulated_deform_conv_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/ms_deform_attn_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/nms_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/nms_quadri_cuda.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/nms_rotated_cuda.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/parrots_cudawarpfunction.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/points_in_boxes_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/points_in_polygons_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/prroi_pool_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/psamask_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/riroi_align_rotated_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/roi_align_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/roi_align_rotated_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/roi_pool_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/roiaware_pool3d_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/roipoint_pool3d_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/rotated_feature_align_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/scatter_points_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/sigmoid_focal_loss_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/softmax_focal_loss_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/stack_ball_query_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/stack_group_points_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/sync_bn_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/three_interpolate_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/three_nn_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/tin_shift_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       copying mmcv/ops/csrc/common/cuda/voxelization_cuda_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda/spconv
+#12 36.48       copying mmcv/ops/csrc/common/cuda/spconv/indice.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda/spconv
+#12 36.48       copying mmcv/ops/csrc/common/cuda/spconv/reordering.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/cuda/spconv
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mlu
+#12 36.48       copying mmcv/ops/csrc/common/mlu/common_mlu_helper.hpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mlu
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mps
+#12 36.48       copying mmcv/ops/csrc/common/mps/MPSDevice.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mps
+#12 36.48       copying mmcv/ops/csrc/common/mps/MPSLibrary.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mps
+#12 36.48       copying mmcv/ops/csrc/common/mps/MPSLibrary.mm -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mps
+#12 36.48       copying mmcv/ops/csrc/common/mps/MPSStream.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mps
+#12 36.48       copying mmcv/ops/csrc/common/mps/MPSUtils.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/mps
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/paramsgrid.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/prettyprint.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/pybind11_utils.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/spconv/geometry.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/spconv/indice.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/spconv/maxpool.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/spconv/mp_helper.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/spconv/point2voxel.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/spconv/reordering.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/tensorview/helper_kernel.cuh -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/tensorview/helper_launch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 36.48       copying mmcv/ops/csrc/common/utils/spconv/tensorview/tensorview.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/active_rotated_filter.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/active_rotated_filter_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/active_rotated_filter_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/assign_score_withk.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/assign_score_withk_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/assign_score_withk_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/ball_query._parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/ball_query.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/ball_query_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/bbox_overlaps.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/bbox_overlaps_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/bbox_overlaps_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/border_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/border_align_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/border_align_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/box_iou_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/box_iou_rotated_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/box_iou_rotated_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/carafe.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/carafe_naive.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/carafe_naive_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/carafe_naive_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/carafe_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/carafe_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/chamfer_distance.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/chamfer_distance_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/chamfer_distance_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/contour_expand.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/contour_expand_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/contour_expand_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/convex_iou.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/convex_iou_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/convex_iou_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/correlation.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/correlation_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/correlation_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/cudabind.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/deform_conv.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/deform_conv_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/deform_conv_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/deform_roi_pool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/deform_roi_pool_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/deform_roi_pool_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/diff_iou_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/diff_iou_rotated_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/diff_iou_rotated_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/focal_loss.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/focal_loss_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/focal_loss_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/furthest_point_sample.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/furthest_point_sample_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/furthest_point_sample_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/fused_bias_leakyrelu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/fused_bias_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/gather_points.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/gather_points_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/gather_points_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/group_points.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/group_points_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/group_points_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/info.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/iou3d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/iou3d_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/iou3d_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/knn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/knn_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/knn_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/masked_conv2d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/masked_conv2d_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/masked_conv2d_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/min_area_polygons.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/min_area_polygons_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/min_area_polygons_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/modulated_deform_conv.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/modulated_deform_conv_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/modulated_deform_conv_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/ms_deform_attn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/ms_deform_attn_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/nms.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/nms_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/nms_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/nms_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/pixel_group.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/pixel_group_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/pixel_group_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/points_in_boxes.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/points_in_boxes_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/points_in_boxes_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/points_in_polygons.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/points_in_polygons_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/points_in_polygons_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/prroi_pool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/prroi_pool_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/prroi_pool_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/psamask.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/psamask_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/psamask_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/riroi_align_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/riroi_align_rotated_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/riroi_align_rotated_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_align_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_align_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_align_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_align_rotated_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_align_rotated_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_pool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_pool_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roi_pool_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roiaware_pool3d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roiaware_pool3d_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roiaware_pool3d_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roipoint_pool3d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roipoint_pool3d_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/roipoint_pool3d_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/rotated_feature_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/rotated_feature_align_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/rotated_feature_align_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/sync_bn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/sync_bn_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/sync_bn_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/three_interpolate.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/three_interpolate_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/three_interpolate_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/three_nn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/three_nn_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/three_nn_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/tin_shift.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/tin_shift_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/tin_shift_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/upfirdn2d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/upfirdn2d_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/voxelization.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/voxelization_parrots.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       copying mmcv/ops/csrc/parrots/voxelization_pytorch.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/parrots
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/active_rotated_filter.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/assign_score_withk.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/ball_query.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/bbox_overlaps.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/bezier_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/bias_act.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/border_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/box_iou_quadri.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/box_iou_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/carafe.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/carafe_naive.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/chamfer_distance.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/contour_expand.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/convex_iou.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/correlation.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/deform_conv.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/deform_roi_pool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/diff_iou_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/filtered_lrelu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/focal_loss.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/furthest_point_sample.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/fused_bias_leakyrelu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/fused_spconv_ops.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/gather_points.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/group_points.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/info.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/iou3d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/knn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/masked_conv2d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/min_area_polygons.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/modulated_deform_conv.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/ms_deform_attn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/nms.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/nms_quadri.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/nms_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/pixel_group.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/points_in_boxes.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/points_in_polygons.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/prroi_pool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/psamask.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/pybind.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/riroi_align_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/roi_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/roi_align_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/roi_pool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/roiaware_pool3d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/roipoint_pool3d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/rotated_feature_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/scatter_points.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/sparse_pool_ops.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/spconv_ops.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/spconv_utils.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/sync_bn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/three_interpolate.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/three_nn.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/tin_shift.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/upfirdn2d.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       copying mmcv/ops/csrc/pytorch/voxelization.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/active_rotated_filter.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/bbox_overlaps_cpu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/bezier_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/box_iou_quadri.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/box_iou_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/deform_conv.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/modulated_deform_conv.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/nms.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/nms_quadri.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/nms_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/pixel_group.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/points_in_boxes.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/psamask.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/roi_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/roi_align_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/rotated_feature_align.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/sparse_indice.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/sparse_maxpool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/sparse_reordering.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       copying mmcv/ops/csrc/pytorch/cpu/voxelization.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cpu
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/active_rotated_filter_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/assign_score_withk_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/ball_query_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/bbox_overlaps_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/bezier_align_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/bias_act_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/border_align_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/box_iou_quadri_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/box_iou_rotated_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/carafe_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/carafe_naive_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/chamfer_distance_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/convex_iou.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/correlation_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/cudabind.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/deform_conv_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/deform_roi_pool_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/diff_iou_rotated_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/filtered_lrelu.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/focal_loss_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/furthest_point_sample_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/fused_bias_leakyrelu_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/fused_spconv_ops_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/gather_points_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/group_points_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/iou3d_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/knn_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/masked_conv2d_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/min_area_polygons.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/modulated_deform_conv_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/ms_deform_attn_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/nms_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/nms_quadri_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/nms_rotated_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/points_in_boxes_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/points_in_polygons_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/prroi_pool_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/psamask_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/riroi_align_rotated_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/roi_align_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/roi_align_rotated_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/roi_pool_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/roiaware_pool3d_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/roipoint_pool3d_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/rotated_feature_align_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/scatter_points_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/sparse_indice.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/sparse_maxpool.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/sparse_pool_ops_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/sparse_reordering.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/spconv_ops_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/stack_ball_query_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/stack_group_points_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/sync_bn_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/three_interpolate_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/three_nn_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/tin_shift_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/upfirdn2d_kernel.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       copying mmcv/ops/csrc/pytorch/cuda/voxelization_cuda.cu -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/cuda
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/ball_query_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/bbox_overlaps_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/box_iou_rotated.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/carafe_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/deform_roi_pool_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/diff_iou_rotated_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/focal_loss_sigmoid_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/iou3d_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/masked_conv2d_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/mlu_common_helper.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/mlu_common_helper.h -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/ms_deform_attn_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/nms_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/nms_rotated_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/psamask_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/roi_align_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/roi_align_rotated_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/roi_pool_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/roiaware_pool3d_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/roipoint_pool3d_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/rotated_feature_align_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/scatter_points_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/sparse_conv_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/three_nn_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/tin_shift_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       copying mmcv/ops/csrc/pytorch/mlu/voxelization_mlu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mlu
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mps
+#12 36.48       copying mmcv/ops/csrc/pytorch/mps/bbox_overlaps_mps.mm -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/mps
+#12 36.48       creating build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/active_rotated_filter_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/bbox_overlaps_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/box_iou_rotated_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/deform_roi_pool.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/focal_loss_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/fused_bias_leakyrelu_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/gather_points_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/group_points_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/nms_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/nms_rotated_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/points_in_polygons_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/psa_mask_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/roi_align_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/roi_pool_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       copying mmcv/ops/csrc/pytorch/npu/voxelization_npu.cpp -> build/lib.linux-aarch64-3.11/mmcv/ops/csrc/pytorch/npu
+#12 36.48       warning: build_py: byte-compiling is disabled, skipping.
+#12 36.48       
+#12 36.48       running build_ext
+#12 36.48       Traceback (most recent call last):
+#12 36.48         File "<string>", line 2, in <module>
+#12 36.48         File "<pip-setuptools-caller>", line 34, in <module>
+#12 36.48         File "/tmp/pip-install-m8v_xvzb/mmcv_baf9f9b545014223bd054d2045f42408/setup.py", line 448, in <module>
+#12 36.48           setup(
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/__init__.py", line 155, in setup
+#12 36.48           return distutils.core.setup(**attrs)
+#12 36.48                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/core.py", line 148, in setup
+#12 36.48           return run_commands(dist)
+#12 36.48                  ^^^^^^^^^^^^^^^^^^
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/core.py", line 163, in run_commands
+#12 36.48           dist.run_commands()
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 967, in run_commands
+#12 36.48           self.run_command(cmd)
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 986, in run_command
+#12 36.48           cmd_obj.run()
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/wheel/_bdist_wheel.py", line 387, in run
+#12 36.48           self.run_command("build")
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/cmd.py", line 313, in run_command
+#12 36.48           self.distribution.run_command(command)
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 986, in run_command
+#12 36.48           cmd_obj.run()
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/command/build.py", line 135, in run
+#12 36.48           self.run_command(cmd_name)
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/cmd.py", line 313, in run_command
+#12 36.48           self.distribution.run_command(command)
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 986, in run_command
+#12 36.48           cmd_obj.run()
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/command/build_ext.py", line 79, in run
+#12 36.48           _build_ext.run(self)
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/command/build_ext.py", line 339, in run
+#12 36.48           self.build_extensions()
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 509, in build_extensions
+#12 36.48           compiler_name, compiler_version = self._check_abi()
+#12 36.48                                             ^^^^^^^^^^^^^^^^^
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 895, in _check_abi
+#12 36.48           _, version = get_compiler_abi_compatibility_and_version(compiler)
+#12 36.48                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 359, in get_compiler_abi_compatibility_and_version
+#12 36.48           if not check_compiler_ok_for_platform(compiler):
+#12 36.48                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 36.48         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 312, in check_compiler_ok_for_platform
+#12 36.48           which = subprocess.check_output(['which', compiler], stderr=subprocess.STDOUT)
+#12 36.48                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 36.48         File "/usr/local/lib/python3.11/subprocess.py", line 466, in check_output
+#12 36.48           return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+#12 36.48                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 36.48         File "/usr/local/lib/python3.11/subprocess.py", line 571, in run
+#12 36.48           raise CalledProcessError(retcode, process.args,
+#12 36.48       subprocess.CalledProcessError: Command '['which', 'g++']' returned non-zero exit status 1.
+#12 36.48       [end of output]
+#12 36.48   
+#12 36.48   note: This error originates from a subprocess, and is likely not a problem with pip.
+#12 36.48   ERROR: Failed building wheel for mmcv
+#12 36.48   Running setup.py clean for mmcv
+#12 37.53 Failed to build mmcv
+#12 37.53 ERROR: Could not build wheels for mmcv, which is required to install pyproject.toml-based projects
+#12 38.71 Collecting mmdet
+#12 38.77   Downloading mmdet-3.3.0-py3-none-any.whl.metadata (29 kB)
+#12 38.92 Collecting matplotlib (from mmdet)
+#12 38.94   Downloading matplotlib-3.10.8-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (52 kB)
+#12 38.96      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 52.8/52.8 kB 3.0 MB/s eta 0:00:00
+#12 38.96 Requirement already satisfied: numpy in /usr/local/lib/python3.11/site-packages (from mmdet) (2.2.6)
+#12 38.98 Collecting pycocotools (from mmdet)
+#12 38.99   Downloading pycocotools-2.0.11-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (1.3 kB)
+#12 39.07 Collecting scipy (from mmdet)
+#12 39.16   Downloading scipy-1.17.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (62 kB)
+#12 39.17      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.1/62.1 kB 31.1 MB/s eta 0:00:00
+#12 39.22 Collecting shapely (from mmdet)
+#12 39.23   Downloading shapely-2.1.2-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (6.8 kB)
+#12 39.23 Requirement already satisfied: six in /usr/local/lib/python3.11/site-packages (from mmdet) (1.17.0)
+#12 39.25 Collecting terminaltables (from mmdet)
+#12 39.27   Downloading terminaltables-3.1.10-py2.py3-none-any.whl.metadata (3.5 kB)
+#12 39.27 Requirement already satisfied: tqdm in /usr/local/lib/python3.11/site-packages (from mmdet) (4.65.2)
+#12 39.31 Collecting contourpy>=1.0.1 (from matplotlib->mmdet)
+#12 39.32   Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl.metadata (5.5 kB)
+#12 39.34 Collecting cycler>=0.10 (from matplotlib->mmdet)
+#12 39.35   Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+#12 39.44 Collecting fonttools>=4.22.0 (from matplotlib->mmdet)
+#12 39.46   Downloading fonttools-4.61.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (114 kB)
+#12 39.46      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 114.2/114.2 kB 88.7 MB/s eta 0:00:00
+#12 39.52 Collecting kiwisolver>=1.3.1 (from matplotlib->mmdet)
+#12 39.53   Downloading kiwisolver-1.4.9-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl.metadata (6.3 kB)
+#12 39.54 Requirement already satisfied: packaging>=20.0 in /usr/local/lib/python3.11/site-packages (from matplotlib->mmdet) (24.2)
+#12 39.54 Requirement already satisfied: pillow>=8 in /usr/local/lib/python3.11/site-packages (from matplotlib->mmdet) (12.1.0)
+#12 39.58 Collecting pyparsing>=3 (from matplotlib->mmdet)
+#12 39.68   Downloading pyparsing-3.3.1-py3-none-any.whl.metadata (5.6 kB)
+#12 39.68 Requirement already satisfied: python-dateutil>=2.7 in /usr/local/lib/python3.11/site-packages (from matplotlib->mmdet) (2.9.0.post0)
+#12 39.78 Downloading mmdet-3.3.0-py3-none-any.whl (2.2 MB)
+#12 39.84    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 44.0 MB/s eta 0:00:00
+#12 39.85 Downloading matplotlib-3.10.8-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (9.5 MB)
+#12 40.31    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.5/9.5 MB 21.1 MB/s eta 0:00:00
+#12 40.32 Downloading pycocotools-2.0.11-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (485 kB)
+#12 40.33    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 485.2/485.2 kB 32.0 MB/s eta 0:00:00
+#12 40.34 Downloading scipy-1.17.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (32.9 MB)
+#12 42.07    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 32.9/32.9 MB 18.8 MB/s eta 0:00:00
+#12 42.08 Downloading shapely-2.1.2-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (3.0 MB)
+#12 42.31    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 13.6 MB/s eta 0:00:00
+#12 42.32 Downloading terminaltables-3.1.10-py2.py3-none-any.whl (15 kB)
+#12 42.34 Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl (329 kB)
+#12 42.36    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 329.2/329.2 kB 25.2 MB/s eta 0:00:00
+#12 42.37 Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+#12 42.39 Downloading fonttools-4.61.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (5.1 MB)
+#12 42.55    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.1/5.1 MB 31.1 MB/s eta 0:00:00
+#12 42.57 Downloading kiwisolver-1.4.9-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl (1.2 MB)
+#12 42.62    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 25.2 MB/s eta 0:00:00
+#12 42.64 Downloading pyparsing-3.3.1-py3-none-any.whl (121 kB)
+#12 42.64    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 121.8/121.8 kB 157.1 MB/s eta 0:00:00
+#12 42.86 Installing collected packages: terminaltables, shapely, scipy, pyparsing, pycocotools, kiwisolver, fonttools, cycler, contourpy, matplotlib, mmdet
+#12 46.14 Successfully installed contourpy-1.3.3 cycler-0.12.1 fonttools-4.61.1 kiwisolver-1.4.9 matplotlib-3.10.8 mmdet-3.3.0 pycocotools-2.0.11 pyparsing-3.3.1 scipy-1.17.0 shapely-2.1.2 terminaltables-3.1.10
+#12 46.14 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#12 46.75 Looking in links: https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.2/index.html
+#12 47.72 ERROR: Could not find a version that satisfies the requirement detectron2 (from versions: none)
+#12 47.72 ERROR: No matching distribution found for detectron2
+#12 DONE 47.9s
+
+#13 [8/8] COPY app.py /app/app.py
+#13 DONE 0.1s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 11.2s done
+#14 exporting manifest sha256:26d8480854f484bc8164df9e3498d5ef416e3d0d26193a6072033c7abf923b44 0.0s done
+#14 exporting config sha256:51a26c4606ef2111e28328a8e4a4631888af5af0ddeba512ac1244e001f8467d done
+#14 exporting attestation manifest sha256:bef2a30aaca5442b203bfd8be14be423a2b45c5c15c4f15b6fa862fabb39a7fe 0.0s done
+#14 exporting manifest list sha256:759fb241ca4036273688370c9ae95c4ed9b05c9e596145c788c07ef8de58f2ff done
+#14 naming to docker.io/envid/local-label-detection:latest done
+#14 unpacking to docker.io/envid/local-label-detection:latest
+#14 unpacking to docker.io/envid/local-label-detection:latest 5.6s done
+#14 DONE 16.8s
+
+#15 resolving provenance for metadata file
+#15 DONE 0.0s
+ envid/local-label-detection:latest  Built
+ Container locallabeldetection-local-label-detection-1  Recreate
+ Container locallabeldetection-local-label-detection-1  Recreated
+ Container locallabeldetection-local-label-detection-1  Starting
+ Container locallabeldetection-local-label-detection-1  Started

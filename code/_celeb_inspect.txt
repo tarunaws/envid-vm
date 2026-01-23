@@ -1,0 +1,23 @@
+url http://localhost:5016/video/20f8f304-b8df-4918-89f0-98a649a2efb4/metadata-json?category=combined
+celebs entries 5
+
+NAME Kunal Khemu
+  occurrences field: 2
+  segments: 1
+  timestamps: 0
+  detections: 0
+  first segment: {'start_seconds': 0, 'end_seconds': 29}
+
+NAME Rahul Dev
+  occurrences field: 1
+  segments: 1
+  timestamps: 0
+  detections: 0
+  first segment: {'start_seconds': 15, 'end_seconds': 29}
+
+NAME Asha Negi
+  occurrences field: 1
+  segments: 1
+  timestamps: 0
+  detections: 0
+  first segment: {'start_seconds': 15, 'end_seconds': 29}

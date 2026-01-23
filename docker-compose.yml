@@ -1,0 +1,86 @@
+version: "3.9"
+
+services:
+  libretranslate-init:
+    image: libretranslate/libretranslate:v1.6.0
+    container_name: libretranslate-init
+    entrypoint: ["sh", "-lc", "mkdir -p /home/libretranslate/.local/share/argos-translate /home/libretranslate/.local/cache && chown -R 1000:1000 /home/libretranslate/.local"]
+    user: "0:0"
+    volumes:
+      - libretranslate_models:/home/libretranslate/.local/share/argos-translate
+      - libretranslate_cache:/home/libretranslate/.local/cache
+    restart: "no"
+
+  libretranslate:
+    image: libretranslate/libretranslate:v1.6.0
+    container_name: libretranslate
+    restart: unless-stopped
+    depends_on:
+      libretranslate-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      # Ensure Argos uses the correct writable home
+      HOME: "/home/libretranslate"
+      XDG_DATA_HOME: "/home/libretranslate/.local/share"
+      XDG_CACHE_HOME: "/home/libretranslate/.local/cache"
+      ARGOS_TRANSLATE_DATA_DIR: "/home/libretranslate/.local/share/argos-translate"
+      # Disable web UI; API-only server
+      LT_DISABLE_WEB_UI: "true"
+      # Use cached Argos models; do not auto-update on every boot
+      LT_UPDATE_MODELS: "false"
+      # Limit languages to reduce memory usage and startup time
+      LT_LOAD_ONLY: "${LT_LOAD_ONLY}"
+      # CPU-only tuning
+      LT_WORKERS: "${LT_WORKERS}"
+      LT_BATCH_ENABLED: "${LT_BATCH_ENABLED}"
+      LT_BATCH_SIZE: "${LT_BATCH_SIZE}"
+      # Optional auth token for API requests
+      LT_AUTH_TOKEN: "${LT_AUTH_TOKEN}"
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist Argos models across restarts
+      - libretranslate_models:/home/libretranslate/.local/share/argos-translate
+      - libretranslate_cache:/home/libretranslate/.local/cache
+    # Run as root to avoid volume permission issues with Argos model/cache directories
+    user: "0:0"
+    # CPU/RAM limits (Docker Compose compatible)
+    cpus: "${LT_CPU_LIMIT}"
+    mem_limit: "${LT_MEM_LIMIT}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/languages').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  proxy:
+    image: caddy:2.8.4-alpine
+    container_name: libretranslate-proxy
+    restart: unless-stopped
+    depends_on:
+      libretranslate:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      PROXY_READ_TIMEOUT: "${PROXY_READ_TIMEOUT}"
+      PROXY_WRITE_TIMEOUT: "${PROXY_WRITE_TIMEOUT}"
+      PROXY_IDLE_TIMEOUT: "${PROXY_IDLE_TIMEOUT}"
+      PROXY_MAX_BODY: "${PROXY_MAX_BODY}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # Non-root by default in this image; keep explicit user for clarity
+    user: "1000:1000"
+    cpus: "${PROXY_CPU_LIMIT}"
+    mem_limit: "${PROXY_MEM_LIMIT}"
+
+volumes:
+  libretranslate_models:
+  libretranslate_cache:
+  caddy_data:
+  caddy_config:

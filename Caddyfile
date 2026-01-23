@@ -1,0 +1,19 @@
+:8080 {
+  encode gzip
+
+  # Limit request body size for safety
+  request_body {
+    max_size {env.PROXY_MAX_BODY}
+  }
+
+  reverse_proxy libretranslate:5000 {
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Forwarded-For {remote_host}
+
+    transport http {
+      read_timeout {env.PROXY_READ_TIMEOUT}
+      write_timeout {env.PROXY_WRITE_TIMEOUT}
+      idle_timeout {env.PROXY_IDLE_TIMEOUT}
+    }
+  }
+}

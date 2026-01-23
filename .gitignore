@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.gcp.local
+.env.multimodal.local
+.env.multimodal.secrets.local
+__pycache__/
+.venv/
+.venv-*/
+**/.venv-*/
+.cache/
+**/.cache/
+contact_logs/
+history/*/original.png
+history/*/thumbnail.png
+*.log
+*.pid

@@ -1,0 +1,1825 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 726B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 2.06kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim-bookworm
+#3 DONE 1.2s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 64B done
+#5 DONE 0.0s
+
+#6 [1/8] FROM docker.io/library/python:3.11-slim-bookworm@sha256:bcbbec29f7a3f9cbee891e3cd69d7fe4dec7e281daf36cbd415ddd8ee2ba0077
+#6 resolve docker.io/library/python:3.11-slim-bookworm@sha256:bcbbec29f7a3f9cbee891e3cd69d7fe4dec7e281daf36cbd415ddd8ee2ba0077 done
+#6 DONE 0.0s
+
+#7 [2/8] WORKDIR /app
+#7 CACHED
+
+#8 [3/8] RUN set -eux;     for i in 1 2 3; do         apt-get update -o Acquire::Retries=5 &&         apt-get install -o Acquire::Retries=5 -y --no-install-recommends             libglib2.0-0             libgl1         && rm -rf /var/lib/apt/lists/*         && break;         echo "apt-get failed (attempt $i); retrying in 5s...";         sleep 5;     done
+#8 0.109 + apt-get update -o Acquire::Retries=5
+#8 0.313 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#8 0.367 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#8 0.606 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+#8 0.666 Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8792 kB]
+#8 1.084 Get:5 http://deb.debian.org/debian bookworm-updates/main amd64 Packages [6924 B]
+#8 1.202 Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [291 kB]
+#8 1.763 Fetched 9344 kB in 2s (6089 kB/s)
+#8 1.763 Reading package lists...
+#8 2.091 + apt-get install -o Acquire::Retries=5 -y --no-install-recommends libglib2.0-0 libgl1
+#8 2.132 Reading package lists...
+#8 2.426 Building dependency tree...
+#8 2.487 Reading state information...
+#8 2.561 The following additional packages will be installed:
+#8 2.562   libbsd0 libdrm-amdgpu1 libdrm-common libdrm-intel1 libdrm-nouveau2
+#8 2.562   libdrm-radeon1 libdrm2 libedit2 libelf1 libexpat1 libgl1-mesa-dri
+#8 2.562   libglapi-mesa libglvnd0 libglx-mesa0 libglx0 libicu72 libllvm15
+#8 2.562   libpciaccess0 libsensors-config libsensors5 libx11-6 libx11-data libx11-xcb1
+#8 2.562   libxau6 libxcb-dri2-0 libxcb-dri3-0 libxcb-glx0 libxcb-present0
+#8 2.562   libxcb-randr0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb1 libxdmcp6
+#8 2.562   libxext6 libxfixes3 libxml2 libxshmfence1 libxxf86vm1 libz3-4
+#8 2.563 Suggested packages:
+#8 2.563   low-memory-monitor pciutils lm-sensors
+#8 2.563 Recommended packages:
+#8 2.563   libglib2.0-data shared-mime-info xdg-user-dirs
+#8 2.679 The following NEW packages will be installed:
+#8 2.679   libbsd0 libdrm-amdgpu1 libdrm-common libdrm-intel1 libdrm-nouveau2
+#8 2.679   libdrm-radeon1 libdrm2 libedit2 libelf1 libexpat1 libgl1 libgl1-mesa-dri
+#8 2.679   libglapi-mesa libglib2.0-0 libglvnd0 libglx-mesa0 libglx0 libicu72 libllvm15
+#8 2.679   libpciaccess0 libsensors-config libsensors5 libx11-6 libx11-data libx11-xcb1
+#8 2.679   libxau6 libxcb-dri2-0 libxcb-dri3-0 libxcb-glx0 libxcb-present0
+#8 2.679   libxcb-randr0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb1 libxdmcp6
+#8 2.679   libxext6 libxfixes3 libxml2 libxshmfence1 libxxf86vm1 libz3-4
+#8 4.430 0 upgraded, 42 newly installed, 0 to remove and 0 not upgraded.
+#8 4.430 Need to get 52.6 MB of archives.
+#8 4.430 After this operation, 220 MB of additional disk space will be used.
+#8 4.430 Get:1 http://deb.debian.org/debian bookworm/main amd64 libbsd0 amd64 0.11.7-2 [117 kB]
+#8 5.272 Get:2 http://deb.debian.org/debian bookworm/main amd64 libdrm-common all 2.4.114-1 [7112 B]
+#8 5.275 Get:3 http://deb.debian.org/debian bookworm/main amd64 libdrm2 amd64 2.4.114-1+b1 [37.5 kB]
+#8 5.290 Get:4 http://deb.debian.org/debian bookworm/main amd64 libdrm-amdgpu1 amd64 2.4.114-1+b1 [20.9 kB]
+#8 5.292 Get:5 http://deb.debian.org/debian bookworm/main amd64 libpciaccess0 amd64 0.17-2 [51.4 kB]
+#8 5.301 Get:6 http://deb.debian.org/debian bookworm/main amd64 libdrm-intel1 amd64 2.4.114-1+b1 [64.0 kB]
+#8 5.308 Get:7 http://deb.debian.org/debian bookworm/main amd64 libdrm-nouveau2 amd64 2.4.114-1+b1 [19.1 kB]
+#8 5.311 Get:8 http://deb.debian.org/debian bookworm/main amd64 libdrm-radeon1 amd64 2.4.114-1+b1 [21.8 kB]
+#8 5.314 Get:9 http://deb.debian.org/debian bookworm/main amd64 libedit2 amd64 3.1-20221030-2 [93.0 kB]
+#8 5.317 Get:10 http://deb.debian.org/debian bookworm/main amd64 libelf1 amd64 0.188-2.1 [174 kB]
+#8 5.326 Get:11 http://deb.debian.org/debian bookworm/main amd64 libexpat1 amd64 2.5.0-1+deb12u2 [99.9 kB]
+#8 5.900 Get:12 http://deb.debian.org/debian bookworm/main amd64 libglvnd0 amd64 1.6.0-1 [51.8 kB]
+#8 5.972 Get:13 http://deb.debian.org/debian bookworm/main amd64 libxau6 amd64 1:1.0.9-1 [19.7 kB]
+#8 5.972 Get:14 http://deb.debian.org/debian bookworm/main amd64 libxdmcp6 amd64 1:1.1.2-3 [26.3 kB]
+#8 5.973 Get:15 http://deb.debian.org/debian bookworm/main amd64 libxcb1 amd64 1.15-1 [144 kB]
+#8 5.976 Get:16 http://deb.debian.org/debian bookworm/main amd64 libx11-data all 2:1.8.4-2+deb12u2 [292 kB]
+#8 5.980 Get:17 http://deb.debian.org/debian bookworm/main amd64 libx11-6 amd64 2:1.8.4-2+deb12u2 [760 kB]
+#8 6.005 Get:18 http://deb.debian.org/debian bookworm/main amd64 libglapi-mesa amd64 22.3.6-1+deb12u1 [35.7 kB]
+#8 6.005 Get:19 http://deb.debian.org/debian bookworm/main amd64 libx11-xcb1 amd64 2:1.8.4-2+deb12u2 [192 kB]
+#8 6.009 Get:20 http://deb.debian.org/debian bookworm/main amd64 libxcb-dri2-0 amd64 1.15-1 [107 kB]
+#8 6.010 Get:21 http://deb.debian.org/debian bookworm/main amd64 libxcb-dri3-0 amd64 1.15-1 [107 kB]
+#8 6.011 Get:22 http://deb.debian.org/debian bookworm/main amd64 libxcb-glx0 amd64 1.15-1 [122 kB]
+#8 6.017 Get:23 http://deb.debian.org/debian bookworm/main amd64 libxcb-present0 amd64 1.15-1 [105 kB]
+#8 6.019 Get:24 http://deb.debian.org/debian bookworm/main amd64 libxcb-randr0 amd64 1.15-1 [117 kB]
+#8 6.021 Get:25 http://deb.debian.org/debian bookworm/main amd64 libxcb-shm0 amd64 1.15-1 [105 kB]
+#8 6.022 Get:26 http://deb.debian.org/debian bookworm/main amd64 libxcb-sync1 amd64 1.15-1 [109 kB]
+#8 6.025 Get:27 http://deb.debian.org/debian bookworm/main amd64 libxcb-xfixes0 amd64 1.15-1 [109 kB]
+#8 6.027 Get:28 http://deb.debian.org/debian bookworm/main amd64 libxext6 amd64 2:1.3.4-1+b1 [52.9 kB]
+#8 6.027 Get:29 http://deb.debian.org/debian bookworm/main amd64 libxfixes3 amd64 1:6.0.0-2 [22.7 kB]
+#8 6.028 Get:30 http://deb.debian.org/debian bookworm/main amd64 libxshmfence1 amd64 1.3-1 [8820 B]
+#8 6.029 Get:31 http://deb.debian.org/debian bookworm/main amd64 libxxf86vm1 amd64 1:1.1.4-1+b2 [20.8 kB]
+#8 6.030 Get:32 http://deb.debian.org/debian bookworm/main amd64 libicu72 amd64 72.1-3+deb12u1 [9376 kB]
+#8 6.480 Get:33 http://deb.debian.org/debian bookworm/main amd64 libxml2 amd64 2.9.14+dfsg-1.3~deb12u5 [688 kB]
+#8 6.513 Get:34 http://deb.debian.org/debian bookworm/main amd64 libz3-4 amd64 4.8.12-3.1 [7216 kB]
+#8 6.883 Get:35 http://deb.debian.org/debian bookworm/main amd64 libllvm15 amd64 1:15.0.6-4+b1 [23.1 MB]
+#8 8.065 Get:36 http://deb.debian.org/debian bookworm/main amd64 libsensors-config all 1:3.6.0-7.1 [14.3 kB]
+#8 8.068 Get:37 http://deb.debian.org/debian bookworm/main amd64 libsensors5 amd64 1:3.6.0-7.1 [34.2 kB]
+#8 8.068 Get:38 http://deb.debian.org/debian bookworm/main amd64 libgl1-mesa-dri amd64 22.3.6-1+deb12u1 [7239 kB]
+#8 8.439 Get:39 http://deb.debian.org/debian bookworm/main amd64 libglx-mesa0 amd64 22.3.6-1+deb12u1 [147 kB]
+#8 8.446 Get:40 http://deb.debian.org/debian bookworm/main amd64 libglx0 amd64 1.6.0-1 [34.4 kB]
+#8 8.447 Get:41 http://deb.debian.org/debian bookworm/main amd64 libgl1 amd64 1.6.0-1 [88.4 kB]
+#8 8.452 Get:42 http://deb.debian.org/debian bookworm/main amd64 libglib2.0-0 amd64 2.74.6-2+deb12u8 [1402 kB]
+#8 8.733 debconf: delaying package configuration, since apt-utils is not installed
+#8 8.776 Fetched 52.6 MB in 6s (9002 kB/s)
+#8 8.838 Selecting previously unselected package libbsd0:amd64.
+#8 8.838 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6695 files and directories currently installed.)
+#8 8.856 Preparing to unpack .../00-libbsd0_0.11.7-2_amd64.deb ...
+#8 8.859 Unpacking libbsd0:amd64 (0.11.7-2) ...
+#8 8.932 Selecting previously unselected package libdrm-common.
+#8 8.932 Preparing to unpack .../01-libdrm-common_2.4.114-1_all.deb ...
+#8 8.934 Unpacking libdrm-common (2.4.114-1) ...
+#8 8.998 Selecting previously unselected package libdrm2:amd64.
+#8 8.998 Preparing to unpack .../02-libdrm2_2.4.114-1+b1_amd64.deb ...
+#8 8.999 Unpacking libdrm2:amd64 (2.4.114-1+b1) ...
+#8 9.068 Selecting previously unselected package libdrm-amdgpu1:amd64.
+#8 9.069 Preparing to unpack .../03-libdrm-amdgpu1_2.4.114-1+b1_amd64.deb ...
+#8 9.070 Unpacking libdrm-amdgpu1:amd64 (2.4.114-1+b1) ...
+#8 9.134 Selecting previously unselected package libpciaccess0:amd64.
+#8 9.135 Preparing to unpack .../04-libpciaccess0_0.17-2_amd64.deb ...
+#8 9.136 Unpacking libpciaccess0:amd64 (0.17-2) ...
+#8 9.204 Selecting previously unselected package libdrm-intel1:amd64.
+#8 9.204 Preparing to unpack .../05-libdrm-intel1_2.4.114-1+b1_amd64.deb ...
+#8 9.206 Unpacking libdrm-intel1:amd64 (2.4.114-1+b1) ...
+#8 9.275 Selecting previously unselected package libdrm-nouveau2:amd64.
+#8 9.275 Preparing to unpack .../06-libdrm-nouveau2_2.4.114-1+b1_amd64.deb ...
+#8 9.276 Unpacking libdrm-nouveau2:amd64 (2.4.114-1+b1) ...
+#8 9.342 Selecting previously unselected package libdrm-radeon1:amd64.
+#8 9.343 Preparing to unpack .../07-libdrm-radeon1_2.4.114-1+b1_amd64.deb ...
+#8 9.344 Unpacking libdrm-radeon1:amd64 (2.4.114-1+b1) ...
+#8 9.408 Selecting previously unselected package libedit2:amd64.
+#8 9.409 Preparing to unpack .../08-libedit2_3.1-20221030-2_amd64.deb ...
+#8 9.410 Unpacking libedit2:amd64 (3.1-20221030-2) ...
+#8 9.481 Selecting previously unselected package libelf1:amd64.
+#8 9.481 Preparing to unpack .../09-libelf1_0.188-2.1_amd64.deb ...
+#8 9.482 Unpacking libelf1:amd64 (0.188-2.1) ...
+#8 9.569 Selecting previously unselected package libexpat1:amd64.
+#8 9.570 Preparing to unpack .../10-libexpat1_2.5.0-1+deb12u2_amd64.deb ...
+#8 9.574 Unpacking libexpat1:amd64 (2.5.0-1+deb12u2) ...
+#8 9.650 Selecting previously unselected package libglvnd0:amd64.
+#8 9.651 Preparing to unpack .../11-libglvnd0_1.6.0-1_amd64.deb ...
+#8 9.652 Unpacking libglvnd0:amd64 (1.6.0-1) ...
+#8 9.720 Selecting previously unselected package libxau6:amd64.
+#8 9.720 Preparing to unpack .../12-libxau6_1%3a1.0.9-1_amd64.deb ...
+#8 9.721 Unpacking libxau6:amd64 (1:1.0.9-1) ...
+#8 9.788 Selecting previously unselected package libxdmcp6:amd64.
+#8 9.789 Preparing to unpack .../13-libxdmcp6_1%3a1.1.2-3_amd64.deb ...
+#8 9.790 Unpacking libxdmcp6:amd64 (1:1.1.2-3) ...
+#8 9.858 Selecting previously unselected package libxcb1:amd64.
+#8 9.858 Preparing to unpack .../14-libxcb1_1.15-1_amd64.deb ...
+#8 9.859 Unpacking libxcb1:amd64 (1.15-1) ...
+#8 9.926 Selecting previously unselected package libx11-data.
+#8 9.927 Preparing to unpack .../15-libx11-data_2%3a1.8.4-2+deb12u2_all.deb ...
+#8 9.928 Unpacking libx11-data (2:1.8.4-2+deb12u2) ...
+#8 10.03 Selecting previously unselected package libx11-6:amd64.
+#8 10.03 Preparing to unpack .../16-libx11-6_2%3a1.8.4-2+deb12u2_amd64.deb ...
+#8 10.03 Unpacking libx11-6:amd64 (2:1.8.4-2+deb12u2) ...
+#8 10.13 Selecting previously unselected package libglapi-mesa:amd64.
+#8 10.13 Preparing to unpack .../17-libglapi-mesa_22.3.6-1+deb12u1_amd64.deb ...
+#8 10.13 Unpacking libglapi-mesa:amd64 (22.3.6-1+deb12u1) ...
+#8 10.20 Selecting previously unselected package libx11-xcb1:amd64.
+#8 10.20 Preparing to unpack .../18-libx11-xcb1_2%3a1.8.4-2+deb12u2_amd64.deb ...
+#8 10.20 Unpacking libx11-xcb1:amd64 (2:1.8.4-2+deb12u2) ...
+#8 10.27 Selecting previously unselected package libxcb-dri2-0:amd64.
+#8 10.27 Preparing to unpack .../19-libxcb-dri2-0_1.15-1_amd64.deb ...
+#8 10.27 Unpacking libxcb-dri2-0:amd64 (1.15-1) ...
+#8 10.34 Selecting previously unselected package libxcb-dri3-0:amd64.
+#8 10.34 Preparing to unpack .../20-libxcb-dri3-0_1.15-1_amd64.deb ...
+#8 10.34 Unpacking libxcb-dri3-0:amd64 (1.15-1) ...
+#8 10.41 Selecting previously unselected package libxcb-glx0:amd64.
+#8 10.41 Preparing to unpack .../21-libxcb-glx0_1.15-1_amd64.deb ...
+#8 10.41 Unpacking libxcb-glx0:amd64 (1.15-1) ...
+#8 10.48 Selecting previously unselected package libxcb-present0:amd64.
+#8 10.48 Preparing to unpack .../22-libxcb-present0_1.15-1_amd64.deb ...
+#8 10.48 Unpacking libxcb-present0:amd64 (1.15-1) ...
+#8 10.56 Selecting previously unselected package libxcb-randr0:amd64.
+#8 10.56 Preparing to unpack .../23-libxcb-randr0_1.15-1_amd64.deb ...
+#8 10.56 Unpacking libxcb-randr0:amd64 (1.15-1) ...
+#8 10.63 Selecting previously unselected package libxcb-shm0:amd64.
+#8 10.63 Preparing to unpack .../24-libxcb-shm0_1.15-1_amd64.deb ...
+#8 10.63 Unpacking libxcb-shm0:amd64 (1.15-1) ...
+#8 10.70 Selecting previously unselected package libxcb-sync1:amd64.
+#8 10.70 Preparing to unpack .../25-libxcb-sync1_1.15-1_amd64.deb ...
+#8 10.70 Unpacking libxcb-sync1:amd64 (1.15-1) ...
+#8 10.77 Selecting previously unselected package libxcb-xfixes0:amd64.
+#8 10.77 Preparing to unpack .../26-libxcb-xfixes0_1.15-1_amd64.deb ...
+#8 10.77 Unpacking libxcb-xfixes0:amd64 (1.15-1) ...
+#8 10.84 Selecting previously unselected package libxext6:amd64.
+#8 10.84 Preparing to unpack .../27-libxext6_2%3a1.3.4-1+b1_amd64.deb ...
+#8 10.84 Unpacking libxext6:amd64 (2:1.3.4-1+b1) ...
+#8 10.90 Selecting previously unselected package libxfixes3:amd64.
+#8 10.90 Preparing to unpack .../28-libxfixes3_1%3a6.0.0-2_amd64.deb ...
+#8 10.91 Unpacking libxfixes3:amd64 (1:6.0.0-2) ...
+#8 10.97 Selecting previously unselected package libxshmfence1:amd64.
+#8 10.97 Preparing to unpack .../29-libxshmfence1_1.3-1_amd64.deb ...
+#8 10.97 Unpacking libxshmfence1:amd64 (1.3-1) ...
+#8 11.03 Selecting previously unselected package libxxf86vm1:amd64.
+#8 11.03 Preparing to unpack .../30-libxxf86vm1_1%3a1.1.4-1+b2_amd64.deb ...
+#8 11.04 Unpacking libxxf86vm1:amd64 (1:1.1.4-1+b2) ...
+#8 11.10 Selecting previously unselected package libicu72:amd64.
+#8 11.10 Preparing to unpack .../31-libicu72_72.1-3+deb12u1_amd64.deb ...
+#8 11.10 Unpacking libicu72:amd64 (72.1-3+deb12u1) ...
+#8 11.53 Selecting previously unselected package libxml2:amd64.
+#8 11.53 Preparing to unpack .../32-libxml2_2.9.14+dfsg-1.3~deb12u5_amd64.deb ...
+#8 11.53 Unpacking libxml2:amd64 (2.9.14+dfsg-1.3~deb12u5) ...
+#8 11.63 Selecting previously unselected package libz3-4:amd64.
+#8 11.63 Preparing to unpack .../33-libz3-4_4.8.12-3.1_amd64.deb ...
+#8 11.63 Unpacking libz3-4:amd64 (4.8.12-3.1) ...
+#8 12.01 Selecting previously unselected package libllvm15:amd64.
+#8 12.01 Preparing to unpack .../34-libllvm15_1%3a15.0.6-4+b1_amd64.deb ...
+#8 12.01 Unpacking libllvm15:amd64 (1:15.0.6-4+b1) ...
+#8 12.70 Selecting previously unselected package libsensors-config.
+#8 12.71 Preparing to unpack .../35-libsensors-config_1%3a3.6.0-7.1_all.deb ...
+#8 12.71 Unpacking libsensors-config (1:3.6.0-7.1) ...
+#8 12.78 Selecting previously unselected package libsensors5:amd64.
+#8 12.78 Preparing to unpack .../36-libsensors5_1%3a3.6.0-7.1_amd64.deb ...
+#8 12.81 Unpacking libsensors5:amd64 (1:3.6.0-7.1) ...
+#8 12.88 Selecting previously unselected package libgl1-mesa-dri:amd64.
+#8 12.88 Preparing to unpack .../37-libgl1-mesa-dri_22.3.6-1+deb12u1_amd64.deb ...
+#8 12.92 Unpacking libgl1-mesa-dri:amd64 (22.3.6-1+deb12u1) ...
+#8 13.29 Selecting previously unselected package libglx-mesa0:amd64.
+#8 13.29 Preparing to unpack .../38-libglx-mesa0_22.3.6-1+deb12u1_amd64.deb ...
+#8 13.29 Unpacking libglx-mesa0:amd64 (22.3.6-1+deb12u1) ...
+#8 13.36 Selecting previously unselected package libglx0:amd64.
+#8 13.36 Preparing to unpack .../39-libglx0_1.6.0-1_amd64.deb ...
+#8 13.36 Unpacking libglx0:amd64 (1.6.0-1) ...
+#8 13.43 Selecting previously unselected package libgl1:amd64.
+#8 13.43 Preparing to unpack .../40-libgl1_1.6.0-1_amd64.deb ...
+#8 13.43 Unpacking libgl1:amd64 (1.6.0-1) ...
+#8 13.50 Selecting previously unselected package libglib2.0-0:amd64.
+#8 13.50 Preparing to unpack .../41-libglib2.0-0_2.74.6-2+deb12u8_amd64.deb ...
+#8 13.50 Unpacking libglib2.0-0:amd64 (2.74.6-2+deb12u8) ...
+#8 13.61 Setting up libexpat1:amd64 (2.5.0-1+deb12u2) ...
+#8 13.62 Setting up libpciaccess0:amd64 (0.17-2) ...
+#8 13.62 Setting up libxau6:amd64 (1:1.0.9-1) ...
+#8 13.62 Setting up libicu72:amd64 (72.1-3+deb12u1) ...
+#8 13.62 Setting up libglib2.0-0:amd64 (2.74.6-2+deb12u8) ...
+#8 13.66 No schema files found: doing nothing.
+#8 13.68 Setting up libglvnd0:amd64 (1.6.0-1) ...
+#8 13.68 Setting up libsensors-config (1:3.6.0-7.1) ...
+#8 13.68 Setting up libz3-4:amd64 (4.8.12-3.1) ...
+#8 13.69 Setting up libx11-data (2:1.8.4-2+deb12u2) ...
+#8 13.69 Setting up libsensors5:amd64 (1:3.6.0-7.1) ...
+#8 13.69 Setting up libglapi-mesa:amd64 (22.3.6-1+deb12u1) ...
+#8 13.69 Setting up libxshmfence1:amd64 (1.3-1) ...
+#8 13.69 Setting up libbsd0:amd64 (0.11.7-2) ...
+#8 13.70 Setting up libdrm-common (2.4.114-1) ...
+#8 13.70 Setting up libelf1:amd64 (0.188-2.1) ...
+#8 13.70 Setting up libxml2:amd64 (2.9.14+dfsg-1.3~deb12u5) ...
+#8 13.70 Setting up libxdmcp6:amd64 (1:1.1.2-3) ...
+#8 13.71 Setting up libxcb1:amd64 (1.15-1) ...
+#8 13.71 Setting up libxcb-xfixes0:amd64 (1.15-1) ...
+#8 13.71 Setting up libxcb-glx0:amd64 (1.15-1) ...
+#8 13.71 Setting up libedit2:amd64 (3.1-20221030-2) ...
+#8 13.72 Setting up libxcb-shm0:amd64 (1.15-1) ...
+#8 13.72 Setting up libxcb-present0:amd64 (1.15-1) ...
+#8 13.72 Setting up libxcb-sync1:amd64 (1.15-1) ...
+#8 13.72 Setting up libxcb-dri2-0:amd64 (1.15-1) ...
+#8 13.73 Setting up libdrm2:amd64 (2.4.114-1+b1) ...
+#8 13.73 Setting up libxcb-randr0:amd64 (1.15-1) ...
+#8 13.73 Setting up libllvm15:amd64 (1:15.0.6-4+b1) ...
+#8 13.73 Setting up libx11-6:amd64 (2:1.8.4-2+deb12u2) ...
+#8 13.73 Setting up libdrm-amdgpu1:amd64 (2.4.114-1+b1) ...
+#8 13.74 Setting up libxcb-dri3-0:amd64 (1.15-1) ...
+#8 13.74 Setting up libx11-xcb1:amd64 (2:1.8.4-2+deb12u2) ...
+#8 13.74 Setting up libdrm-nouveau2:amd64 (2.4.114-1+b1) ...
+#8 13.74 Setting up libdrm-radeon1:amd64 (2.4.114-1+b1) ...
+#8 13.74 Setting up libdrm-intel1:amd64 (2.4.114-1+b1) ...
+#8 13.75 Setting up libgl1-mesa-dri:amd64 (22.3.6-1+deb12u1) ...
+#8 13.79 Setting up libxext6:amd64 (2:1.3.4-1+b1) ...
+#8 13.79 Setting up libxxf86vm1:amd64 (1:1.1.4-1+b2) ...
+#8 13.80 Setting up libxfixes3:amd64 (1:6.0.0-2) ...
+#8 13.80 Setting up libglx-mesa0:amd64 (22.3.6-1+deb12u1) ...
+#8 13.80 Setting up libglx0:amd64 (1.6.0-1) ...
+#8 13.80 Setting up libgl1:amd64 (1.6.0-1) ...
+#8 13.80 Processing triggers for libc-bin (2.36-9+deb12u13) ...
+#8 13.88 + rm -rf /var/lib/apt/lists/auxfiles /var/lib/apt/lists/deb.debian.org_debian-security_dists_bookworm-security_InRelease /var/lib/apt/lists/deb.debian.org_debian-security_dists_bookworm-security_main_binary-amd64_Packages.lz4 /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm-updates_InRelease /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm-updates_main_binary-amd64_Packages.lz4 /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm_InRelease /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm_main_binary-amd64_Packages.lz4 /var/lib/apt/lists/lock /var/lib/apt/lists/partial
+#8 13.90 + break
+#8 DONE 14.0s
+
+#9 [4/8] COPY requirements.txt /app/requirements.txt
+#9 DONE 0.0s
+
+#10 [5/8] RUN pip install --no-cache-dir     --extra-index-url https://download.pytorch.org/whl/cpu     -f https://download.pytorch.org/whl/cpu/torch_stable.html     torch==2.2.2 torchvision==0.17.2
+#10 0.968 Looking in indexes: https://pypi.org/simple, https://download.pytorch.org/whl/cpu
+#10 0.968 Looking in links: https://download.pytorch.org/whl/cpu/torch_stable.html
+#10 4.046 Collecting torch==2.2.2
+#10 4.064   Downloading https://download.pytorch.org/whl/cpu/torch-2.2.2%2Bcpu-cp311-cp311-linux_x86_64.whl (186.8 MB)
+#10 13.77      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 186.8/186.8 MB 19.2 MB/s eta 0:00:00
+#10 16.83 Collecting torchvision==0.17.2
+#10 16.92   Downloading https://download.pytorch.org/whl/cpu/torchvision-0.17.2%2Bcpu-cp311-cp311-linux_x86_64.whl (1.6 MB)
+#10 17.03      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.6/1.6 MB 14.9 MB/s eta 0:00:00
+#10 19.60 Collecting filelock (from torch==2.2.2)
+#10 19.68   Downloading filelock-3.20.3-py3-none-any.whl.metadata (2.1 kB)
+#10 21.74 Collecting typing-extensions>=4.8.0 (from torch==2.2.2)
+#10 21.75   Downloading https://download.pytorch.org/whl/typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+#10 23.20 Collecting sympy (from torch==2.2.2)
+#10 23.21   Downloading sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+#10 25.61 Collecting networkx (from torch==2.2.2)
+#10 25.63   Downloading networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+#10 26.62 Collecting jinja2 (from torch==2.2.2)
+#10 26.63   Downloading https://download.pytorch.org/whl/jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+#10 28.16 Collecting fsspec (from torch==2.2.2)
+#10 28.18   Downloading fsspec-2026.1.0-py3-none-any.whl.metadata (10 kB)
+#10 31.80 Collecting numpy (from torchvision==0.17.2)
+#10 31.81   Downloading numpy-2.4.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+#10 34.37 Collecting pillow!=8.3.*,>=5.3.0 (from torchvision==0.17.2)
+#10 34.39   Downloading pillow-12.1.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.8 kB)
+#10 36.65 Collecting MarkupSafe>=2.0 (from jinja2->torch==2.2.2)
+#10 36.66   Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+#10 37.88 Collecting mpmath<1.4,>=1.1.0 (from sympy->torch==2.2.2)
+#10 37.90   Downloading mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+#10 37.94 Downloading pillow-12.1.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.0 MB)
+#10 40.18    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.0/7.0 MB 3.1 MB/s eta 0:00:00
+#10 40.22 Downloading https://download.pytorch.org/whl/typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+#10 40.22    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.6/44.6 kB 108.3 MB/s eta 0:00:00
+#10 40.24 Downloading filelock-3.20.3-py3-none-any.whl (16 kB)
+#10 40.26 Downloading fsspec-2026.1.0-py3-none-any.whl (201 kB)
+#10 40.33    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 201.8/201.8 kB 3.2 MB/s eta 0:00:00
+#10 40.36 Downloading https://download.pytorch.org/whl/jinja2-3.1.6-py3-none-any.whl (134 kB)
+#10 40.39    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.9/134.9 kB 5.1 MB/s eta 0:00:00
+#10 40.50 Downloading networkx-3.6.1-py3-none-any.whl (2.1 MB)
+#10 41.13    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 3.3 MB/s eta 0:00:00
+#10 41.15 Downloading numpy-2.4.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.7 MB)
+#10 46.25    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.7/16.7 MB 3.4 MB/s eta 0:00:00
+#10 46.27 Downloading sympy-1.14.0-py3-none-any.whl (6.3 MB)
+#10 48.13    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 3.4 MB/s eta 0:00:00
+#10 48.16 Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+#10 48.17 Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)
+#10 48.37    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 2.7 MB/s eta 0:00:00
+#10 48.60 Installing collected packages: mpmath, typing-extensions, sympy, pillow, numpy, networkx, MarkupSafe, fsspec, filelock, jinja2, torch, torchvision
+#10 59.59 Successfully installed MarkupSafe-3.0.3 filelock-3.20.3 fsspec-2026.1.0 jinja2-3.1.6 mpmath-1.3.0 networkx-3.6.1 numpy-2.4.1 pillow-12.1.0 sympy-1.14.0 torch-2.2.2+cpu torchvision-0.17.2+cpu typing-extensions-4.15.0
+#10 59.59 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#10 DONE 60.1s
+
+#11 [6/8] RUN pip install --no-cache-dir -r /app/requirements.txt
+#11 1.203 Collecting flask>=2.3 (from -r /app/requirements.txt (line 1))
+#11 1.372   Downloading flask-3.1.2-py3-none-any.whl.metadata (3.2 kB)
+#11 1.375 Requirement already satisfied: numpy>=1.26 in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 2)) (2.4.1)
+#11 1.376 Requirement already satisfied: pillow>=10.0 in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 3)) (12.1.0)
+#11 1.513 Collecting opencv-python-headless>=4.8 (from -r /app/requirements.txt (line 4))
+#11 1.527   Downloading opencv_python_headless-4.12.0.88-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (19 kB)
+#11 1.612 Requirement already satisfied: torch in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 7)) (2.2.2+cpu)
+#11 1.613 Requirement already satisfied: torchvision in /usr/local/lib/python3.11/site-packages (from -r /app/requirements.txt (line 8)) (0.17.2+cpu)
+#11 1.643 Collecting blinker>=1.9.0 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 1.658   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+#11 1.690 Collecting click>=8.1.3 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 1.703   Downloading click-8.3.1-py3-none-any.whl.metadata (2.6 kB)
+#11 1.729 Collecting itsdangerous>=2.2.0 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 1.746   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+#11 1.748 Requirement already satisfied: jinja2>=3.1.2 in /usr/local/lib/python3.11/site-packages (from flask>=2.3->-r /app/requirements.txt (line 1)) (3.1.6)
+#11 1.749 Requirement already satisfied: markupsafe>=2.1.1 in /usr/local/lib/python3.11/site-packages (from flask>=2.3->-r /app/requirements.txt (line 1)) (3.0.3)
+#11 2.096 Collecting werkzeug>=3.1.0 (from flask>=2.3->-r /app/requirements.txt (line 1))
+#11 2.112   Downloading werkzeug-3.1.5-py3-none-any.whl.metadata (4.0 kB)
+#11 2.436 Collecting numpy>=1.26 (from -r /app/requirements.txt (line 2))
+#11 2.448   Downloading numpy-2.2.6-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (62 kB)
+#11 2.472      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.0/62.0 kB 3.2 MB/s eta 0:00:00
+#11 2.483 Requirement already satisfied: filelock in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (3.20.3)
+#11 2.484 Requirement already satisfied: typing-extensions>=4.8.0 in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (4.15.0)
+#11 2.485 Requirement already satisfied: sympy in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (1.14.0)
+#11 2.486 Requirement already satisfied: networkx in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (3.6.1)
+#11 2.487 Requirement already satisfied: fsspec in /usr/local/lib/python3.11/site-packages (from torch->-r /app/requirements.txt (line 7)) (2026.1.0)
+#11 2.540 Requirement already satisfied: mpmath<1.4,>=1.1.0 in /usr/local/lib/python3.11/site-packages (from sympy->torch->-r /app/requirements.txt (line 7)) (1.3.0)
+#11 2.555 Downloading flask-3.1.2-py3-none-any.whl (103 kB)
+#11 2.584    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.3/103.3 kB 4.5 MB/s eta 0:00:00
+#11 2.597 Downloading opencv_python_headless-4.12.0.88-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (54.0 MB)
+#11 18.66    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 54.0/54.0 MB 3.4 MB/s eta 0:00:00
+#11 18.69 Downloading numpy-2.2.6-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (16.8 MB)
+#11 23.45    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.8/16.8 MB 3.6 MB/s eta 0:00:00
+#11 23.47 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#11 23.48 Downloading click-8.3.1-py3-none-any.whl (108 kB)
+#11 23.52    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 108.3/108.3 kB 3.8 MB/s eta 0:00:00
+#11 23.54 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#11 23.56 Downloading werkzeug-3.1.5-py3-none-any.whl (225 kB)
+#11 23.62    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 225.0/225.0 kB 3.8 MB/s eta 0:00:00
+#11 23.88 Installing collected packages: werkzeug, numpy, itsdangerous, click, blinker, opencv-python-headless, flask
+#11 23.96   Attempting uninstall: numpy
+#11 23.96     Found existing installation: numpy 2.4.1
+#11 24.03     Uninstalling numpy-2.4.1:
+#11 24.26       Successfully uninstalled numpy-2.4.1
+#11 25.90 Successfully installed blinker-1.9.0 click-8.3.1 flask-3.1.2 itsdangerous-2.2.0 numpy-2.2.6 opencv-python-headless-4.12.0.88 werkzeug-3.1.5
+#11 25.90 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#11 DONE 26.1s
+
+#12 [7/8] RUN pip install --no-cache-dir         -f https://download.openmmlab.com/mmcv/dist/cpu/torch2.2/index.html         'mmcv==2.1.0'  && pip install --no-cache-dir 'mmdet==3.3.0'  && python -c "import mmcv, mmdet; import mmcv._ext"  && (pip install --no-cache-dir      -f https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.2/index.html      detectron2 || true)
+#12 1.095 Looking in links: https://download.openmmlab.com/mmcv/dist/cpu/torch2.2/index.html
+#12 36.75 Collecting mmcv==2.1.0
+#12 36.83   Downloading mmcv-2.1.0.tar.gz (471 kB)
+#12 36.89      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 471.4/471.4 kB 9.5 MB/s eta 0:00:00
+#12 36.96   Preparing metadata (setup.py): started
+#12 39.10   Preparing metadata (setup.py): finished with status 'done'
+#12 39.16 Collecting addict (from mmcv==2.1.0)
+#12 39.25   Downloading addict-2.4.0-py3-none-any.whl.metadata (1.0 kB)
+#12 39.32 Collecting mmengine>=0.3.0 (from mmcv==2.1.0)
+#12 39.33   Downloading mmengine-0.10.7-py3-none-any.whl.metadata (20 kB)
+#12 39.34 Requirement already satisfied: numpy in /usr/local/lib/python3.11/site-packages (from mmcv==2.1.0) (2.2.6)
+#12 39.40 Collecting packaging (from mmcv==2.1.0)
+#12 39.41   Downloading packaging-25.0-py3-none-any.whl.metadata (3.3 kB)
+#12 39.41 Requirement already satisfied: Pillow in /usr/local/lib/python3.11/site-packages (from mmcv==2.1.0) (12.1.0)
+#12 39.50 Collecting pyyaml (from mmcv==2.1.0)
+#12 39.51   Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+#12 39.57 Collecting yapf (from mmcv==2.1.0)
+#12 39.58   Downloading yapf-0.43.0-py3-none-any.whl.metadata (46 kB)
+#12 39.58      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 46.8/46.8 kB 255.0 MB/s eta 0:00:00
+#12 39.76 Collecting matplotlib (from mmengine>=0.3.0->mmcv==2.1.0)
+#12 39.77   Downloading matplotlib-3.10.8-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (52 kB)
+#12 39.77      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 52.8/52.8 kB 300.4 MB/s eta 0:00:00
+#12 39.87 Collecting rich (from mmengine>=0.3.0->mmcv==2.1.0)
+#12 39.88   Downloading rich-14.2.0-py3-none-any.whl.metadata (18 kB)
+#12 39.93 Collecting termcolor (from mmengine>=0.3.0->mmcv==2.1.0)
+#12 39.95   Downloading termcolor-3.3.0-py3-none-any.whl.metadata (6.5 kB)
+#12 40.06 Collecting opencv-python>=3 (from mmengine>=0.3.0->mmcv==2.1.0)
+#12 40.07   Downloading opencv_python-4.12.0.88-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (19 kB)
+#12 40.15 Collecting platformdirs>=3.5.1 (from yapf->mmcv==2.1.0)
+#12 40.16   Downloading platformdirs-4.5.1-py3-none-any.whl.metadata (12 kB)
+#12 40.36 Collecting contourpy>=1.0.1 (from matplotlib->mmengine>=0.3.0->mmcv==2.1.0)
+#12 40.38   Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (5.5 kB)
+#12 40.43 Collecting cycler>=0.10 (from matplotlib->mmengine>=0.3.0->mmcv==2.1.0)
+#12 40.44   Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+#12 40.63 Collecting fonttools>=4.22.0 (from matplotlib->mmengine>=0.3.0->mmcv==2.1.0)
+#12 40.64   Downloading fonttools-4.61.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (114 kB)
+#12 40.65      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 114.2/114.2 kB 31.6 MB/s eta 0:00:00
+#12 40.73 Collecting kiwisolver>=1.3.1 (from matplotlib->mmengine>=0.3.0->mmcv==2.1.0)
+#12 40.83   Downloading kiwisolver-1.4.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (6.3 kB)
+#12 40.91 Collecting pyparsing>=3 (from matplotlib->mmengine>=0.3.0->mmcv==2.1.0)
+#12 40.93   Downloading pyparsing-3.3.1-py3-none-any.whl.metadata (5.6 kB)
+#12 40.99 Collecting python-dateutil>=2.7 (from matplotlib->mmengine>=0.3.0->mmcv==2.1.0)
+#12 41.00   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+#12 41.06 Collecting markdown-it-py>=2.2.0 (from rich->mmengine>=0.3.0->mmcv==2.1.0)
+#12 41.07   Downloading markdown_it_py-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+#12 41.14 Collecting pygments<3.0.0,>=2.13.0 (from rich->mmengine>=0.3.0->mmcv==2.1.0)
+#12 41.15   Downloading pygments-2.19.2-py3-none-any.whl.metadata (2.5 kB)
+#12 41.24 Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich->mmengine>=0.3.0->mmcv==2.1.0)
+#12 41.25   Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+#12 41.39 Collecting six>=1.5 (from python-dateutil>=2.7->matplotlib->mmengine>=0.3.0->mmcv==2.1.0)
+#12 41.41   Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+#12 41.42 Downloading mmengine-0.10.7-py3-none-any.whl (452 kB)
+#12 41.43    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 452.7/452.7 kB 87.5 MB/s eta 0:00:00
+#12 41.44 Downloading addict-2.4.0-py3-none-any.whl (3.8 kB)
+#12 41.46 Downloading packaging-25.0-py3-none-any.whl (66 kB)
+#12 41.46    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 66.5/66.5 kB 193.9 MB/s eta 0:00:00
+#12 41.47 Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+#12 41.50    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 26.7 MB/s eta 0:00:00
+#12 41.52 Downloading yapf-0.43.0-py3-none-any.whl (256 kB)
+#12 41.52    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 256.2/256.2 kB 70.8 MB/s eta 0:00:00
+#12 41.54 Downloading opencv_python-4.12.0.88-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (67.0 MB)
+#12 44.87    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.0/67.0 MB 19.6 MB/s eta 0:00:00
+#12 44.89 Downloading platformdirs-4.5.1-py3-none-any.whl (18 kB)
+#12 44.90 Downloading matplotlib-3.10.8-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (8.7 MB)
+#12 45.32    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8.7/8.7 MB 21.1 MB/s eta 0:00:00
+#12 45.34 Downloading rich-14.2.0-py3-none-any.whl (243 kB)
+#12 45.35    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 243.4/243.4 kB 40.5 MB/s eta 0:00:00
+#12 45.36 Downloading termcolor-3.3.0-py3-none-any.whl (7.7 kB)
+#12 45.38 Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (355 kB)
+#12 45.38    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 355.2/355.2 kB 76.1 MB/s eta 0:00:00
+#12 45.40 Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+#12 45.41 Downloading fonttools-4.61.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.0 MB)
+#12 45.62    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.0/5.0 MB 24.7 MB/s eta 0:00:00
+#12 45.63 Downloading kiwisolver-1.4.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.4 MB)
+#12 45.69    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 29.5 MB/s eta 0:00:00
+#12 45.70 Downloading markdown_it_py-4.0.0-py3-none-any.whl (87 kB)
+#12 45.71    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 87.3/87.3 kB 167.4 MB/s eta 0:00:00
+#12 45.72 Downloading pygments-2.19.2-py3-none-any.whl (1.2 MB)
+#12 45.75    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 43.2 MB/s eta 0:00:00
+#12 45.77 Downloading pyparsing-3.3.1-py3-none-any.whl (121 kB)
+#12 45.77    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 121.8/121.8 kB 171.3 MB/s eta 0:00:00
+#12 45.79 Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#12 45.79    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 229.9/229.9 kB 206.9 MB/s eta 0:00:00
+#12 45.81 Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+#12 45.82 Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+#12 46.01 Building wheels for collected packages: mmcv
+#12 46.01   Building wheel for mmcv (setup.py): started
+#12 48.24   Building wheel for mmcv (setup.py): finished with status 'error'
+#12 48.31   error: subprocess-exited-with-error
+#12 48.31   
+#12 48.31   × python setup.py bdist_wheel did not run successfully.
+#12 48.31   │ exit code: 1
+#12 48.31   ╰─> [1296 lines of output]
+#12 48.31       /tmp/pip-install-ippqcflz/mmcv_a8ce0138c8f44d5b8d16b811bb36e4ee/setup.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+#12 48.31         from pkg_resources import DistributionNotFound, get_distribution, parse_version
+#12 48.31       
+#12 48.31       A module that was compiled using NumPy 1.x cannot be run in
+#12 48.31       NumPy 2.2.6 as it may crash. To support both 1.x and 2.x
+#12 48.31       versions of NumPy, modules must be compiled with NumPy 2.0.
+#12 48.31       Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+#12 48.31       
+#12 48.31       If you are a user of the module, the easiest solution will be to
+#12 48.31       downgrade to 'numpy<2' or try to upgrade the affected module.
+#12 48.31       We expect that some modules will need time to support NumPy 2.
+#12 48.31       
+#12 48.31       Traceback (most recent call last):  File "<string>", line 2, in <module>
+#12 48.31         File "<pip-setuptools-caller>", line 34, in <module>
+#12 48.31         File "/tmp/pip-install-ippqcflz/mmcv_a8ce0138c8f44d5b8d16b811bb36e4ee/setup.py", line 10, in <module>
+#12 48.31           import torch
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/__init__.py", line 1477, in <module>
+#12 48.31           from .functional import *  # noqa: F403
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/functional.py", line 9, in <module>
+#12 48.31           import torch.nn.functional as F
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/nn/__init__.py", line 1, in <module>
+#12 48.31           from .modules import *  # noqa: F403
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/nn/modules/__init__.py", line 35, in <module>
+#12 48.31           from .transformer import TransformerEncoder, TransformerDecoder, \
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/nn/modules/transformer.py", line 20, in <module>
+#12 48.31           device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+#12 48.31       /usr/local/lib/python3.11/site-packages/torch/nn/modules/transformer.py:20: UserWarning: Failed to initialize NumPy: _ARRAY_API not found (Triggered internally at ../torch/csrc/utils/tensor_numpy.cpp:84.)
+#12 48.31         device: torch.device = torch.device(torch._C._get_default_device()),  # torch.device('cpu'),
+#12 48.31       Compiling mmcv._ext only with CPU
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/dist.py:759: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               Please consider removing the following classifiers in favor of a SPDX license expression:
+#12 48.31       
+#12 48.31               License :: OSI Approved :: Apache Software License
+#12 48.31       
+#12 48.31               See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         self._finalize_license_expression()
+#12 48.31       running bdist_wheel
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/_distutils/cmd.py:135: SetuptoolsDeprecationWarning: bdist_wheel.universal is deprecated
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               With Python 2.7 end-of-life, support for building universal wheels
+#12 48.31               (i.e., wheels that support both Python 2 and Python 3)
+#12 48.31               is being obviated.
+#12 48.31               Please discontinue using this option, or if you still need it,
+#12 48.31               file an issue with pypa/setuptools describing your use case.
+#12 48.31       
+#12 48.31               This deprecation is overdue, please update your project and remove deprecated
+#12 48.31               calls to avoid build errors in the future.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         self.finalize_options()
+#12 48.31       /usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py:500: UserWarning: Attempted to use ninja as the BuildExtension backend but we could not find ninja.. Falling back to using the slow distutils backend.
+#12 48.31         warnings.warn(msg.format('we could not find ninja.'))
+#12 48.31       running build
+#12 48.31       running build_py
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv
+#12 48.31       copying mmcv/version.py -> build/lib.linux-x86_64-cpython-311/mmcv
+#12 48.31       copying mmcv/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/utils
+#12 48.31       copying mmcv/utils/device_type.py -> build/lib.linux-x86_64-cpython-311/mmcv/utils
+#12 48.31       copying mmcv/utils/parrots_jit.py -> build/lib.linux-x86_64-cpython-311/mmcv/utils
+#12 48.31       copying mmcv/utils/ext_loader.py -> build/lib.linux-x86_64-cpython-311/mmcv/utils
+#12 48.31       copying mmcv/utils/env.py -> build/lib.linux-x86_64-cpython-311/mmcv/utils
+#12 48.31       copying mmcv/utils/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/utils
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/cnn
+#12 48.31       copying mmcv/cnn/alexnet.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn
+#12 48.31       copying mmcv/cnn/resnet.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn
+#12 48.31       copying mmcv/cnn/vgg.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn
+#12 48.31       copying mmcv/cnn/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/deprecated_wrappers.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/roi_pool.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/filtered_lrelu.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/assign_score_withk.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/points_in_boxes.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/corner_pool.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/rotated_feature_align.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/sync_bn.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/fused_bias_leakyrelu.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/sparse_conv.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/convex_iou.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/pixel_group.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/saconv.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/carafe.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/point_sample.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/conv2d_gradfix.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/gather_points.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/sparse_modules.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/merge_cells.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/bezier_align.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/riroi_align_rotated.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/ball_query.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/multi_scale_deform_attn.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/voxelize.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/bbox.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/cc_attention.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/sparse_pool.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/sparse_ops.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/contour_expand.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/tin_shift.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/furthest_point_sample.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/diff_iou_rotated.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/active_rotated_filter.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/scatter_points.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/psa_mask.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/sparse_functional.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/masked_conv.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/box_iou_quadri.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/nms.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/box_iou_rotated.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/modulated_deform_conv.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/deform_roi_pool.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/prroi_pool.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/border_align.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/focal_loss.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/roi_align.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/roipoint_pool3d.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/iou3d.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/min_area_polygons.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/sparse_structure.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/points_sampler.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/three_nn.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/knn.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/chamfer_distance.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/deform_conv.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/correlation.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/info.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/points_in_polygons.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/group_points.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/bias_act.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/upfirdn2d.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/roi_align_rotated.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/roiaware_pool3d.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       copying mmcv/ops/three_interpolate.py -> build/lib.linux-x86_64-cpython-311/mmcv/ops
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/image
+#12 48.31       copying mmcv/image/geometric.py -> build/lib.linux-x86_64-cpython-311/mmcv/image
+#12 48.31       copying mmcv/image/io.py -> build/lib.linux-x86_64-cpython-311/mmcv/image
+#12 48.31       copying mmcv/image/colorspace.py -> build/lib.linux-x86_64-cpython-311/mmcv/image
+#12 48.31       copying mmcv/image/photometric.py -> build/lib.linux-x86_64-cpython-311/mmcv/image
+#12 48.31       copying mmcv/image/misc.py -> build/lib.linux-x86_64-cpython-311/mmcv/image
+#12 48.31       copying mmcv/image/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/image
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/base.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/wrappers.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/utils.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/processing.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/loading.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/builder.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       copying mmcv/transforms/formatting.py -> build/lib.linux-x86_64-cpython-311/mmcv/transforms
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/video
+#12 48.31       copying mmcv/video/io.py -> build/lib.linux-x86_64-cpython-311/mmcv/video
+#12 48.31       copying mmcv/video/optflow.py -> build/lib.linux-x86_64-cpython-311/mmcv/video
+#12 48.31       copying mmcv/video/processing.py -> build/lib.linux-x86_64-cpython-311/mmcv/video
+#12 48.31       copying mmcv/video/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/video
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/arraymisc
+#12 48.31       copying mmcv/arraymisc/quantization.py -> build/lib.linux-x86_64-cpython-311/mmcv/arraymisc
+#12 48.31       copying mmcv/arraymisc/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/arraymisc
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/visualization
+#12 48.31       copying mmcv/visualization/image.py -> build/lib.linux-x86_64-cpython-311/mmcv/visualization
+#12 48.31       copying mmcv/visualization/optflow.py -> build/lib.linux-x86_64-cpython-311/mmcv/visualization
+#12 48.31       copying mmcv/visualization/color.py -> build/lib.linux-x86_64-cpython-311/mmcv/visualization
+#12 48.31       copying mmcv/visualization/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/visualization
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/cnn/utils
+#12 48.31       copying mmcv/cnn/utils/fuse_conv_bn.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/utils
+#12 48.31       copying mmcv/cnn/utils/flops_counter.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/utils
+#12 48.31       copying mmcv/cnn/utils/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/utils
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/activation.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/conv_ws.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/upsample.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/wrappers.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/scale.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/conv.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/hsigmoid.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/norm.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/depthwise_separable_conv_module.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/non_local.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/hswish.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/context_block.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/conv_module.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/generalized_attention.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/padding.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/plugin.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/conv2d_adaptive_padding.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/swish.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/transformer.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       copying mmcv/cnn/bricks/drop.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/bricks
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/cnn/rfsearch
+#12 48.31       copying mmcv/cnn/rfsearch/utils.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/rfsearch
+#12 48.31       copying mmcv/cnn/rfsearch/operator.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/rfsearch
+#12 48.31       copying mmcv/cnn/rfsearch/search.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/rfsearch
+#12 48.31       copying mmcv/cnn/rfsearch/__init__.py -> build/lib.linux-x86_64-cpython-311/mmcv/cnn/rfsearch
+#12 48.31       running egg_info
+#12 48.31       writing mmcv.egg-info/PKG-INFO
+#12 48.31       writing dependency_links to mmcv.egg-info/dependency_links.txt
+#12 48.31       writing requirements to mmcv.egg-info/requires.txt
+#12 48.31       writing top-level names to mmcv.egg-info/top_level.txt
+#12 48.31       reading manifest file 'mmcv.egg-info/SOURCES.txt'
+#12 48.31       reading manifest template 'MANIFEST.in'
+#12 48.31       adding license file 'LICENSE'
+#12 48.31       adding license file 'LICENSES.md'
+#12 48.31       writing manifest file 'mmcv.egg-info/SOURCES.txt'
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common.cuda' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common.cuda' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common.cuda' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common.cuda' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common.cuda' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common.cuda.spconv' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common.cuda.spconv' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common.cuda.spconv' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common.cuda.spconv' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common.cuda.spconv' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common.mlu' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common.mlu' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common.mlu' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common.mlu' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common.mlu' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common.mps' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common.mps' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common.mps' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common.mps' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common.mps' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common.utils.spconv' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common.utils.spconv' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common.utils.spconv' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common.utils.spconv' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common.utils.spconv' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common.utils.spconv.spconv' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common.utils.spconv.spconv' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common.utils.spconv.spconv' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common.utils.spconv.spconv' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common.utils.spconv.spconv' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.common.utils.spconv.tensorview' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.common.utils.spconv.tensorview' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.common.utils.spconv.tensorview' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.common.utils.spconv.tensorview' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.common.utils.spconv.tensorview' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.parrots' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.parrots' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.parrots' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.parrots' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.parrots' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.pytorch' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.pytorch' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.pytorch' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.pytorch' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.pytorch' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.pytorch.cpu' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.pytorch.cpu' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.pytorch.cpu' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.pytorch.cpu' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.pytorch.cpu' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.pytorch.cuda' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.pytorch.cuda' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.pytorch.cuda' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.pytorch.cuda' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.pytorch.cuda' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.pytorch.mlu' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.pytorch.mlu' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.pytorch.mlu' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.pytorch.mlu' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.pytorch.mlu' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.pytorch.mps' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.pytorch.mps' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.pytorch.mps' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.pytorch.mps' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.pytorch.mps' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       /usr/local/lib/python3.11/site-packages/setuptools/command/build_py.py:212: _Warning: Package 'mmcv.ops.csrc.pytorch.npu' is absent from the `packages` configuration.
+#12 48.31       !!
+#12 48.31       
+#12 48.31               ********************************************************************************
+#12 48.31               ############################
+#12 48.31               # Package would be ignored #
+#12 48.31               ############################
+#12 48.31               Python recognizes 'mmcv.ops.csrc.pytorch.npu' as an importable package[^1],
+#12 48.31               but it is absent from setuptools' `packages` configuration.
+#12 48.31       
+#12 48.31               This leads to an ambiguous overall configuration. If you want to distribute this
+#12 48.31               package, please make sure that 'mmcv.ops.csrc.pytorch.npu' is explicitly added
+#12 48.31               to the `packages` configuration field.
+#12 48.31       
+#12 48.31               Alternatively, you can also rely on setuptools' discovery methods
+#12 48.31               (for example by using `find_namespace_packages(...)`/`find_namespace:`
+#12 48.31               instead of `find_packages(...)`/`find:`).
+#12 48.31       
+#12 48.31               You can read more about "package discovery" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+#12 48.31       
+#12 48.31               If you don't want 'mmcv.ops.csrc.pytorch.npu' to be distributed and are
+#12 48.31               already explicitly excluding 'mmcv.ops.csrc.pytorch.npu' via
+#12 48.31               `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+#12 48.31               you can try to use `exclude_package_data`, or `include-package-data=False` in
+#12 48.31               combination with a more fine grained `package-data` configuration.
+#12 48.31       
+#12 48.31               You can read more about "package data files" on setuptools documentation page:
+#12 48.31       
+#12 48.31               - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+#12 48.31       
+#12 48.31       
+#12 48.31               [^1]: For Python, any directory (with suitable naming) can be imported,
+#12 48.31                     even if it does not contain any `.py` files.
+#12 48.31                     On the other hand, currently there is no concept of package data
+#12 48.31                     directory, all directories are treated like packages.
+#12 48.31               ********************************************************************************
+#12 48.31       
+#12 48.31       !!
+#12 48.31         check.warn(importable)
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/box_iou_rotated_utils.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/parrots_cpp_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/parrots_cuda_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/pytorch_cpp_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/pytorch_cuda_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/pytorch_device_registry.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/pytorch_mlu_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       copying mmcv/ops/csrc/common/pytorch_npu_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/active_rotated_filter_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/assign_score_withk_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/ball_query_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/bbox_overlaps_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/bezier_align_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/border_align_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/box_iou_quadri_cuda.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/box_iou_rotated_cuda.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/carafe_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/carafe_naive_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/chamfer_distance_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/common_cuda_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/convex_iou_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/correlation_cuda.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/deform_conv_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/deform_roi_pool_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/diff_iou_rotated_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/furthest_point_sample_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/gather_points_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/group_points_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/iou3d_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/knn_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/masked_conv2d_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/min_area_polygons_cuda.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/modulated_deform_conv_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/ms_deform_attn_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/nms_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/nms_quadri_cuda.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/nms_rotated_cuda.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/parrots_cudawarpfunction.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/points_in_boxes_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/points_in_polygons_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/prroi_pool_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/psamask_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/riroi_align_rotated_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/roi_align_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/roi_align_rotated_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/roi_pool_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/roiaware_pool3d_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/roipoint_pool3d_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/rotated_feature_align_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/scatter_points_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/sigmoid_focal_loss_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/softmax_focal_loss_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/stack_ball_query_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/stack_group_points_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/sync_bn_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/three_interpolate_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/three_nn_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/tin_shift_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       copying mmcv/ops/csrc/common/cuda/voxelization_cuda_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda/spconv
+#12 48.31       copying mmcv/ops/csrc/common/cuda/spconv/indice.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda/spconv
+#12 48.31       copying mmcv/ops/csrc/common/cuda/spconv/reordering.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/cuda/spconv
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mlu
+#12 48.31       copying mmcv/ops/csrc/common/mlu/common_mlu_helper.hpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mlu
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mps
+#12 48.31       copying mmcv/ops/csrc/common/mps/MPSDevice.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mps
+#12 48.31       copying mmcv/ops/csrc/common/mps/MPSLibrary.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mps
+#12 48.31       copying mmcv/ops/csrc/common/mps/MPSLibrary.mm -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mps
+#12 48.31       copying mmcv/ops/csrc/common/mps/MPSStream.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mps
+#12 48.31       copying mmcv/ops/csrc/common/mps/MPSUtils.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/mps
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/paramsgrid.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/prettyprint.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/pybind11_utils.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/spconv/geometry.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/spconv/indice.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/spconv/maxpool.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/spconv/mp_helper.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/spconv/point2voxel.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/spconv/reordering.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/spconv
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/tensorview/helper_kernel.cuh -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/tensorview/helper_launch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 48.31       copying mmcv/ops/csrc/common/utils/spconv/tensorview/tensorview.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/common/utils/spconv/tensorview
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/active_rotated_filter.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/active_rotated_filter_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/active_rotated_filter_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/assign_score_withk.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/assign_score_withk_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/assign_score_withk_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/ball_query._parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/ball_query.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/ball_query_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/bbox_overlaps.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/bbox_overlaps_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/bbox_overlaps_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/border_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/border_align_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/border_align_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/box_iou_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/box_iou_rotated_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/box_iou_rotated_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/carafe.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/carafe_naive.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/carafe_naive_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/carafe_naive_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/carafe_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/carafe_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/chamfer_distance.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/chamfer_distance_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/chamfer_distance_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/contour_expand.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/contour_expand_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/contour_expand_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/convex_iou.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/convex_iou_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/convex_iou_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/correlation.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/correlation_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/correlation_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/cudabind.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/deform_conv.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/deform_conv_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/deform_conv_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/deform_roi_pool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/deform_roi_pool_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/deform_roi_pool_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/diff_iou_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/diff_iou_rotated_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/diff_iou_rotated_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/focal_loss.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/focal_loss_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/focal_loss_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/furthest_point_sample.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/furthest_point_sample_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/furthest_point_sample_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/fused_bias_leakyrelu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/fused_bias_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/gather_points.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/gather_points_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/gather_points_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/group_points.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/group_points_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/group_points_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/info.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/iou3d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/iou3d_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/iou3d_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/knn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/knn_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/knn_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/masked_conv2d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/masked_conv2d_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/masked_conv2d_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/min_area_polygons.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/min_area_polygons_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/min_area_polygons_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/modulated_deform_conv.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/modulated_deform_conv_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/modulated_deform_conv_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/ms_deform_attn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/ms_deform_attn_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/nms.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/nms_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/nms_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/nms_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/pixel_group.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/pixel_group_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/pixel_group_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/points_in_boxes.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/points_in_boxes_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/points_in_boxes_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/points_in_polygons.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/points_in_polygons_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/points_in_polygons_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/prroi_pool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/prroi_pool_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/prroi_pool_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/psamask.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/psamask_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/psamask_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/riroi_align_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/riroi_align_rotated_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/riroi_align_rotated_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_align_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_align_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_align_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_align_rotated_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_align_rotated_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_pool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_pool_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roi_pool_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roiaware_pool3d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roiaware_pool3d_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roiaware_pool3d_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roipoint_pool3d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roipoint_pool3d_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/roipoint_pool3d_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/rotated_feature_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/rotated_feature_align_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/rotated_feature_align_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/sync_bn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/sync_bn_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/sync_bn_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/three_interpolate.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/three_interpolate_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/three_interpolate_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/three_nn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/three_nn_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/three_nn_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/tin_shift.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/tin_shift_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/tin_shift_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/upfirdn2d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/upfirdn2d_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/voxelization.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/voxelization_parrots.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       copying mmcv/ops/csrc/parrots/voxelization_pytorch.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/parrots
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/active_rotated_filter.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/assign_score_withk.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/ball_query.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/bbox_overlaps.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/bezier_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/bias_act.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/border_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/box_iou_quadri.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/box_iou_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/carafe.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/carafe_naive.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/chamfer_distance.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/contour_expand.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/convex_iou.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/correlation.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/deform_conv.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/deform_roi_pool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/diff_iou_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/filtered_lrelu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/focal_loss.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/furthest_point_sample.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/fused_bias_leakyrelu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/fused_spconv_ops.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/gather_points.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/group_points.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/info.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/iou3d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/knn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/masked_conv2d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/min_area_polygons.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/modulated_deform_conv.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/ms_deform_attn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/nms.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/nms_quadri.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/nms_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/pixel_group.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/points_in_boxes.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/points_in_polygons.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/prroi_pool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/psamask.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/pybind.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/riroi_align_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/roi_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/roi_align_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/roi_pool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/roiaware_pool3d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/roipoint_pool3d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/rotated_feature_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/scatter_points.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/sparse_pool_ops.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/spconv_ops.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/spconv_utils.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/sync_bn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/three_interpolate.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/three_nn.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/tin_shift.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/upfirdn2d.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       copying mmcv/ops/csrc/pytorch/voxelization.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/active_rotated_filter.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/bbox_overlaps_cpu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/bezier_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/box_iou_quadri.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/box_iou_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/deform_conv.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/modulated_deform_conv.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/nms.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/nms_quadri.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/nms_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/pixel_group.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/points_in_boxes.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/psamask.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/roi_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/roi_align_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/rotated_feature_align.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/sparse_indice.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/sparse_maxpool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/sparse_reordering.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       copying mmcv/ops/csrc/pytorch/cpu/voxelization.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cpu
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/active_rotated_filter_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/assign_score_withk_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/ball_query_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/bbox_overlaps_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/bezier_align_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/bias_act_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/border_align_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/box_iou_quadri_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/box_iou_rotated_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/carafe_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/carafe_naive_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/chamfer_distance_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/convex_iou.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/correlation_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/cudabind.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/deform_conv_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/deform_roi_pool_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/diff_iou_rotated_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/filtered_lrelu.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/focal_loss_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/furthest_point_sample_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/fused_bias_leakyrelu_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/fused_spconv_ops_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/gather_points_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/group_points_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/iou3d_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/knn_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/masked_conv2d_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/min_area_polygons.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/modulated_deform_conv_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/ms_deform_attn_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/nms_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/nms_quadri_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/nms_rotated_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/points_in_boxes_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/points_in_polygons_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/prroi_pool_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/psamask_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/riroi_align_rotated_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/roi_align_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/roi_align_rotated_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/roi_pool_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/roiaware_pool3d_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/roipoint_pool3d_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/rotated_feature_align_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/scatter_points_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/sparse_indice.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/sparse_maxpool.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/sparse_pool_ops_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/sparse_reordering.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/spconv_ops_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/stack_ball_query_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/stack_group_points_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/sync_bn_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/three_interpolate_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/three_nn_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/tin_shift_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/upfirdn2d_kernel.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       copying mmcv/ops/csrc/pytorch/cuda/voxelization_cuda.cu -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/cuda
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/ball_query_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/bbox_overlaps_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/box_iou_rotated.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/carafe_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/deform_roi_pool_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/diff_iou_rotated_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/focal_loss_sigmoid_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/iou3d_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/masked_conv2d_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/mlu_common_helper.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/mlu_common_helper.h -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/ms_deform_attn_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/nms_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/nms_rotated_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/psamask_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/roi_align_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/roi_align_rotated_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/roi_pool_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/roiaware_pool3d_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/roipoint_pool3d_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/rotated_feature_align_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/scatter_points_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/sparse_conv_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/three_nn_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/tin_shift_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       copying mmcv/ops/csrc/pytorch/mlu/voxelization_mlu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mlu
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mps
+#12 48.31       copying mmcv/ops/csrc/pytorch/mps/bbox_overlaps_mps.mm -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/mps
+#12 48.31       creating build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/active_rotated_filter_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/bbox_overlaps_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/box_iou_rotated_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/deform_roi_pool.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/focal_loss_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/fused_bias_leakyrelu_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/gather_points_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/group_points_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/nms_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/nms_rotated_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/points_in_polygons_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/psa_mask_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/roi_align_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/roi_pool_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       copying mmcv/ops/csrc/pytorch/npu/voxelization_npu.cpp -> build/lib.linux-x86_64-cpython-311/mmcv/ops/csrc/pytorch/npu
+#12 48.31       warning: build_py: byte-compiling is disabled, skipping.
+#12 48.31       
+#12 48.31       running build_ext
+#12 48.31       Traceback (most recent call last):
+#12 48.31         File "<string>", line 2, in <module>
+#12 48.31         File "<pip-setuptools-caller>", line 34, in <module>
+#12 48.31         File "/tmp/pip-install-ippqcflz/mmcv_a8ce0138c8f44d5b8d16b811bb36e4ee/setup.py", line 448, in <module>
+#12 48.31           setup(
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/__init__.py", line 117, in setup
+#12 48.31           return distutils.core.setup(**attrs)
+#12 48.31                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/core.py", line 186, in setup
+#12 48.31           return run_commands(dist)
+#12 48.31                  ^^^^^^^^^^^^^^^^^^
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/core.py", line 202, in run_commands
+#12 48.31           dist.run_commands()
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 1002, in run_commands
+#12 48.31           self.run_command(cmd)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/dist.py", line 1104, in run_command
+#12 48.31           super().run_command(command)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 1021, in run_command
+#12 48.31           cmd_obj.run()
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/command/bdist_wheel.py", line 370, in run
+#12 48.31           self.run_command("build")
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/cmd.py", line 357, in run_command
+#12 48.31           self.distribution.run_command(command)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/dist.py", line 1104, in run_command
+#12 48.31           super().run_command(command)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 1021, in run_command
+#12 48.31           cmd_obj.run()
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/command/build.py", line 135, in run
+#12 48.31           self.run_command(cmd_name)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/cmd.py", line 357, in run_command
+#12 48.31           self.distribution.run_command(command)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/dist.py", line 1104, in run_command
+#12 48.31           super().run_command(command)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/dist.py", line 1021, in run_command
+#12 48.31           cmd_obj.run()
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/command/build_ext.py", line 99, in run
+#12 48.31           _build_ext.run(self)
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/setuptools/_distutils/command/build_ext.py", line 368, in run
+#12 48.31           self.build_extensions()
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 509, in build_extensions
+#12 48.31           compiler_name, compiler_version = self._check_abi()
+#12 48.31                                             ^^^^^^^^^^^^^^^^^
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 895, in _check_abi
+#12 48.31           _, version = get_compiler_abi_compatibility_and_version(compiler)
+#12 48.31                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 359, in get_compiler_abi_compatibility_and_version
+#12 48.31           if not check_compiler_ok_for_platform(compiler):
+#12 48.31                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 48.31         File "/usr/local/lib/python3.11/site-packages/torch/utils/cpp_extension.py", line 312, in check_compiler_ok_for_platform
+#12 48.31           which = subprocess.check_output(['which', compiler], stderr=subprocess.STDOUT)
+#12 48.31                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 48.31         File "/usr/local/lib/python3.11/subprocess.py", line 466, in check_output
+#12 48.31           return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+#12 48.31                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#12 48.31         File "/usr/local/lib/python3.11/subprocess.py", line 571, in run
+#12 48.31           raise CalledProcessError(retcode, process.args,
+#12 48.31       subprocess.CalledProcessError: Command '['which', 'g++']' returned non-zero exit status 1.
+#12 48.31       [end of output]
+#12 48.31   
+#12 48.31   note: This error originates from a subprocess, and is likely not a problem with pip.
+#12 48.31   ERROR: Failed building wheel for mmcv
+#12 48.31   Running setup.py clean for mmcv
+#12 49.97 Failed to build mmcv
+#12 49.97 ERROR: Could not build wheels for mmcv, which is required to install pyproject.toml-based projects
+#12 ERROR: process "/bin/sh -c pip install --no-cache-dir         -f https://download.openmmlab.com/mmcv/dist/cpu/torch2.2/index.html         'mmcv==2.1.0'  && pip install --no-cache-dir 'mmdet==3.3.0'  && python -c \"import mmcv, mmdet; import mmcv._ext\"  && (pip install --no-cache-dir      -f https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.2/index.html      detectron2 || true)" did not complete successfully: exit code: 1
+------
+ > [7/8] RUN pip install --no-cache-dir         -f https://download.openmmlab.com/mmcv/dist/cpu/torch2.2/index.html         'mmcv==2.1.0'  && pip install --no-cache-dir 'mmdet==3.3.0'  && python -c "import mmcv, mmdet; import mmcv._ext"  && (pip install --no-cache-dir      -f https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.2/index.html      detectron2 || true):
+48.31         File "/usr/local/lib/python3.11/subprocess.py", line 571, in run
+48.31           raise CalledProcessError(retcode, process.args,
+48.31       subprocess.CalledProcessError: Command '['which', 'g++']' returned non-zero exit status 1.
+48.31       [end of output]
+48.31   
+48.31   note: This error originates from a subprocess, and is likely not a problem with pip.
+48.31   ERROR: Failed building wheel for mmcv
+48.31   Running setup.py clean for mmcv
+49.97 Failed to build mmcv
+49.97 ERROR: Could not build wheels for mmcv, which is required to install pyproject.toml-based projects
+------
+Dockerfile:44
+
+--------------------
+
+  43 |     # (via docker-compose.amd64.yml) to get prebuilt mmcv wheels with compiled ops.
+
+  44 | >>> RUN pip install --no-cache-dir \
+
+  45 | >>>         -f https://download.openmmlab.com/mmcv/dist/cpu/torch2.2/index.html \
+
+  46 | >>>         'mmcv==2.1.0' \
+
+  47 | >>>  && pip install --no-cache-dir 'mmdet==3.3.0' \
+
+  48 | >>>  && python -c "import mmcv, mmdet; import mmcv._ext" \
+
+  49 | >>>  && (pip install --no-cache-dir \
+
+  50 | >>>      -f https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.2/index.html \
+
+  51 | >>>      detectron2 || true)
+
+  52 |     
+
+--------------------
+
+failed to solve: process "/bin/sh -c pip install --no-cache-dir         -f https://download.openmmlab.com/mmcv/dist/cpu/torch2.2/index.html         'mmcv==2.1.0'  && pip install --no-cache-dir 'mmdet==3.3.0'  && python -c \"import mmcv, mmdet; import mmcv._ext\"  && (pip install --no-cache-dir      -f https://dl.fbaipublicfiles.com/detectron2/wheels/cpu/torch2.2/index.html      detectron2 || true)" did not complete successfully: exit code: 1
+

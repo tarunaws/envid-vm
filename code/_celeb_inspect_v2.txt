@@ -1,0 +1,42 @@
+url http://localhost:5016/video/20f8f304-b8df-4918-89f0-98a649a2efb4/metadata-json?category=combined
+celebs entries 5
+
+All celebrity names (with occurrences):
+- Kunal Khemu: 2
+- Rahul Dev: 1
+- Tanuj Virwani: 1
+- Asha Negi: 1
+- Vijay Raaz: 1
+
+NAME Kunal Khemu
+  occurrences field: 2
+  segments: 1
+  timestamps: 0
+  timestamps_seconds: 2
+  timestamps_ms: 12
+  detections: 0
+  first segment: {'start_seconds': 0, 'end_seconds': 29}
+  first 10 timestamps_seconds: [0, 15]
+  first 10 timestamps_ms: [2520, 5000, 5520, 6000, 9000, 14000, 14520, 15000, 15520, 16000]
+
+NAME Rahul Dev
+  occurrences field: 1
+  segments: 1
+  timestamps: 0
+  timestamps_seconds: 1
+  timestamps_ms: 1
+  detections: 0
+  first segment: {'start_seconds': 15, 'end_seconds': 29}
+  first 10 timestamps_seconds: [15]
+  first 10 timestamps_ms: [27520]
+
+NAME Asha Negi
+  occurrences field: 1
+  segments: 1
+  timestamps: 0
+  timestamps_seconds: 1
+  timestamps_ms: 1
+  detections: 0
+  first segment: {'start_seconds': 15, 'end_seconds': 29}
+  first 10 timestamps_seconds: [15]
+  first 10 timestamps_ms: [28000]
