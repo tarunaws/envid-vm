@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 import zipfile
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from math import exp
@@ -271,6 +272,41 @@ def _libretranslate_translate(*, text: str, source_lang: str | None, target_lang
         resp = json.loads(r.read().decode("utf-8"))
     translated = resp.get("translatedText") or resp.get("translated_text") or ""
     return str(translated or "").strip()
+
+
+def _whisper_docker_transcribe(
+    *,
+    audio_path: Path,
+    model_size: str,
+    decode_kwargs: Dict[str, Any],
+    prompt: str | None,
+) -> dict[str, Any]:
+    base_url = (os.getenv("ENVID_WHISPER_DOCKER_URL") or "http://localhost:5070").strip()
+    endpoint = base_url.rstrip("/") + "/transcribe"
+    payload = {
+        "model_size": model_size,
+        "language": decode_kwargs.get("language") or "",
+        "temperature": str(decode_kwargs.get("temperature", 0.0)),
+        "beam_size": str(decode_kwargs.get("beam_size", 1)),
+        "best_of": str(decode_kwargs.get("best_of", 1)),
+        "condition_on_previous_text": str(bool(decode_kwargs.get("condition_on_previous_text", True))).lower(),
+        "initial_prompt": prompt or "",
+        "fp16": str(bool(decode_kwargs.get("fp16", False))).lower(),
+    }
+    if "logprob_threshold" in decode_kwargs:
+        payload["logprob_threshold"] = str(decode_kwargs["logprob_threshold"])
+    if "compression_ratio_threshold" in decode_kwargs:
+        payload["compression_ratio_threshold"] = str(decode_kwargs["compression_ratio_threshold"])
+    if "no_speech_threshold" in decode_kwargs:
+        payload["no_speech_threshold"] = str(decode_kwargs["no_speech_threshold"])
+    with open(audio_path, "rb") as handle:
+        files = {"file": handle}
+        resp = requests.post(endpoint, data=payload, files=files, timeout=120)
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+    if not isinstance(data, dict):
+        raise RuntimeError("Whisper docker response is not a JSON object")
+    return data
 
 
 def _translate_targets() -> list[str]:
@@ -1233,8 +1269,7 @@ def _parse_allowed_gcs_video_source(raw: str) -> Tuple[str, str]:
         obj = parts[3]
         if allowed is not None and uri_bucket not in allowed:
             raise ValueError(f"Bucket not allowed: {uri_bucket}. Allowed: {', '.join(sorted(allowed))}")
-        if allowed is None:
-            bucket = uri_bucket
+        bucket = uri_bucket
     else:
         obj = v.lstrip("/")
 
@@ -2323,6 +2358,50 @@ def _build_categorized_metadata_json(video: dict[str, Any]) -> dict[str, Any]:
             combined["scene_by_scene_metadata"] = payload
 
     return {"categories": categories, "combined": combined}
+
+
+def _build_combined_metadata_for_language(video: dict[str, Any], lang: str | None) -> dict[str, Any]:
+    categorized = _build_categorized_metadata_json(video)
+    combined = categorized.get("combined") if isinstance(categorized.get("combined"), dict) else {}
+    lang_norm = (lang or "").strip().lower()
+    if not lang_norm or lang_norm in {"orig", "original"}:
+        return combined
+
+    translations = video.get("translations") if isinstance(video, dict) else None
+    by_lang = None
+    if isinstance(translations, dict):
+        by_lang = translations.get("by_language")
+        if isinstance(by_lang, dict):
+            by_lang = by_lang.get(lang_norm)
+        else:
+            by_lang = None
+    if not isinstance(by_lang, dict):
+        return combined
+
+    out = deepcopy(combined)
+
+    translated_transcript = by_lang.get("transcript")
+    if isinstance(translated_transcript, dict):
+        meta = {}
+        if isinstance(out.get("transcript"), dict):
+            meta = out.get("transcript", {}).get("meta") or {}
+        out["transcript"] = {
+            "text": str(translated_transcript.get("text") or ""),
+            "segments": translated_transcript.get("segments") or [],
+            "language_code": lang_norm,
+            "meta": meta,
+        }
+
+    for key in ("synopses_by_age_group", "scene_by_scene_metadata", "key_scenes", "high_points"):
+        value = by_lang.get(key)
+        if value is not None:
+            out[key] = value
+
+    on_screen_text = by_lang.get("on_screen_text")
+    if on_screen_text is not None:
+        out["on_screen_text"] = on_screen_text
+
+    return out
 
 
 def _overlap_seconds(a_start: float, a_end: float, b_start: float, b_end: float) -> float:
@@ -4443,15 +4522,31 @@ def _process_gcs_video_job_cloud_only(
                     whisper_size = "large-v3"
                 _job_step_update(job_id, "transcribe", status="running", percent=5, message=f"Running (OpenAI Whisper/{whisper_size})")
 
-                model = openai_whisper.load_model(whisper_size)
+                model = None
+                whisper_device_raw = (os.getenv("ENVID_WHISPER_DEVICE") or "auto").strip().lower()
+                whisper_device: str | None = None
+                if whisper_device_raw in {"", "auto"}:
+                    try:
+                        import torch  # type: ignore
+
+                        if getattr(torch, "cuda", None) and torch.cuda.is_available():
+                            whisper_device = "cuda"
+                        elif getattr(torch, "backends", None) and getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+                            whisper_device = "mps"
+                        else:
+                            whisper_device = "cpu"
+                    except Exception:
+                        whisper_device = None
+                elif whisper_device_raw in {"cuda", "mps", "cpu"}:
+                    whisper_device = whisper_device_raw
 
                 # Audio preprocessing (best-effort): extract clean mono 16kHz WAV and optionally slow down tempo.
                 # This improves stability for noisy inputs and some fast-speaking clips.
-                preprocess_enabled = True
+                preprocess_enabled = _env_truthy(os.getenv("ENVID_WHISPER_AUDIO_PREPROCESS"), default=True)
                 tempo_raw = (os.getenv("ENVID_WHISPER_AUDIO_ATEMPO") or "").strip()
                 tempo = _safe_float(tempo_raw or "0.9", 0.9)
                 filters = (os.getenv("ENVID_WHISPER_AUDIO_FILTERS") or "").strip()
-                if preprocess_enabled and not filters:
+                if preprocess_enabled and (not filters or filters.strip().lower() in {"none", "off", "false", "0"}):
                     # Default denoise chain for speech (best-effort): band-limit + denoise + normalize.
                     # If any filter isn't supported by the local ffmpeg build, we fall back at runtime.
                     filters = "highpass=f=80,lowpass=f=8000,anlmdn,afftdn,loudnorm=I=-16:LRA=11:TP=-1.5"
@@ -4488,6 +4583,7 @@ def _process_gcs_video_job_cloud_only(
 
                 transcript_meta["whisper"] = {
                     "model": whisper_size,
+                    "device": whisper_device or "auto",
                     "audio_preprocess": {
                         "enabled": bool(preprocess_enabled),
                         "filters": filters,
@@ -4512,6 +4608,12 @@ def _process_gcs_video_job_cloud_only(
 
                 # Defaults lean towards quality; user can tune via env vars.
                 temperature = _safe_float(os.getenv("ENVID_WHISPER_TEMPERATURE"), 0.0)
+                logprob_threshold = os.getenv("ENVID_WHISPER_LOGPROB_THRESHOLD")
+                compression_ratio_threshold = os.getenv("ENVID_WHISPER_COMPRESSION_RATIO_THRESHOLD")
+                no_speech_threshold = os.getenv("ENVID_WHISPER_NO_SPEECH_THRESHOLD")
+                logprob_threshold_value = _safe_float(logprob_threshold, None) if logprob_threshold not in {None, ""} else None
+                compression_ratio_threshold_value = _safe_float(compression_ratio_threshold, None) if compression_ratio_threshold not in {None, ""} else None
+                no_speech_threshold_value = _safe_float(no_speech_threshold, None) if no_speech_threshold not in {None, ""} else None
                 if quality == "best":
                     beam_default = 10
                     best_default = 10
@@ -4526,6 +4628,9 @@ def _process_gcs_video_job_cloud_only(
                 best_of = _parse_int(os.getenv("ENVID_WHISPER_BEST_OF"), default=best_default, min_value=1, max_value=10)
                 condition_prev = _env_truthy(os.getenv("ENVID_WHISPER_CONDITION_ON_PREVIOUS_TEXT"), default=True)
 
+                # Apple Silicon: keep fp16 off to avoid slow Metal emulation paths.
+                is_apple_mps = whisper_device == "mps"
+
                 decode_kwargs: Dict[str, Any] = {
                     "fp16": False,
                     "temperature": float(temperature),
@@ -4533,6 +4638,12 @@ def _process_gcs_video_job_cloud_only(
                     "best_of": int(best_of),
                     "condition_on_previous_text": bool(condition_prev),
                 }
+                if logprob_threshold_value is not None:
+                    decode_kwargs["logprob_threshold"] = float(logprob_threshold_value)
+                if compression_ratio_threshold_value is not None:
+                    decode_kwargs["compression_ratio_threshold"] = float(compression_ratio_threshold_value)
+                if no_speech_threshold_value is not None:
+                    decode_kwargs["no_speech_threshold"] = float(no_speech_threshold_value)
                 if whisper_language:
                     decode_kwargs["language"] = whisper_language
                 if whisper_prompt:
@@ -4546,21 +4657,40 @@ def _process_gcs_video_job_cloud_only(
                     "beam_size": int(beam_size),
                     "best_of": int(best_of),
                     "condition_on_previous_text": bool(condition_prev),
+                    "logprob_threshold": float(logprob_threshold_value) if logprob_threshold_value is not None else None,
+                    "compression_ratio_threshold": float(compression_ratio_threshold_value) if compression_ratio_threshold_value is not None else None,
+                    "no_speech_threshold": float(no_speech_threshold_value) if no_speech_threshold_value is not None else None,
                 }
 
                 # Chunking (best-effort): improves completeness on long audio by avoiding
                 # any single extremely long decoding pass.
                 chunking_enabled = _env_truthy(os.getenv("ENVID_WHISPER_CHUNKING"), default=True)
-                chunk_seconds = float(os.getenv("ENVID_WHISPER_CHUNK_SECONDS") or 900.0)
+                chunk_seconds_default = 60.0 if is_apple_mps else 900.0
+                chunk_seconds = float(os.getenv("ENVID_WHISPER_CHUNK_SECONDS") or chunk_seconds_default)
                 overlap_seconds = float(os.getenv("ENVID_WHISPER_CHUNK_OVERLAP_SECONDS") or 3.0)
                 # Only chunk when reasonably long, unless explicitly requested.
-                min_chunk_duration = float(os.getenv("ENVID_WHISPER_MIN_DURATION_TO_CHUNK_SECONDS") or 900.0)
+                min_chunk_duration_default = 60.0 if is_apple_mps else 900.0
+                min_chunk_duration = float(os.getenv("ENVID_WHISPER_MIN_DURATION_TO_CHUNK_SECONDS") or min_chunk_duration_default)
 
                 transcript_words = []
                 transcript_segments = []
                 seg_quality_issues: List[Dict[str, Any]] = []
 
                 def _whisper_transcribe_compat(path: Path) -> dict[str, Any]:
+                    runtime = (os.getenv("ENVID_WHISPER_RUNTIME") or "local").strip().lower()
+                    if runtime in {"docker", "http", "sidecar"}:
+                        return _whisper_docker_transcribe(
+                            audio_path=path,
+                            model_size=whisper_size,
+                            decode_kwargs=decode_kwargs,
+                            prompt=whisper_prompt,
+                        )
+                    nonlocal model
+                    if model is None:
+                        if whisper_device:
+                            model = openai_whisper.load_model(whisper_size, device=whisper_device)
+                        else:
+                            model = openai_whisper.load_model(whisper_size)
                     try:
                         return model.transcribe(str(path), **decode_kwargs)
                     except TypeError:
@@ -6589,7 +6719,10 @@ def upload_video() -> Any:
 @app.route("/process-gcs-video-cloud", methods=["POST"])
 def process_gcs_video_cloud() -> Any:
     payload = request.get_json(silent=True) or {}
+    gcs_bucket = (payload.get("gcs_bucket") or payload.get("bucket") or "").strip()
     raw = (payload.get("gcs_object") or payload.get("gcs_uri") or "").strip()
+    if raw and gcs_bucket and not raw.lower().startswith("gs://"):
+        raw = f"gs://{gcs_bucket}/{raw.lstrip('/')}"
     if not raw:
         return jsonify({"error": "Missing gcs_object (or gcs_uri)"}), 400
     try:
@@ -6659,24 +6792,39 @@ def get_video_metadata_json(video_id: str) -> Any:
     if not v:
         return jsonify({"error": "Video not found"}), 404
 
+    category = (request.args.get("category") or "").strip().lower()
+    lang = (request.args.get("lang") or "").strip().lower() or None
+    download = (request.args.get("download") or "").strip().lower() in {"1", "true", "yes", "on"}
+
     categorized = _build_categorized_metadata_json(v)
     categories = categorized.get("categories") if isinstance(categorized.get("categories"), dict) else {}
-    combined = categorized.get("combined") if isinstance(categorized.get("combined"), dict) else {}
-    return (
-        jsonify(
-            {
-                "id": video_id,
-                "categories": categories,
-                "combined": combined,
-                "task_selection": v.get("task_selection") if isinstance(v.get("task_selection"), dict) else {},
-                "task_selection_requested_models": v.get("task_selection_requested_models")
-                if isinstance(v.get("task_selection_requested_models"), dict)
-                else {},
-                "task_selection_effective": v.get("task_selection_effective") if isinstance(v.get("task_selection_effective"), dict) else {},
-            }
-        ),
-        200,
-    )
+    combined = _build_combined_metadata_for_language(v, lang)
+
+    payload: dict[str, Any]
+    if category == "combined":
+        payload = {"id": video_id, "combined": combined}
+    elif category == "categories":
+        payload = {"id": video_id, "categories": categories}
+    else:
+        payload = {
+            "id": video_id,
+            "categories": categories,
+            "combined": combined,
+            "task_selection": v.get("task_selection") if isinstance(v.get("task_selection"), dict) else {},
+            "task_selection_requested_models": v.get("task_selection_requested_models")
+            if isinstance(v.get("task_selection_requested_models"), dict)
+            else {},
+            "task_selection_effective": v.get("task_selection_effective") if isinstance(v.get("task_selection_effective"), dict) else {},
+        }
+
+    if lang:
+        payload["language"] = lang
+
+    response = jsonify(payload)
+    if download:
+        suffix = f".{lang}" if lang else ""
+        response.headers["Content-Disposition"] = f'attachment; filename="{video_id}{suffix}.metadata.json"'
+    return response, 200
 
 
 @app.route("/video/<video_id>/metadata-json.zip", methods=["GET"])
