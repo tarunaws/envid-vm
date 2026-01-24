@@ -89,21 +89,17 @@ export ENVID_METADATA_LOCAL_KEYSCENE_URL="${ENVID_METADATA_LOCAL_KEYSCENE_URL:-h
 
 # AWS/S3 has been removed from the default slim stack.
 
-ENVID_MULTIMODAL_BACKEND_DOCKER="${ENVID_MULTIMODAL_BACKEND_DOCKER:-1}"
+if [ ! -f "$VENV_PYTHON" ]; then
+  echo "❌ Virtual environment not found at $PROJECT_ROOT/.venv"
+  echo "Please run: python3.13 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  exit 1
+fi
 
-if [[ "$ENVID_MULTIMODAL_BACKEND_DOCKER" != "1" ]]; then
-  if [ ! -f "$VENV_PYTHON" ]; then
-    echo "❌ Virtual environment not found at $PROJECT_ROOT/.venv"
-    echo "Please run: python3.13 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
-    exit 1
-  fi
-
-  # Ensure the venv is using Python 3.14+
-  if ! "$VENV_PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 14) else 1)'; then
-    echo "❌ This project requires Python 3.14+ (venv is using: $($VENV_PYTHON -V 2>&1))"
-    echo "Recreate the venv with: rm -rf .venv && python3.14 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
-    exit 1
-  fi
+# Ensure the venv is using Python 3.14+
+if ! "$VENV_PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 14) else 1)'; then
+  echo "❌ This project requires Python 3.14+ (venv is using: $($VENV_PYTHON -V 2>&1))"
+  echo "Recreate the venv with: rm -rf .venv && python3.14 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  exit 1
 fi
 
 start_service() {
@@ -366,19 +362,21 @@ start_multimodal_backend_docker() {
   local pid_file="$PROJECT_ROOT/${service_name}.pid"
   local log_file="$PROJECT_ROOT/${service_name}.log"
   local image_name="${ENVID_MULTIMODAL_DOCKER_IMAGE:-envid-metadata-multimodal:dev}"
+  local repo_root
 
-  if declare -f ensure_docker_ready >/dev/null 2>&1; then
-    if ! ensure_docker_ready; then
+  repo_root="$(cd "$PROJECT_ROOT/.." && pwd)"
+
+  if ! ensure_docker_ready; then
+    if command -v docker >/dev/null 2>&1; then
       echo "⚠️  Docker daemon not reachable; cannot start $service_name"
-      return 0
+    else
+      echo "⚠️  docker not found; cannot start $service_name"
     fi
-  elif ! command -v docker >/dev/null 2>&1; then
-    echo "⚠️  docker not found; cannot start $service_name"
     return 0
   fi
 
   echo "🐳 Building $service_name image..."
-  docker build -t "$image_name" -f "$PROJECT_ROOT/envidMetadataGCP/Dockerfile" "$PROJECT_ROOT/.." > "$log_file" 2>&1 || true
+  docker build -t "$image_name" -f "$repo_root/code/envidMetadataGCP/Dockerfile" "$repo_root" > "$log_file" 2>&1 || true
 
   local env_args=()
   local env_files=(
@@ -401,12 +399,21 @@ start_multimodal_backend_docker() {
     gcp_env=(-e "GOOGLE_APPLICATION_CREDENTIALS=/opt/gcp.json")
   fi
 
+  local gpu_args=()
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    if [[ "${ENVID_MULTIMODAL_DOCKER_GPUS:-all}" != "0" ]]; then
+      gpu_args=(--gpus "${ENVID_MULTIMODAL_DOCKER_GPUS:-all}")
+    fi
+  fi
+
   docker rm -f "$service_name" >/dev/null 2>&1 || true
   echo "🐳 Starting $service_name via Docker on port $port..."
   container_id="$(docker run -d --name "$service_name" \
     -p "${port}:5016" \
     -e PYTHONUNBUFFERED=1 \
     -e PYTHONPATH="/app:/app/code" \
+    -e ENVID_METADATA_PORT="${port}" \
+    "${gpu_args[@]}" \
     "${env_args[@]}" \
     "${gcp_env[@]}" \
     "${gcp_mount[@]}" \
@@ -421,4 +428,4 @@ start_multimodal_backend_docker() {
 #  Envid Metadata (Multimodal only)
 start_local_moderation_service
 start_local_keyscene_best_service
-start_multimodal_backend_docker
+# Multimodal backend is managed by always-on Docker (no start/stop here).

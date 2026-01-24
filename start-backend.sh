@@ -210,13 +210,12 @@ start_multimodal_backend_docker() {
   local log_file="$PROJECT_ROOT/${service_name}.log"
   local image_name="${ENVID_MULTIMODAL_DOCKER_IMAGE:-envid-metadata-multimodal:dev}"
 
-  if declare -f ensure_docker_ready >/dev/null 2>&1; then
-    if ! ensure_docker_ready; then
+  if ! ensure_docker_ready; then
+    if command -v docker >/dev/null 2>&1; then
       echo "⚠️  Docker daemon not reachable; cannot start $service_name"
-      return 0
+    else
+      echo "⚠️  docker not found; cannot start $service_name"
     fi
-  elif ! command -v docker >/dev/null 2>&1; then
-    echo "⚠️  docker not found; cannot start $service_name"
     return 0
   fi
 
@@ -244,12 +243,21 @@ start_multimodal_backend_docker() {
     gcp_env=(-e "GOOGLE_APPLICATION_CREDENTIALS=/opt/gcp.json")
   fi
 
+  local gpu_args=()
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    if [[ "${ENVID_MULTIMODAL_DOCKER_GPUS:-all}" != "0" ]]; then
+      gpu_args=(--gpus "${ENVID_MULTIMODAL_DOCKER_GPUS:-all}")
+    fi
+  fi
+
   docker rm -f "$service_name" >/dev/null 2>&1 || true
   echo "🐳 Starting $service_name via Docker on port $port..."
   container_id="$(docker run -d --name "$service_name" \
     -p "${port}:5016" \
     -e PYTHONUNBUFFERED=1 \
     -e PYTHONPATH="/app:/app/code" \
+    -e ENVID_METADATA_PORT="${port}" \
+    "${gpu_args[@]}" \
     "${env_args[@]}" \
     "${gcp_env[@]}" \
     "${gcp_mount[@]}" \
@@ -264,7 +272,7 @@ start_multimodal_backend_docker() {
 #  Envid Metadata (Multimodal only)
 start_local_moderation_service
 start_local_keyscene_best_service
-start_multimodal_backend_docker
+# Multimodal backend is managed by always-on Docker (no start/stop here).
 
 # Other services intentionally disabled.
 # Uncomment as needed.

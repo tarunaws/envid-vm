@@ -337,11 +337,86 @@ PY
     maybe_fix_keyscene_clip_cache "$url/health" "$service_name"
 }
 
+start_multimodal_backend_docker() {
+    local service_name="envid-metadata-multimodal"
+    local port="5016"
+    local pid_file="$PROJECT_ROOT/${service_name}.pid"
+    local log_file="$PROJECT_ROOT/${service_name}.log"
+    local image_name="${ENVID_MULTIMODAL_DOCKER_IMAGE:-envid-metadata-multimodal:dev}"
+    local env_target="${ENVID_ENV_TARGET:-}"
+
+    if [ -z "$env_target" ]; then
+        if [ "$(uname -s)" = "Darwin" ]; then
+            env_target="laptop"
+        else
+            env_target="vm"
+        fi
+    fi
+
+    if ! ensure_docker_ready; then
+        if command -v docker >/dev/null 2>&1; then
+            echo "⚠️  Docker daemon not reachable; cannot start $service_name"
+        else
+            echo "⚠️  docker not found; cannot start $service_name"
+        fi
+        return 0
+    fi
+
+    echo "🐳 Building $service_name image..."
+    docker build -t "$image_name" -f "$PROJECT_ROOT/code/envidMetadataGCP/Dockerfile" "$PROJECT_ROOT" > "$log_file" 2>&1 || true
+
+    local env_args=()
+    local env_files=(
+        "$ENV_MULTIMODAL_LOCAL_FILE"
+        "$ENV_MULTIMODAL_SECRETS_FILE"
+        "$PROJECT_ROOT/.env.multimodal.${env_target}.local"
+        "$PROJECT_ROOT/.env.multimodal.${env_target}.secrets.local"
+    )
+    for env_file in "${env_files[@]}"; do
+        if [ -f "$env_file" ]; then
+            env_args+=(--env-file "$env_file")
+        fi
+    done
+
+    local gcp_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
+    local gcp_mount=()
+    local gcp_env=()
+    if [ -n "$gcp_file" ] && [ -f "$gcp_file" ]; then
+        gcp_mount=(-v "$gcp_file:/opt/gcp.json:ro")
+        gcp_env=(-e "GOOGLE_APPLICATION_CREDENTIALS=/opt/gcp.json")
+    fi
+
+    local gpu_args=()
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        if [[ "${ENVID_MULTIMODAL_DOCKER_GPUS:-all}" != "0" ]]; then
+            gpu_args=(--gpus "${ENVID_MULTIMODAL_DOCKER_GPUS:-all}")
+        fi
+    fi
+
+    docker rm -f "$service_name" >/dev/null 2>&1 || true
+    echo "🐳 Starting $service_name via Docker on port $port..."
+    container_id="$(docker run -d --name "$service_name" \
+        -p "${port}:5016" \
+        -e PYTHONUNBUFFERED=1 \
+        -e PYTHONPATH="/app:/app/code" \
+        -e ENVID_METADATA_PORT="${port}" \
+        "${gpu_args[@]}" \
+        "${env_args[@]}" \
+        "${gcp_env[@]}" \
+        "${gcp_mount[@]}" \
+        "$image_name")"
+
+    echo "$container_id" > "$pid_file"
+    echo "✅ $service_name started (container: $container_id)"
+
+    wait_for_health "$service_name" "http://localhost:${port}/health" "$log_file" 90 || true
+}
+
 start_local_moderation_service
 start_local_keyscene_best_service
 
 # ✅ Envid Metadata (Multimodal only)
-start_service "envid-metadata-multimodal" "code/envidMetadataGCP" "app.py" "5016" "$ENV_MULTIMODAL_LOCAL_FILE,$ENV_MULTIMODAL_SECRETS_FILE"
+# Multimodal backend is managed by always-on Docker (no start/stop here).
 
 # Other services intentionally disabled to run a slim stack.
 # Uncomment as needed.
