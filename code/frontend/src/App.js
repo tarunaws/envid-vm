@@ -104,8 +104,6 @@ function App() {
 
   const cpuLabel = formatPercent(systemStats?.cpu_percent);
   const gpuLabel = formatPercent(systemStats?.gpu_percent);
-  const memUsed = formatGb(systemStats?.memory_used_gb);
-  const memTotal = formatGb(systemStats?.memory_total_gb);
   const memPercent = formatPercent(systemStats?.memory_percent);
 
   if (!isAuthenticated) {
@@ -173,7 +171,7 @@ function App() {
               <NavCenter>
                 <StatsGroup>
                   <StatsPill>CPU: {cpuLabel}</StatsPill>
-                  <StatsPill>RAM: {memUsed}/{memTotal} GB ({memPercent})</StatsPill>
+                  <StatsPill>RAM: {memPercent}</StatsPill>
                   <StatsPill>GPU: {gpuLabel}</StatsPill>
                 </StatsGroup>
               </NavCenter>
