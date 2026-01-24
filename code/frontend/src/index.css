@@ -31,18 +31,22 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
   font-family: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-#root {
-  min-height: 100vh;
 }
 
 code {

@@ -233,6 +233,9 @@ const AppContainer = styled.div`
 const MainContent = styled.main`
   flex: 1;
   padding: 120px 4vw 48px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 `;
 
 const NeonNav = styled.nav`
