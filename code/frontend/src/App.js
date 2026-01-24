@@ -102,6 +102,8 @@ function App() {
     return value.toFixed(1);
   };
 
+  const cpuLabel = formatPercent(systemStats?.cpu_percent);
+  const gpuLabel = formatPercent(systemStats?.gpu_percent);
   const memPercent = formatPercent(systemStats?.memory_percent);
 
   if (!isAuthenticated) {
@@ -168,7 +170,9 @@ function App() {
               </NavLinks>
               <NavCenter>
                 <StatsGroup>
+                  <StatsPill>CPU: {cpuLabel}</StatsPill>
                   <StatsPill>RAM: {memPercent}</StatsPill>
+                  <StatsPill>GPU: {gpuLabel}</StatsPill>
                 </StatsGroup>
               </NavCenter>
               <Spacer />
