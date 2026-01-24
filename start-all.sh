@@ -325,7 +325,11 @@ if ! command -v npm >/dev/null 2>&1; then
     echo "👉 Install Node.js (which bundles npm) and rerun ./start-all.sh to launch the React app."
 else
     echo "🎨 Starting frontend application..."
-    cd "$PROJECT_ROOT/frontend"
+    FRONTEND_DIR="$PROJECT_ROOT/code/frontend"
+    if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+        FRONTEND_DIR="$PROJECT_ROOT/frontend"
+    fi
+    cd "$FRONTEND_DIR"
 
     # Check if node_modules exists
     if [ ! -d "node_modules" ]; then
