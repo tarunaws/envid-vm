@@ -6838,8 +6838,15 @@ def process_gcs_video_cloud() -> Any:
     return jsonify({"job_id": job_id, "job": job}), 202
 
 
-@app.route("/jobs/<job_id>", methods=["GET"])
+@app.route("/jobs/<job_id>", methods=["GET", "DELETE"])
 def get_job(job_id: str) -> Any:
+    if request.method == "DELETE":
+        with JOBS_LOCK:
+            removed = JOBS.pop(job_id, None)
+        if not removed:
+            return jsonify({"error": "Job not found"}), 404
+        return jsonify({"ok": True, "deleted": job_id}), 200
+
     with JOBS_LOCK:
         job = JOBS.get(job_id)
     if not job:
