@@ -129,7 +129,7 @@ function App() {
         <GlobalStyle />
         <LoginShell>
           <LoginCard>
-            <LoginBrand>Envid Metadata</LoginBrand>
+            <LoginBrand>Development environment</LoginBrand>
             <LoginTitle>Sign in to continue</LoginTitle>
             <LoginSubtitle>Use the provided credentials.</LoginSubtitle>
             <LoginForm onSubmit={handleLogin}>
