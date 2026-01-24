@@ -354,11 +354,7 @@ elif ok is False:
     print("false")
 else:
     print("unknown")
-    FRONTEND_DIR="$PROJECT_ROOT/code/frontend"
-    if [ ! -f "$FRONTEND_DIR/package.json" ]; then
-        FRONTEND_DIR="$PROJECT_ROOT/frontend"
-    fi
-    cd "$FRONTEND_DIR"
+PY
     }
 
     maybe_fix_keyscene_clip_cache() {
