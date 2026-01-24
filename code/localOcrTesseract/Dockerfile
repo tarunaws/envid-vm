@@ -9,4 +9,4 @@ RUN apt-get update \
      tesseract-ocr-hin \
   && rm -rf /var/lib/apt/lists/*
 
-CMD ["tesseract", "--version"]
+CMD ["/bin/bash", "-lc", "tesseract --version && tail -f /dev/null"]

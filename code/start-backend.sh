@@ -364,51 +364,6 @@ start_local_label_detection_service() {
   wait_for_health "$service_name" "$url/health" "$log_file" 60 || true
 }
 
-start_local_ocr_paddle_service() {
-  local service_name="local-ocr-paddle"
-  local port="${ENVID_LOCAL_OCR_PADDLE_PORT:-5084}"
-  local url="${ENVID_METADATA_LOCAL_OCR_PADDLE_URL:-http://localhost:${port}}"
-  local pid_file="$PROJECT_ROOT/${service_name}.pid"
-  local log_file="$PROJECT_ROOT/${service_name}.log"
-
-  if [[ "${ENVID_LOCAL_OCR_PADDLE_AUTOSTART:-1}" == "0" ]]; then
-    echo "ℹ️  Local PaddleOCR autostart disabled (ENVID_LOCAL_OCR_PADDLE_AUTOSTART=0)"
-    return 0
-  fi
-
-  if [[ "$url" != http://localhost:${port}* && "$url" != http://127.0.0.1:${port}* ]]; then
-    echo "ℹ️  Local PaddleOCR URL is non-local ($url); skipping autostart"
-    return 0
-  fi
-
-  if curl -fsS "$url/health" >/dev/null 2>&1; then
-    echo "✅ $service_name already healthy ($url)"
-    return 0
-  fi
-
-  if ! ensure_docker_ready; then
-    if command -v docker >/dev/null 2>&1; then
-      echo "⚠️  Docker is installed but the daemon is not reachable; skipping docker start for $service_name"
-    else
-      echo "⚠️  docker not found; cannot start $service_name"
-    fi
-    return 0
-  fi
-
-  echo "🐳 Starting $service_name via Docker on port $port..."
-  (
-    cd "$PROJECT_ROOT/localOcrPaddle" || exit 0
-
-    docker rm -f "$service_name" >/dev/null 2>&1 || true
-    docker build -t "$service_name:dev" .
-
-    container_id="$(docker run -d --name "$service_name" -p "${port}:5084" -e PORT=5084 "$service_name:dev")"
-    echo "$container_id" > "$pid_file"
-    echo "✅ $service_name started (container: $container_id)"
-  ) > "$log_file" 2>&1 || true
-
-  wait_for_health "$service_name" "$url/health" "$log_file" 240 || true
-}
 
 start_local_keyscene_best_service() {
   local service_name="local-keyscene-best"
@@ -518,4 +473,3 @@ PY
 #  Envid Metadata (Multimodal only)
 start_local_moderation_service
 start_local_label_detection_service
-start_local_ocr_paddle_service
