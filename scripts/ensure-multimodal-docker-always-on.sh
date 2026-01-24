@@ -17,6 +17,23 @@ if [ -z "$ENV_TARGET" ]; then
   fi
 fi
 
+load_env_file() {
+  local file="$1"
+  if [ -f "$file" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$file"
+    set +a
+  fi
+}
+
+load_env_file "$PROJECT_ROOT/.env"
+load_env_file "$PROJECT_ROOT/.env.local"
+load_env_file "$PROJECT_ROOT/.env.multimodal.local"
+load_env_file "$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.local"
+load_env_file "$PROJECT_ROOT/.env.multimodal.secrets.local"
+load_env_file "$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.secrets.local"
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "❌ docker not found"
   exit 1
@@ -44,6 +61,13 @@ for f in "${ENV_FILES[@]}"; do
 done
 
 GCP_FILE="${GOOGLE_APPLICATION_CREDENTIALS:-}"
+if [ -z "$GCP_FILE" ]; then
+  if [ -f "$HOME/gcp.json" ]; then
+    GCP_FILE="$HOME/gcp.json"
+  elif [ -f "$HOME/gcpAccess/gcp.json" ]; then
+    GCP_FILE="$HOME/gcpAccess/gcp.json"
+  fi
+fi
 GCP_MOUNT=()
 GCP_ENV=()
 if [ -n "$GCP_FILE" ] && [ -f "$GCP_FILE" ]; then
