@@ -59,15 +59,17 @@ fi
 # These must be set even when using default ports, because the backend expects the URL env vars.
 export ENVID_LOCAL_MODERATION_PORT="${ENVID_LOCAL_MODERATION_PORT:-5081}"
 export ENVID_LOCAL_LABEL_DETECTION_PORT="${ENVID_LOCAL_LABEL_DETECTION_PORT:-5083}"
+export ENVID_LOCAL_KEYSCENE_PORT="${ENVID_LOCAL_KEYSCENE_PORT:-5085}"
 
 export ENVID_METADATA_LOCAL_MODERATION_URL="${ENVID_METADATA_LOCAL_MODERATION_URL:-http://localhost:${ENVID_LOCAL_MODERATION_PORT}}"
 export ENVID_METADATA_LOCAL_LABEL_DETECTION_URL="${ENVID_METADATA_LOCAL_LABEL_DETECTION_URL:-http://localhost:${ENVID_LOCAL_LABEL_DETECTION_PORT}}"
+export ENVID_METADATA_LOCAL_KEYSCENE_URL="${ENVID_METADATA_LOCAL_KEYSCENE_URL:-http://localhost:${ENVID_LOCAL_KEYSCENE_PORT}}"
 
 
 # AWS/S3 has been removed from the default slim stack.
 
 # Ensure all services can import the shared helpers without per-app sys.path hacks
-export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+export PYTHONPATH="$PROJECT_ROOT/code:$PROJECT_ROOT:${PYTHONPATH:-}"
 
 # Ensure default engine selections prefer local ffmpeg processing
 export SCENE_SUMMARY_VIDEO_ENGINE="${SCENE_SUMMARY_VIDEO_ENGINE:-ffmpeg}"
@@ -115,7 +117,7 @@ start_service() {
                 fi
             done
 
-            export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+            export PYTHONPATH="$PROJECT_ROOT/code:$PROJECT_ROOT:${PYTHONPATH:-}"
             nohup env PYTHONUNBUFFERED=1 PYTHONPATH="$PYTHONPATH" ENVID_METADATA_PORT="$port" $VENV_PYTHON $service_file > "$PROJECT_ROOT/$service_name.log" 2>&1 &
             echo $! > "$PROJECT_ROOT/$service_name.pid"
         )
@@ -125,6 +127,7 @@ start_service() {
 
     else
         cd "$PROJECT_ROOT/$service_dir"
+        export PYTHONPATH="$PROJECT_ROOT/code:$PROJECT_ROOT:${PYTHONPATH:-}"
         nohup env PYTHONUNBUFFERED=1 PYTHONPATH="$PYTHONPATH" ENVID_METADATA_PORT="$port" $VENV_PYTHON $service_file > "$PROJECT_ROOT/$service_name.log" 2>&1 &
         pid=$!
         echo $pid > "$PROJECT_ROOT/$service_name.pid"
@@ -162,6 +165,29 @@ wait_for_health() {
     done
 }
 
+ensure_docker_ready() {
+    if ! command -v docker >/dev/null 2>&1; then
+        return 1
+    fi
+    if docker info >/dev/null 2>&1; then
+        return 0
+    fi
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        if command -v open >/dev/null 2>&1; then
+            open -a Docker >/dev/null 2>&1 || true
+        fi
+    fi
+    local max_tries="${ENVID_DOCKER_WAIT_TRIES:-30}"
+    local i
+    for ((i=1; i<=max_tries; i++)); do
+        if docker info >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
+}
+
 
 # Start backend services
 echo "🔧 Starting backend services..."
@@ -169,7 +195,7 @@ echo "🔧 Starting backend services..."
 # Optionally start local moderation service (NudeNet) in a separate Python runtime.
 start_local_moderation_service() {
     local service_name="local-moderation-nudenet"
-    local runner="$PROJECT_ROOT/localModerationNudeNet/run_local_venv.sh"
+    local runner="$PROJECT_ROOT/code/localModerationNudeNet/run_local_venv.sh"
     local port="${ENVID_LOCAL_MODERATION_PORT:-5081}"
     local url="${ENVID_METADATA_LOCAL_MODERATION_URL:-http://localhost:${port}}"
 
@@ -182,6 +208,7 @@ start_local_moderation_service() {
         return 0
     fi
     if curl -fsS "$url/health" >/dev/null 2>&1; then
+        echo "✅ $service_name already healthy ($url)"
         return 0
     fi
     if [[ ! -x "$runner" ]]; then
@@ -210,7 +237,7 @@ start_local_moderation_service() {
 # Optionally start local label-detection service (Detectron2/MMDetection) in a separate Python runtime.
 start_local_label_detection_service() {
     local service_name="local-label-detection"
-    local runner="$PROJECT_ROOT/localLabelDetection/run_local_venv.sh"
+    local runner="$PROJECT_ROOT/code/localLabelDetection/run_local_venv.sh"
     local port="${ENVID_LOCAL_LABEL_DETECTION_PORT:-5083}"
     local url="${ENVID_METADATA_LOCAL_LABEL_DETECTION_URL:-http://localhost:${port}}"
     local pid_file="$PROJECT_ROOT/${service_name}.pid"
@@ -244,19 +271,19 @@ start_local_label_detection_service() {
             local compose_file="${ENVID_LOCAL_LABEL_DETECTION_DOCKER_COMPOSE_FILE:-}"
             if [[ -z "$compose_file" ]]; then
                 compose_file="docker-compose.yml"
-                if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" && -f "$PROJECT_ROOT/localLabelDetection/docker-compose.amd64.yml" ]]; then
+                if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" && -f "$PROJECT_ROOT/code/localLabelDetection/docker-compose.amd64.yml" ]]; then
                     compose_file="docker-compose.amd64.yml"
                     echo "ℹ️  Apple Silicon detected; defaulting localLabelDetection to $compose_file (override via ENVID_LOCAL_LABEL_DETECTION_DOCKER_COMPOSE_FILE)"
                 fi
             fi
-        if [[ ! -f "$PROJECT_ROOT/localLabelDetection/$compose_file" ]]; then
+        if [[ ! -f "$PROJECT_ROOT/code/localLabelDetection/$compose_file" ]]; then
             echo "⚠️  $compose_file not found for localLabelDetection; cannot run via docker"
             return 0
         fi
 
         echo "🐳 Starting $service_name via docker compose on port $port..."
         (
-            cd "$PROJECT_ROOT/localLabelDetection" || exit 0
+            cd "$PROJECT_ROOT/code/localLabelDetection" || exit 0
 
             # Clean up any stale container names from previous runs (common when switching compose files/platforms).
             docker compose -f "$compose_file" down --remove-orphans >/dev/null 2>&1 || true
@@ -279,6 +306,7 @@ start_local_label_detection_service() {
         elif command -v python3.12 >/dev/null 2>&1; then
             py_bin="python3.12"
         else
+            echo "⚠️  python3.11/python3.12 not found; skipping local label detection service autostart"
             return 0
         fi
     fi
@@ -291,11 +319,121 @@ start_local_label_detection_service() {
     wait_for_health "$service_name" "$url/health" "$log_file" 60 || true
 }
 
+start_local_keyscene_best_service() {
+    local service_name="local-keyscene-best"
+    local port="${ENVID_LOCAL_KEYSCENE_PORT:-5085}"
+    local url="${ENVID_METADATA_LOCAL_KEYSCENE_URL:-http://localhost:${port}}"
+    local pid_file="$PROJECT_ROOT/${service_name}.pid"
+    local log_file="$PROJECT_ROOT/${service_name}.log"
+    local autoclean="${ENVID_LOCAL_KEYSCENE_AUTOCLEAN:-1}"
+
+    get_keyscene_clip_ok() {
+        local health_url="$1"
+        "$VENV_PYTHON" - "$health_url" <<'PY'
+import json
+import sys
+import urllib.request
+
+url = sys.argv[1] if len(sys.argv) > 1 else ""
+try:
+    with urllib.request.urlopen(url, timeout=5) as resp:
+        raw = resp.read().decode("utf-8", errors="ignore")
+    data = json.loads(raw or "{}") if raw else {}
+except Exception:
+    print("unknown")
+    raise SystemExit(0)
+
+details = data.get("details") if isinstance(data, dict) else None
+clip = details.get("clip") if isinstance(details, dict) else None
+ok = None
+if isinstance(clip, dict):
+    ok = clip.get("ok")
+if ok is True:
+    print("true")
+elif ok is False:
+    print("false")
+else:
+    print("unknown")
+    FRONTEND_DIR="$PROJECT_ROOT/code/frontend"
+    if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+        FRONTEND_DIR="$PROJECT_ROOT/frontend"
+    fi
+    cd "$FRONTEND_DIR"
+    }
+
+    maybe_fix_keyscene_clip_cache() {
+        local health_url="$1"
+        local container_name="$2"
+        local clip_ok
+        clip_ok="$(get_keyscene_clip_ok "$health_url")"
+        if [[ "$clip_ok" == "false" && "$autoclean" != "0" ]]; then
+            echo "⚠️  CLIP cache appears corrupted; clearing cache and restarting $service_name"
+            docker exec "$container_name" sh -lc 'rm -rf /cache/huggingface /cache/open_clip /cache/torch || true; mkdir -p /cache/huggingface' >/dev/null 2>&1 || true
+            docker restart "$container_name" >/dev/null 2>&1 || true
+            wait_for_health "$service_name" "$health_url" "$log_file" 240 || true
+            clip_ok="$(get_keyscene_clip_ok "$health_url")"
+            if [[ "$clip_ok" != "true" ]]; then
+                echo "⚠️  CLIP cache cleanup did not resolve CLIP health"
+            fi
+        fi
+    }
+
+    if [[ "${ENVID_LOCAL_KEYSCENE_AUTOSTART:-1}" == "0" ]]; then
+        echo "ℹ️  Local keyscene autostart disabled (ENVID_LOCAL_KEYSCENE_AUTOSTART=0)"
+        return 0
+    fi
+
+    if [[ "$url" != http://localhost:${port}* && "$url" != http://127.0.0.1:${port}* ]]; then
+        echo "ℹ️  Local keyscene URL is non-local ($url); skipping autostart"
+        return 0
+    fi
+
+    if curl -fsS "$url/health" >/dev/null 2>&1; then
+        echo "✅ $service_name already healthy ($url)"
+        maybe_fix_keyscene_clip_cache "$url/health" "$service_name"
+        return 0
+    fi
+
+    if ! ensure_docker_ready; then
+        if command -v docker >/dev/null 2>&1; then
+            echo "⚠️  Docker is installed but the daemon is not reachable; skipping docker start for $service_name"
+        else
+            echo "⚠️  docker not found; cannot start $service_name"
+        fi
+        return 0
+    fi
+
+    echo "🐳 Starting $service_name via Docker on port $port..."
+    (
+        cd "$PROJECT_ROOT/code/localKeySceneBest" || exit 0
+
+        docker rm -f "$service_name" >/dev/null 2>&1 || true
+        docker build -t "$service_name:dev" .
+
+        container_id="$(docker run -d --name "$service_name" \
+          -p "${port}:5085" \
+          -e PORT=5085 \
+          -e CLIP_MODEL="${ENVID_CLIP_MODEL:-ViT-B-32}" \
+          -e CLIP_PRETRAINED="${ENVID_CLIP_PRETRAINED:-laion2b_s34b_b79k}" \
+          -e TRANSNETV2_MODEL_DIR="${TRANSNETV2_MODEL_DIR:-/weights/transnetv2-weights}" \
+          -e XDG_CACHE_HOME="/cache" \
+          -v "$PROJECT_ROOT/code/localKeySceneBest/weights:/weights:ro" \
+          -v "$PROJECT_ROOT/code/localKeySceneBest/.cache:/cache" \
+          "$service_name:dev")"
+        echo "$container_id" > "$pid_file"
+        echo "✅ $service_name started (container: $container_id)"
+    ) > "$log_file" 2>&1 || true
+
+    wait_for_health "$service_name" "$url/health" "$log_file" 240 || true
+    maybe_fix_keyscene_clip_cache "$url/health" "$service_name"
+}
+
 start_local_moderation_service
 start_local_label_detection_service
+start_local_keyscene_best_service
 
 # ✅ Envid Metadata (Multimodal only)
-start_service "envid-metadata-multimodal" "envidMetadataGCP" "app.py" "5016" "$ENV_MULTIMODAL_LOCAL_FILE,$ENV_MULTIMODAL_SECRETS_FILE"
+start_service "envid-metadata-multimodal" "code/envidMetadataGCP" "app.py" "5016" "$ENV_MULTIMODAL_LOCAL_FILE,$ENV_MULTIMODAL_SECRETS_FILE"
 
 # Other services intentionally disabled to run a slim stack.
 # Uncomment as needed.
@@ -343,7 +481,7 @@ else
     # VS Code tasks can terminate child process trees after the task completes.
     # To keep the dev server running reliably, start it in a new session using
     # `os.setsid()` (portable; avoids requiring an external `setsid` binary).
-    nohup env PORT="$FRONTEND_PORT" BROWSER=none "$VENV_PYTHON" -c 'import os; os.setsid(); os.execvpe("npm", ["npm", "start"], os.environ)' > "../frontend.log" 2>&1 < /dev/null &
+    nohup env PORT="$FRONTEND_PORT" BROWSER=none "$VENV_PYTHON" -c 'import os; os.setsid(); os.execvpe("npm", ["npm", "start"], os.environ)' > "$PROJECT_ROOT/frontend.log" 2>&1 < /dev/null &
 
     # Wait for the dev server to start listening (up to ~30s)
     for _ in {1..30}; do
@@ -355,7 +493,7 @@ else
 
     FRONTEND_LISTENER_PID="$(lsof -nP -t -iTCP:"$FRONTEND_PORT" -sTCP:LISTEN 2>/dev/null | head -n 1)"
     if [ -n "$FRONTEND_LISTENER_PID" ]; then
-        echo "$FRONTEND_LISTENER_PID" > "../frontend.pid"
+        echo "$FRONTEND_LISTENER_PID" > "$PROJECT_ROOT/frontend.pid"
     fi
 
     if ! lsof -nP -iTCP:"$FRONTEND_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
