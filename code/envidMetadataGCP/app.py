@@ -329,6 +329,25 @@ def _whisperx_command() -> list[str] | None:
     py_path = (os.getenv("ENVID_WHISPERX_PYTHON") or "").strip()
     if py_path:
         return [py_path, "-m", "whisperx"]
+    docker_bin = shutil.which("docker")
+    if docker_bin:
+        try:
+            res = subprocess.run(
+                [docker_bin, "ps", "--filter", "name=whisperx-service", "--format", "{{.ID}}"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if (res.stdout or "").strip():
+                return [docker_bin, "exec", "-i", "whisperx-service", "python3", "-m", "whisperx"]
+        except Exception:
+            pass
+    for candidate in (
+        "/home/tarun-envid/whisperx-venv/bin/python",
+        "/home/tarun-envid/whisperx-venv/bin/python3",
+    ):
+        if Path(candidate).exists():
+            return [candidate, "-m", "whisperx"]
     if shutil.which("whisperx"):
         return ["whisperx"]
     return None
@@ -1904,7 +1923,11 @@ def _precheck_models(
 
     # WhisperX availability
     if enable_transcribe:
-        _require(_whisperx_available(), "whisperx", "WhisperX is not available (set ENVID_WHISPERX_BIN or ENVID_WHISPERX_PYTHON)")
+        _require(
+            _whisperx_available(),
+            "whisperx",
+            "WhisperX is not available (set ENVID_WHISPERX_BIN/ENVID_WHISPERX_PYTHON or run whisperx-service docker)",
+        )
         nlp_mode = "openrouter_llama"
         if nlp_mode in {"openrouter_llama", "openrouter", "llama"}:
             api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
@@ -6517,6 +6540,29 @@ def _gpu_percent() -> float | None:
         return None
 
 
+def _memory_stats() -> tuple[float, float, float] | None:
+    try:
+        mem_total_kb = None
+        mem_available_kb = None
+        with open("/proc/meminfo", "r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("MemTotal:"):
+                    mem_total_kb = float(line.split()[1])
+                elif line.startswith("MemAvailable:"):
+                    mem_available_kb = float(line.split()[1])
+                if mem_total_kb is not None and mem_available_kb is not None:
+                    break
+        if mem_total_kb is None or mem_available_kb is None:
+            return None
+        total_gb = mem_total_kb / 1024.0 / 1024.0
+        available_gb = mem_available_kb / 1024.0 / 1024.0
+        used_gb = max(0.0, total_gb - available_gb)
+        percent = 0.0 if total_gb <= 0 else (used_gb / total_gb) * 100.0
+        return (used_gb, total_gb, max(0.0, min(100.0, percent)))
+    except Exception:
+        return None
+
+
 @app.route("/health", methods=["GET"])
 def health() -> Any:
     resolved_bucket = None
@@ -6543,11 +6589,15 @@ def system_stats() -> Any:
     with _CPU_SAMPLE_LOCK:
         cpu_value = _cpu_percent()
     gpu_value = _gpu_percent()
+    mem_stats = _memory_stats()
     return jsonify(
         {
             "status": "ok",
             "cpu_percent": cpu_value,
             "gpu_percent": gpu_value,
+            "memory_used_gb": mem_stats[0] if mem_stats else None,
+            "memory_total_gb": mem_stats[1] if mem_stats else None,
+            "memory_percent": mem_stats[2] if mem_stats else None,
             "timestamp": datetime.utcnow().isoformat(),
         }
     )

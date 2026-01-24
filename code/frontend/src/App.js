@@ -20,6 +20,9 @@ import UseCases from './UseCases';
 import VideoGeneration from './VideoGeneration';
 import { VisibleUseCasesProvider } from './VisibleUseCasesContext';
 
+const BACKEND_URL = process.env.REACT_APP_ENVID_METADATA_BACKEND_URL || '/envid-multimodal';
+const STATS_POLL_MS = 5000;
+
 function App() {
   const [scrolled, setScrolled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -27,6 +30,7 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [systemStats, setSystemStats] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 12);
@@ -47,6 +51,27 @@ function App() {
     }
   }, [buildId]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    let active = true;
+    const fetchStats = async () => {
+      try {
+        const resp = await fetch(`${BACKEND_URL}/system/stats`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('Failed to fetch system stats');
+        const data = await resp.json();
+        if (active) setSystemStats(data);
+      } catch (err) {
+        if (active) setSystemStats(null);
+      }
+    };
+    fetchStats();
+    const id = setInterval(fetchStats, STATS_POLL_MS);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [isAuthenticated]);
+
   const handleLogin = (event) => {
     event.preventDefault();
     const user = username.trim();
@@ -66,6 +91,22 @@ function App() {
     setPassword('');
     setAuthError('');
   };
+
+  const formatPercent = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+    return `${Math.round(value)}%`;
+  };
+
+  const formatGb = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+    return value.toFixed(1);
+  };
+
+  const cpuLabel = formatPercent(systemStats?.cpu_percent);
+  const gpuLabel = formatPercent(systemStats?.gpu_percent);
+  const memUsed = formatGb(systemStats?.memory_used_gb);
+  const memTotal = formatGb(systemStats?.memory_total_gb);
+  const memPercent = formatPercent(systemStats?.memory_percent);
 
   if (!isAuthenticated) {
     return (
@@ -129,6 +170,13 @@ function App() {
                 <NeonLink to="/use-cases">Live Demo</NeonLink>
                 <NeonLink to="/about">About</NeonLink>
               </NavLinks>
+              <NavCenter>
+                <StatsGroup>
+                  <StatsPill>CPU: {cpuLabel}</StatsPill>
+                  <StatsPill>RAM: {memUsed}/{memTotal} GB ({memPercent})</StatsPill>
+                  <StatsPill>GPU: {gpuLabel}</StatsPill>
+                </StatsGroup>
+              </NavCenter>
               <Spacer />
               <LogoutButton type="button" onClick={handleLogout}>
                 Logout
@@ -292,6 +340,32 @@ const NavLinks = styled.div`
   display: flex;
   align-items: center;
   gap: clamp(0.5rem, 1.6vw, 1.5rem);
+`;
+
+const NavCenter = styled.div`
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+`;
+
+const StatsGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+`;
+
+const StatsPill = styled.div`
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
 `;
 
 const NeonLink = styled(NavLink)`
