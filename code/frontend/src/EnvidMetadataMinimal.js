@@ -1900,6 +1900,37 @@ export default function EnvidMetadataMinimal() {
     return { text: 'Not started', variant: 'neutral' };
   };
 
+  const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(value)));
+
+  const extractPercentFromMessage = (message) => {
+    if (!message) return null;
+    const match = String(message).match(/(\d{1,3})\s*%/);
+    if (!match) return null;
+    const parsed = Number(match[1]);
+    if (!Number.isFinite(parsed)) return null;
+    return clampPercent(parsed);
+  };
+
+  const deriveStepPercent = (step) => {
+    if (!step || typeof step !== 'object') return null;
+    const status = String(step.status || '').toLowerCase();
+    const raw = typeof step.percent === 'number' ? clampPercent(step.percent) : null;
+    if (raw !== null && raw > 0) return raw;
+    const msgPercent = extractPercentFromMessage(step.message);
+    if (msgPercent !== null) return msgPercent;
+    if (status === 'completed' || status === 'failed' || status === 'skipped') return 100;
+    if (status !== 'running') return raw;
+    const startedAt = step.started_at || step.startedAt;
+    if (startedAt) {
+      const startedMs = Date.parse(startedAt);
+      if (Number.isFinite(startedMs)) {
+        const elapsedSeconds = Math.max(0, (Date.now() - startedMs) / 1000);
+        return clampPercent(Math.min(90, Math.max(2, elapsedSeconds * 1.2)));
+      }
+    }
+    return raw !== null ? raw : 0;
+  };
+
   const hasSelectedInput =
     videoSource === 'local' ? Boolean(selectedFile) : Boolean(String(gcsRawVideoObject || '').trim());
 
@@ -2033,7 +2064,7 @@ export default function EnvidMetadataMinimal() {
             {pipelineSteps.map((step) => {
               const id = String(step?.id || '');
               const label = String(step?.label || id || 'Step');
-              const pct = typeof step?.percent === 'number' ? Math.max(0, Math.min(100, step.percent)) : null;
+              const pct = deriveStepPercent(step);
               const badge = statusBadgeFor(step?.status);
               const hint = String(step?.message || '').trim();
               const hintText = (() => {
