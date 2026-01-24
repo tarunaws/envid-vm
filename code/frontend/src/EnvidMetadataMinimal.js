@@ -979,18 +979,17 @@ function formatSeconds(seconds) {
   return hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`;
 }
 
-function formatTaskDurationSummary(taskDurations, totalSeconds) {
+function formatTaskDurationSummary(taskDurations) {
   if (!taskDurations || typeof taskDurations !== 'object') return '';
+  const allowed = new Set(['label_detection', 'transcribe']);
   const entries = Object.entries(taskDurations)
     .map(([key, value]) => ({ key, value: Number(value) }))
-    .filter((item) => Number.isFinite(item.value) && item.value > 0 && item.key !== 'overall');
+    .filter((item) => allowed.has(item.key) && Number.isFinite(item.value) && item.value > 0);
 
-  if (!entries.length && !Number.isFinite(Number(totalSeconds))) return '';
+  if (!entries.length) return '';
 
   entries.sort((a, b) => b.value - a.value);
-  const top = entries.slice(0, 6).map((item) => `${item.key} ${formatSeconds(item.value)}`);
-  const totalLabel = Number.isFinite(Number(totalSeconds)) ? `Total ${formatSeconds(totalSeconds)}` : '';
-  const parts = [...top, totalLabel].filter(Boolean);
+  const parts = entries.map((item) => `${item.key} ${formatSeconds(item.value)}`);
   return parts.length ? `Task time: ${parts.join(' · ')}` : '';
 }
 
@@ -2636,10 +2635,7 @@ export default function EnvidMetadataMinimal() {
                     const status = video?.status || video?.processing_status || video?.state;
                     const thumbSrc = asJpegDataUri(video?.thumbnail);
                     const frameCount = Number(video?.frame_count ?? video?.frameCount ?? 0) || 0;
-                    const taskSummary = formatTaskDurationSummary(
-                      video?.task_durations,
-                      video?.task_duration_total_seconds
-                    );
+                    const taskSummary = formatTaskDurationSummary(video?.task_durations);
 
                     return (
                       <CarouselItem
