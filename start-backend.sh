@@ -589,7 +589,7 @@ PY
 
 #  Envid Metadata (Multimodal only)
 start_local_moderation_service
-start_local_moderation_nsfwjs_service
+# local-moderation-nsfwjs is managed by systemd (always-on). Do not start here.
 start_local_label_detection_service
 start_local_ocr_paddle_service
 start_local_keyscene_best_service

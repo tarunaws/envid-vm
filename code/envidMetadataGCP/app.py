@@ -1972,19 +1972,16 @@ def _precheck_models(
 
     # Key scene sidecar (CLIP clustering optional, sidecar required for transnetv2 scenes)
     if enable_key_scene and requested_key_scene_model in {"transnetv2_clip_cluster", "pyscenedetect_clip_cluster", "clip_cluster"}:
-        base = (os.getenv("ENVID_METADATA_LOCAL_KEYSCENE_URL") or "").strip().rstrip("/")
-        if not base:
-            _require(False, "keyscene_sidecar", "ENVID_METADATA_LOCAL_KEYSCENE_URL is not set")
+        base = (os.getenv("ENVID_METADATA_LOCAL_KEYSCENE_URL") or "http://localhost:5085").strip().rstrip("/")
+        health = _check_service_health(f"{base}/health")
+        if not health.get("ok"):
+            _require(False, "keyscene_sidecar", f"key scene sidecar unhealthy: {health.get('error') or health.get('raw')}")
         else:
-            health = _check_service_health(f"{base}/health")
-            if not health.get("ok"):
-                _require(False, "keyscene_sidecar", f"key scene sidecar unhealthy: {health.get('error') or health.get('raw')}")
-            else:
-                # If CLIP is degraded, only warn (optional clustering)
-                raw = health.get("raw") if isinstance(health.get("raw"), dict) else {}
-                clip_ok = bool(((raw or {}).get("details") or {}).get("clip", {}).get("ok")) if isinstance(raw, dict) else True
-                if not clip_ok:
-                    _require(False, "clip_model", "CLIP model unavailable")
+            # If CLIP is degraded, only warn (optional clustering)
+            raw = health.get("raw") if isinstance(health.get("raw"), dict) else {}
+            clip_ok = bool(((raw or {}).get("details") or {}).get("clip", {}).get("ok")) if isinstance(raw, dict) else True
+            if not clip_ok:
+                _warn(False, "clip_model", "CLIP model unavailable")
 
     # LibreTranslate availability (when translation is enabled)
     enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
@@ -4250,6 +4247,8 @@ def _process_gcs_video_job_cloud_only(
         use_clip_cluster_for_key_scenes = bool(
             enable_key_scene and requested_key_scene_model in {"transnetv2_clip_cluster", "pyscenedetect_clip_cluster", "clip_cluster"}
         )
+
+        # Sidecar availability is validated in precheck; no auto-disable here.
 
         want_shots = bool(enable_scene_by_scene or enable_key_scene or enable_high_point)
         # For scene-by-scene, allow VI shots as the default scene source when no local scene engine is selected.
