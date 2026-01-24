@@ -46,6 +46,10 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+:root {
+  --ui-scale: 0.9;
+}
+
 body {
   margin: 0;
   font-family: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
@@ -53,6 +57,15 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  zoom: var(--ui-scale);
+}
+
+@supports not (zoom: 1) {
+  #root {
+    transform: scale(var(--ui-scale));
+    transform-origin: top left;
+    width: calc(100% / var(--ui-scale));
+  }
 }
 
 code {
