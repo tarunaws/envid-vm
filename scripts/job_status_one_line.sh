@@ -7,7 +7,7 @@ if [ "$#" -lt 1 ]; then
 fi
 
 JOB_ID="$1"
-API_BASE="${2:-http://34.23.26.211/envid-multimodal}"
+API_BASE="${2:-http://34.23.26.211/backend}"
 VM_NAME="${3:-gpu-g2-vm}"
 PROJECT_ID="${4:-envid-development}"
 ZONE="${5:-us-east1-b}"

@@ -35,15 +35,12 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from shared.env_loader import load_environment
 
+from envidMetadataGCP.orchestrator import OrchestratorInputs, orchestrate_preflight
+
 try:
     from PIL import Image  # type: ignore
 except Exception:  # pragma: no cover
     Image = None  # type: ignore
-
-try:
-    from paddleocr import PaddleOCR  # type: ignore
-except Exception:  # pragma: no cover
-    PaddleOCR = None  # type: ignore
 
 try:
     import pytesseract  # type: ignore
@@ -80,11 +77,6 @@ try:
 except Exception:  # pragma: no cover
     gcp_video_intelligence = None  # type: ignore
 
-
-try:
-    from ultralytics import YOLO as UltralyticsYOLO  # type: ignore
-except Exception:  # pragma: no cover
-    UltralyticsYOLO = None  # type: ignore
 
 _NUDENET_IMPORT_ERROR: str | None = None
 try:
@@ -461,169 +453,76 @@ def _translate_segments(
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for seg in segments:
-        if not isinstance(seg, dict):
-            continue
-        txt = str(seg.get("text") or "").strip()
-        if not txt:
-            continue
-        tr = _translate_text(
-            text=txt,
-            source_lang=source_lang,
-            target_lang=target_lang,
-            provider=provider,
-            gcp_client=gcp_client,
-            gcp_parent=gcp_parent,
+        sel: Dict[str, Any] = task_selection if isinstance(task_selection, dict) else {}
+        requested_models = _task_selection_requested_models(sel)
+        preflight = orchestrate_preflight(
+            inputs=OrchestratorInputs(job_id=job_id, task_selection=sel, requested_models=requested_models),
+            precheck_models=_precheck_models,
+            job_update=_job_update,
+            job_step_update=_job_step_update,
         )
-        item = dict(seg)
-        item["text"] = tr or txt
-        out.append(item)
-    return out
+        selection = preflight.selection
+        precheck = preflight.precheck
 
+        enable_label_detection = selection.enable_label_detection
+        enable_text_on_screen = selection.enable_text_on_screen
+        enable_moderation = selection.enable_moderation
+        enable_transcribe = selection.enable_transcribe
+        enable_famous_locations = selection.enable_famous_locations
+        enable_scene_by_scene = selection.enable_scene_by_scene
+        enable_key_scene = selection.enable_key_scene
+        enable_high_point = selection.enable_high_point
+        enable_synopsis_generation = selection.enable_synopsis_generation
+        enable_opening_closing = selection.enable_opening_closing
+        enable_celebrity_detection = selection.enable_celebrity_detection
+        enable_celebrity_bio_image = selection.enable_celebrity_bio_image
 
+        requested_label_model_raw = selection.requested_label_model_raw
+        requested_label_model = selection.requested_label_model
+        requested_text_model = selection.requested_text_model
+        requested_moderation_model = selection.requested_moderation_model
+        requested_key_scene_model_raw = selection.requested_key_scene_model_raw
+        requested_key_scene_model = selection.requested_key_scene_model
 
+        label_engine = selection.label_engine
+        use_vi_label_detection = selection.use_vi_label_detection
+        use_local_ocr = selection.use_local_ocr
+        use_local_moderation = selection.use_local_moderation
+        allow_moderation_fallback = selection.allow_moderation_fallback
+        local_moderation_url_override = selection.local_moderation_url_override
 
-def _env_truthy(value: str | None, *, default: bool = True) -> bool:
-    if value is None:
-        return default
-    v = str(value).strip().lower()
-    if v in {"0", "false", "no", "off"}:
-        return False
-    if v in {"1", "true", "yes", "on"}:
-        return True
-    return default
+        key_scene_step_finalized = False
+        allowed_key_scene_models = {
+            "gcp_video_intelligence",
+            "transnetv2_clip_cluster",
+            "pyscenedetect_clip_cluster",
+            "clip_cluster",
+        }
+        if enable_key_scene and requested_key_scene_model not in allowed_key_scene_models:
+            _job_step_update(
+                job_id,
+                "key_scene_detection",
+                status="failed",
+                percent=100,
+                message=(
+                    "key_scene_detection_model must be one of: gcp_video_intelligence, transnetv2_clip_cluster, "
+                    "pyscenedetect_clip_cluster (no fallback)."
+                ),
+            )
+            key_scene_step_finalized = True
+            enable_key_scene = False
+            enable_high_point = False
 
+        use_transnetv2_for_scenes = selection.use_transnetv2_for_scenes
+        use_pyscenedetect_for_scenes = selection.use_pyscenedetect_for_scenes
+        use_clip_cluster_for_key_scenes = selection.use_clip_cluster_for_key_scenes
+        want_shots = selection.want_shots
+        want_vi_shots = selection.want_vi_shots
+        want_any_vi = selection.want_any_vi
 
-def _parse_int(value: Any, *, default: int, min_value: int | None = None, max_value: int | None = None) -> int:
-    try:
-        v = int(value)
-    except Exception:
-        v = default
-    if min_value is not None:
-        v = max(min_value, v)
-    if max_value is not None:
-        v = min(max_value, v)
-    return v
-
-
-def _build_ffmpeg_atempo_chain(tempo: float) -> str:
-    """Build a safe ffmpeg atempo chain for a requested tempo.
-
-    ffmpeg's atempo filter generally supports 0.5..2.0 per filter instance.
-    We chain multiple atempo filters when tempo is outside that range.
-    """
-
-    try:
-        t = float(tempo)
-    except Exception:
-        return ""
-    if t <= 0:
-        return ""
-    if abs(t - 1.0) < 1e-6:
-        return ""
-
-    parts: list[float] = []
-    while t < 0.5:
-        parts.append(0.5)
-        t = t / 0.5
-    while t > 2.0:
-        parts.append(2.0)
-        t = t / 2.0
-    parts.append(t)
-    return ",".join([f"atempo={p:.6f}".rstrip("0").rstrip(".") for p in parts if p and abs(p - 1.0) > 1e-6])
-
-
-def _languagetool_correct_text(*, text: str, language: str | None) -> tuple[str, list[dict[str, Any]]]:
-    """Optional grammar correction via an external LanguageTool HTTP endpoint.
-
-    Set ENVID_GRAMMAR_CORRECTION_URL (e.g., http://localhost:8010) to enable.
-    Returns (corrected_text, suggestions).
-    """
-
-    base = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip().rstrip("/")
-    use_local = False
-    if not base and not (use_local and language_tool_python is not None):
-        return text, []
-
-    lang = (language or "").strip() or "auto"
-    url = f"{base}/v2/check" if base else ""
-    timeout_seconds = 12.0
-    max_chars = 12000
-
-    src = (text or "").strip()
-    if not src:
-        return text, []
-    if len(src) > max_chars:
-        src = src[:max_chars]
-
-    if base:
-        form = urllib.parse.urlencode({"text": src, "language": lang}).encode("utf-8")
-        req = urllib.request.Request(url, data=form, headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as r:
-                resp = json.loads(r.read().decode("utf-8"))
-        except Exception:
-            return text, []
-    else:
-        resp = _languagetool_local_check(text=src, language=lang)
-        if not resp:
-            return text, []
-
-    matches = resp.get("matches")
-    if not isinstance(matches, list) or not matches:
-        return text, []
-
-    suggestions: list[dict[str, Any]] = []
-    edits: list[tuple[int, int, str]] = []
-
-    for m in matches[:250]:
-        if not isinstance(m, dict):
-            continue
-        try:
-            offset = int(m.get("offset") or 0)
-            length = int(m.get("length") or 0)
-        except Exception:
-            continue
-        repls = m.get("replacements")
-        replacement = ""
-        if isinstance(repls, list) and repls:
-            first = repls[0]
-            if isinstance(first, dict):
-                replacement = str(first.get("value") or "")
-            else:
-                replacement = str(first)
-
-        suggestions.append(
-            {
-                "offset": offset,
-                "length": length,
-                "replacement": replacement,
-                "message": str(m.get("message") or "")[:240],
-                "rule": (m.get("rule") or {}).get("id") if isinstance(m.get("rule"), dict) else None,
-            }
-        )
-        if length > 0 and replacement:
-            edits.append((offset, length, replacement))
-
-    corrected = src
-    # Apply from end to start to keep offsets valid.
-    for offset, length, replacement in sorted(edits, key=lambda x: x[0], reverse=True):
-        if offset < 0 or length <= 0:
-            continue
-        if offset + length > len(corrected):
-            continue
-        corrected = corrected[:offset] + replacement + corrected[offset + length :]
-
-    return corrected.strip(), suggestions
-
-
-def _normalize_transcript_basic(text: str) -> str:
-    out = (text or "").strip()
-    if not out:
-        return ""
-    out = re.sub(r"[\t\r]+", " ", out)
-    out = re.sub(r"\s+", " ", out)
-    return out.strip()
-
+        vi_label_mode = (os.getenv("ENVID_METADATA_GCP_VI_LABEL_MODE") or "frame").strip().lower() or "frame"
+        if vi_label_mode not in {"segment", "shot", "frame"}:
+            vi_label_mode = "frame"
 
 def _enhance_transcript_punctuation(text: str) -> str:
     """Lightweight, deterministic punctuation/spacing cleanup (language-agnostic, Hindi-friendly)."""
@@ -1475,6 +1374,11 @@ def _load_indices() -> None:
     VIDEO_INDEX = _safe_json_load(VIDEO_INDEX_FILE, [])
     if not isinstance(VIDEO_INDEX, list):
         VIDEO_INDEX = []
+    if not VIDEO_INDEX:
+        gcs_videos = _load_video_index_from_gcs()
+        if gcs_videos:
+            VIDEO_INDEX = gcs_videos
+            _safe_json_save(VIDEO_INDEX_FILE, VIDEO_INDEX)
     DOCUMENT_INDEX = _safe_json_load(DOCUMENT_INDEX_FILE, [])
     if not isinstance(DOCUMENT_INDEX, list):
         DOCUMENT_INDEX = []
@@ -1483,11 +1387,50 @@ def _load_indices() -> None:
 def _save_video_index() -> None:
     with VIDEO_INDEX_LOCK:
         _safe_json_save(VIDEO_INDEX_FILE, VIDEO_INDEX)
+    _upload_video_index_to_gcs()
 
 
 def _save_document_index() -> None:
     with DOCUMENT_INDEX_LOCK:
         _safe_json_save(DOCUMENT_INDEX_FILE, DOCUMENT_INDEX)
+
+
+def _history_index_gcs_location() -> tuple[str, str]:
+    bucket = _gcs_artifacts_bucket(_gcs_bucket_name())
+    prefix = _gcs_artifacts_prefix()
+    obj = f"{prefix}/history/video_index.json".strip("/")
+    return bucket, obj
+
+
+def _upload_video_index_to_gcs() -> None:
+    try:
+        bucket, obj = _history_index_gcs_location()
+        payload = json.dumps(VIDEO_INDEX, indent=2, ensure_ascii=False, default=str)
+        _gcs_client().bucket(bucket).blob(obj).upload_from_string(payload, content_type="application/json")
+    except Exception as exc:
+        try:
+            app.logger.warning("Failed to upload video history index to GCS: %s", exc)
+        except Exception:
+            pass
+
+
+def _load_video_index_from_gcs() -> list[dict[str, Any]] | None:
+    try:
+        bucket, obj = _history_index_gcs_location()
+        client = _gcs_client()
+        blob = client.bucket(bucket).blob(obj)
+        if not blob.exists(client):
+            return None
+        raw = blob.download_as_bytes()
+        parsed = json.loads(raw.decode("utf-8"))
+        if isinstance(parsed, list):
+            return parsed
+    except Exception as exc:
+        try:
+            app.logger.warning("Failed to load video history index from GCS: %s", exc)
+        except Exception:
+            pass
+    return None
 
 
 def _subtitles_local_path(video_id: str, *, lang: str, fmt: str) -> Path:
@@ -1542,6 +1485,78 @@ def _languagetool_local_check(*, text: str, language: str) -> dict[str, Any] | N
         )
 
     return {"matches": match_dicts}
+
+
+def _languagetool_remote_check(*, text: str, language: str) -> dict[str, Any] | None:
+    url = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip()
+    if not url:
+        return None
+
+    if url.endswith("/"):
+        url = url[:-1]
+    if not url.endswith("/v2/check") and not url.endswith("/check"):
+        url = f"{url}/v2/check"
+
+    lang = (language or "auto").strip() or "auto"
+    timeout_s = _safe_float(os.getenv("ENVID_GRAMMAR_CORRECTION_TIMEOUT_SECONDS"), 10.0)
+    try:
+        resp = requests.post(url, data={"text": text, "language": lang}, timeout=timeout_s)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+    except Exception:
+        return None
+
+    return data if isinstance(data, dict) else None
+
+
+def _apply_languagetool_matches(text: str, matches: list[dict[str, Any]]) -> str:
+    if not matches:
+        return text
+
+    # Apply replacements from the end to preserve offsets.
+    out = text
+    ordered = sorted(matches, key=lambda m: int(m.get("offset", 0) or 0), reverse=True)
+    for m in ordered:
+        try:
+            offset = int(m.get("offset", 0) or 0)
+            length = int(m.get("length", 0) or 0)
+            repls = m.get("replacements") or []
+            replacement = ""
+            if repls:
+                rep0 = repls[0]
+                if isinstance(rep0, dict):
+                    replacement = str(rep0.get("value") or "")
+                else:
+                    replacement = str(rep0 or "")
+            if length <= 0:
+                continue
+            out = out[:offset] + replacement + out[offset + length :]
+        except Exception:
+            continue
+    return out
+
+
+def _languagetool_correct_text(*, text: str, language: str | None) -> tuple[str, dict[str, Any]]:
+    if not text:
+        return "", {"matches": [], "source": "none"}
+
+    lang = (language or "auto").strip() or "auto"
+    data = _languagetool_remote_check(text=text, language=lang)
+    source = "remote"
+    if data is None:
+        data = _languagetool_local_check(text=text, language=lang)
+        source = "local"
+
+    if not isinstance(data, dict):
+        return text, {"matches": [], "source": "none"}
+
+    matches = data.get("matches")
+    if not isinstance(matches, list):
+        matches = []
+
+    corrected = _apply_languagetool_matches(text, matches)
+    return corrected, {"matches": matches, "source": source}
 
 
 def _is_hindi_language(language_code: str | None) -> bool:
@@ -1895,12 +1910,10 @@ def _precheck_models(
     requested_label_model: str,
     requested_text_model: str,
     requested_moderation_model: str,
-    use_local_label_detection_service: bool,
     use_local_moderation: bool,
     allow_moderation_fallback: bool,
     use_local_ocr: bool,
     want_any_vi: bool,
-    local_label_detection_url_override: str,
     local_moderation_url_override: str,
 ) -> dict[str, Any]:
     checks: dict[str, Any] = {}
@@ -1943,57 +1956,22 @@ def _precheck_models(
         api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
         _require(bool(api_key), "openrouter", "OPENROUTER_API_KEY is not set (scene-by-scene)")
 
-    # Local label detection service
-    if enable_label_detection and use_local_label_detection_service:
-        service_url = (local_label_detection_url_override or os.getenv("ENVID_METADATA_LOCAL_LABEL_DETECTION_URL") or "").strip().rstrip("/")
-        if not service_url:
-            _require(False, "local_label_detection", "ENVID_METADATA_LOCAL_LABEL_DETECTION_URL is not set")
-        else:
-            health = _check_service_health(f"{service_url}/health")
-            _require(bool(health.get("ok")), "local_label_detection", f"local label detection unhealthy: {health.get('error') or health.get('raw')}")
-    if enable_label_detection and requested_label_model in {"yolo_ultralytics", "yolo", "yolov8", "yolov11"}:
-        _require(UltralyticsYOLO is not None, "yolo", "ultralytics is not installed")
-        yolo_model = (os.getenv("ENVID_METADATA_YOLO_MODEL") or "yolov8n.pt").strip() or "yolov8n.pt"
-        yolo_path = Path(yolo_model)
-        if not yolo_path.exists():
-            candidate = _repo_root() / yolo_model
-            if candidate.exists():
-                yolo_path = candidate
-        _require(yolo_path.exists(), "yolo", f"YOLO model not found: {yolo_model}")
-
-    # Local moderation service
+    # Local moderation service (NudeNet only)
     if enable_moderation and use_local_moderation:
         service_url_default = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_URL") or "").strip()
-        service_url_nsfwjs = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL") or "").strip()
-        service_url = (local_moderation_url_override or (service_url_nsfwjs if requested_moderation_model == "nsfwjs" else "") or service_url_default).strip()
+        service_url = (local_moderation_url_override or service_url_default).strip()
         if not service_url:
-            if requested_moderation_model == "nudenet":
-                _require(NudeClassifier is not None, "nudenet", f"nudenet is not installed: {_NUDENET_IMPORT_ERROR or 'missing dependency'}")
-            else:
-                _require(False, "local_moderation", "ENVID_METADATA_LOCAL_MODERATION_URL is not set")
+            _require(NudeClassifier is not None, "nudenet", f"nudenet is not installed: {_NUDENET_IMPORT_ERROR or 'missing dependency'}")
         else:
             health = _check_service_health(f"{service_url.rstrip('/')}/health")
             _require(bool(health.get("ok")), "local_moderation", f"local moderation unhealthy: {health.get('error') or health.get('raw')}")
     if enable_moderation and (not use_local_moderation or allow_moderation_fallback) and want_any_vi:
         _require(gcp_video_intelligence is not None, "gcp_video_intelligence", "google-cloud-videointelligence is not installed")
 
-    # Text-on-screen OCR
+    # Text-on-screen OCR (Tesseract only)
     if enable_text_on_screen and use_local_ocr:
-        local_ocr_url = (os.getenv("ENVID_METADATA_LOCAL_OCR_PADDLE_URL") or "").strip()
-        if local_ocr_url:
-            health = _check_service_health(f"{local_ocr_url.rstrip('/')}/health")
-            _require(bool(health.get("ok")), "local_ocr", f"local ocr unhealthy: {health.get('error') or health.get('raw')}")
-        elif requested_text_model == "paddleocr":
-            _require(PaddleOCR is not None, "paddleocr", "paddleocr is not installed")
-            if PaddleOCR is not None:
-                try:
-                    import paddle  # type: ignore
-                    _require(True, "paddlepaddle", "paddlepaddle available")
-                except Exception as exc:
-                    _require(False, "paddlepaddle", f"paddlepaddle is not installed: {exc}")
-        elif requested_text_model == "tesseract":
-            _require(pytesseract is not None, "tesseract", "pytesseract is not installed")
-            _require(bool(shutil.which("tesseract")), "tesseract", "tesseract binary is not available in PATH")
+        _require(pytesseract is not None, "tesseract", "pytesseract is not installed")
+        _require(bool(shutil.which("tesseract")), "tesseract", "tesseract binary is not available in PATH")
     if enable_text_on_screen and (not use_local_ocr) and want_any_vi:
         _require(gcp_video_intelligence is not None, "gcp_video_intelligence", "google-cloud-videointelligence is not installed")
 
@@ -2526,6 +2504,36 @@ def _safe_float(v: Any, default: float = 0.0) -> float:
         return float(v)
     except Exception:
         return default
+
+
+def _parse_int(
+    value: Any,
+    *,
+    default: int = 0,
+    min_value: int | None = None,
+    max_value: int | None = None,
+) -> int:
+    try:
+        parsed = int(str(value).strip())
+    except Exception:
+        parsed = int(default)
+    if min_value is not None:
+        parsed = max(int(min_value), parsed)
+    if max_value is not None:
+        parsed = min(int(max_value), parsed)
+    return parsed
+
+
+def _env_truthy(value: Any, *, default: bool = False) -> bool:
+    if value is None:
+        return bool(default)
+    try:
+        text = str(value).strip().lower()
+    except Exception:
+        return bool(default)
+    if not text:
+        return bool(default)
+    return text in {"1", "true", "yes", "y", "on"}
 
 
 def _count_overlapping_segments(items: Any, start_s: float, end_s: float) -> int:
@@ -3327,30 +3335,6 @@ def _yolo_detect_labels_from_video(
     merged.sort(key=lambda x: (len(x.get("segments") or []), str(x.get("label") or "")), reverse=True)
     return merged
 
-
-_PADDLE_OCR_LOCK = threading.Lock()
-_PADDLE_OCR_INSTANCE: Any = None
-
-
-def _get_paddle_ocr(*, lang: str) -> Any:
-    global _PADDLE_OCR_INSTANCE
-    if PaddleOCR is None:
-        return None
-    # PaddleOCR init is expensive; keep a singleton.
-    with _PADDLE_OCR_LOCK:
-        if _PADDLE_OCR_INSTANCE is None:
-            try:
-                _PADDLE_OCR_INSTANCE = PaddleOCR(use_angle_cls=True, lang=lang)
-            except ModuleNotFoundError as exc:
-                # PaddleOCR depends on paddlepaddle. If it's missing, guide the user.
-                if (getattr(exc, "name", None) or "") == "paddle" or "paddle" in str(exc).lower():
-                    raise RuntimeError(
-                        "paddleocr is installed but paddlepaddle is missing; install paddlepaddle or switch text_model to tesseract"
-                    ) from exc
-                raise
-        return _PADDLE_OCR_INSTANCE
-
-
 def _sample_video_frames(*, video_path: Path, interval_seconds: float, max_frames: int) -> List[Tuple[float, Any]]:
     """Return list of (timestamp_seconds, bgr_frame_ndarray)."""
     try:
@@ -3565,89 +3549,6 @@ def _local_moderation_service_explicit_frames_from_video(
     return out
 
 
-def _local_label_detection_service_labels_from_video(
-    *,
-    video_path: Path,
-    interval_seconds: float,
-    max_frames: int,
-    service_base_url: str,
-    model: str,
-    timeout_seconds: int,
-) -> List[Dict[str, Any]]:
-    """Call an external local label-detection service by sending sampled frames.
-
-    Service API:
-      POST {base}/detect/frames  { model, frame_len, frames:[{time, image_b64, image_mime}] }
-      -> { labels: [{label, segments:[{start,end,confidence}]}] }
-    """
-
-    try:
-        import cv2  # type: ignore
-    except Exception as exc:
-        raise RuntimeError("opencv is not installed") from exc
-
-    base = service_base_url.rstrip("/")
-    url = f"{base}/detect/frames"
-
-    frames = _sample_video_frames(video_path=video_path, interval_seconds=interval_seconds, max_frames=max_frames)
-    if not frames:
-        return []
-
-    payload_frames: List[Dict[str, Any]] = []
-    for t, bgr in frames:
-        ok, enc = cv2.imencode(".jpg", bgr)
-        if not ok:
-            continue
-        payload_frames.append(
-            {
-                "time": float(t),
-                "image_b64": base64.b64encode(enc.tobytes()).decode("ascii"),
-                "image_mime": "image/jpeg",
-            }
-        )
-
-    data = json.dumps({"model": model, "frame_len": float(interval_seconds), "frames": payload_frames}).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as r:
-            resp = json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = ""
-        try:
-            body = exc.read().decode("utf-8")
-        except Exception:
-            body = ""
-        raise RuntimeError(f"local label detection service HTTP {exc.code}: {body[:200]}") from exc
-    except Exception as exc:
-        raise RuntimeError(f"local label detection service request failed: {exc}") from exc
-
-    labels = resp.get("labels")
-    if not isinstance(labels, list):
-        raise RuntimeError("local label detection service returned invalid labels")
-    out: List[Dict[str, Any]] = []
-    for it in labels:
-        if not isinstance(it, dict):
-            continue
-        lbl = (it.get("label") or it.get("name") or "").strip() if isinstance(it.get("label") or it.get("name"), str) else ""
-        segs_in = it.get("segments")
-        if not lbl or not isinstance(segs_in, list):
-            continue
-        segs: List[Dict[str, Any]] = []
-        for s in segs_in:
-            if not isinstance(s, dict):
-                continue
-            segs.append(
-                {
-                    "start": float(s.get("start") or 0.0),
-                    "end": float(s.get("end") or 0.0),
-                    "confidence": float(s.get("confidence") or 0.0),
-                }
-            )
-        if segs:
-            out.append({"label": lbl, "segments": segs})
-    return out
-
-
 def _aggregate_text_segments(
     *,
     hits: List[Tuple[str, float, float, float]],
@@ -3730,216 +3631,6 @@ def _ocr_preprocess_frame(frame: Any, *, upscale: float, enable_clahe: bool, ena
     else:
         _, thresh = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
-
-
-@app.get("/local-label-detection/health")
-def local_label_detection_health():
-    """Proxy health for the external local label-detection service.
-
-    This lets the frontend show actionable readiness/errors (e.g. MMCV ops missing).
-    """
-
-    service_url = (os.getenv("ENVID_METADATA_LOCAL_LABEL_DETECTION_URL") or "").strip().rstrip("/")
-    if not service_url:
-        return jsonify(
-            {
-                "ok": False,
-                "configured": False,
-                "service_url": "",
-                "error": "ENVID_METADATA_LOCAL_LABEL_DETECTION_URL is not set",
-            }
-        )
-
-    url = f"{service_url}/health"
-    timeout_seconds = float(os.getenv("ENVID_METADATA_LOCAL_LABEL_HEALTH_TIMEOUT_SECONDS") or 4.0)
-    try:
-        with urllib.request.urlopen(url, timeout=timeout_seconds) as r:
-            body = r.read().decode("utf-8")
-        data = json.loads(body)
-        if not isinstance(data, dict):
-            raise RuntimeError("invalid JSON")
-
-        return jsonify(
-            {
-                "ok": True,
-                "configured": True,
-                "service_url": service_url,
-                "health": data,
-            }
-        )
-    except Exception as exc:
-        return jsonify(
-            {
-                "ok": False,
-                "configured": True,
-                "service_url": service_url,
-                "error": str(exc)[:200],
-            }
-        )
-
-
-@app.get("/local-ocr-paddle/health")
-def local_ocr_paddle_health():
-    """Proxy health for the external PaddleOCR service.
-
-    This keeps PaddleOCR in a separate runtime (Python 3.11) while the main backend
-    runs on Python 3.14+.
-    """
-
-    service_url = (os.getenv("ENVID_METADATA_LOCAL_OCR_PADDLE_URL") or "").strip().rstrip("/")
-    if not service_url:
-        return jsonify(
-            {
-                "ok": False,
-                "configured": False,
-                "service_url": "",
-                "error": "ENVID_METADATA_LOCAL_OCR_PADDLE_URL is not set",
-            }
-        )
-
-    url = f"{service_url}/health"
-    timeout_seconds = float(os.getenv("ENVID_METADATA_LOCAL_OCR_PADDLE_HEALTH_TIMEOUT_SECONDS") or 4.0)
-    try:
-        with urllib.request.urlopen(url, timeout=timeout_seconds) as r:
-            body = r.read().decode("utf-8")
-        data = json.loads(body)
-        if not isinstance(data, dict):
-            raise RuntimeError("invalid JSON")
-
-        return jsonify(
-            {
-                "ok": True,
-                "configured": True,
-                "service_url": service_url,
-                "health": data,
-            }
-        )
-    except Exception as exc:
-        return jsonify(
-            {
-                "ok": False,
-                "configured": True,
-                "service_url": service_url,
-                "error": str(exc)[:200],
-            }
-        )
-
-
-def _local_ocr_paddle_service_text_from_video(
-    *,
-    video_path: Path,
-    interval_seconds: float,
-    max_frames: int,
-    service_base_url: str,
-    lang: str,
-    timeout_seconds: int,
-) -> List[Dict[str, Any]]:
-    """Call external PaddleOCR service by sending sampled frames.
-
-    Service API:
-      POST {base}/ocr/frames { lang, frame_len, frames:[{time,image_b64,image_mime}] }
-      -> { text: [{text, segments:[{start,end,confidence}]}] }
-    """
-
-    try:
-        import cv2  # type: ignore
-    except Exception as exc:
-        raise RuntimeError("opencv is not installed") from exc
-
-    base = service_base_url.rstrip("/")
-    url = f"{base}/ocr/frames"
-
-    frames = _sample_video_frames(video_path=video_path, interval_seconds=interval_seconds, max_frames=max_frames)
-    if not frames:
-        return []
-
-    payload_frames: List[Dict[str, Any]] = []
-    for t, bgr in frames:
-        ok, enc = cv2.imencode(".jpg", bgr)
-        if not ok:
-            continue
-        payload_frames.append(
-            {
-                "time": float(t),
-                "image_b64": base64.b64encode(enc.tobytes()).decode("ascii"),
-                "image_mime": "image/jpeg",
-            }
-        )
-
-    data = json.dumps({"lang": str(lang or "en"), "frame_len": float(interval_seconds), "frames": payload_frames}).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as r:
-            resp = json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = ""
-        try:
-            body = exc.read().decode("utf-8")
-        except Exception:
-            body = ""
-        raise RuntimeError(f"local PaddleOCR service HTTP {exc.code}: {body[:200]}") from exc
-    except Exception as exc:
-        raise RuntimeError(f"local PaddleOCR service request failed: {exc}") from exc
-
-    texts = resp.get("text")
-    if not isinstance(texts, list):
-        raise RuntimeError("local PaddleOCR service returned invalid text")
-
-    out: List[Dict[str, Any]] = []
-    for it in texts:
-        if not isinstance(it, dict):
-            continue
-        txt = (it.get("text") or "").strip() if isinstance(it.get("text"), str) else ""
-        segs_in = it.get("segments")
-        if not txt or not isinstance(segs_in, list):
-            continue
-        segs: List[Dict[str, Any]] = []
-        for s in segs_in:
-            if not isinstance(s, dict):
-                continue
-            segs.append(
-                {
-                    "start": float(s.get("start") or 0.0),
-                    "end": float(s.get("end") or 0.0),
-                    "confidence": float(s.get("confidence") or 0.0),
-                }
-            )
-        if segs:
-            out.append({"text": txt, "segments": segs})
-    return out
-
-
-def _paddleocr_text_from_video(
-    *,
-    video_path: Path,
-    interval_seconds: float,
-    max_frames: int,
-    lang: str,
-) -> List[Dict[str, Any]]:
-    ocr = _get_paddle_ocr(lang=lang)
-    if ocr is None:
-        raise RuntimeError("paddleocr is not installed")
-
-    hits: List[Tuple[str, float, float, float]] = []
-    frames = _sample_video_frames(video_path=video_path, interval_seconds=interval_seconds, max_frames=max_frames)
-    for t, frame in frames:
-        # PaddleOCR accepts ndarray BGR.
-        try:
-            res = ocr.ocr(frame, cls=True)
-        except Exception:
-            continue
-
-        # Res may be a list of lines; each line: [box, (text, conf)]
-        for line in res or []:
-            try:
-                txt = str(line[1][0] or "").strip()
-                conf = float(line[1][1] or 0.0)
-            except Exception:
-                continue
-            if not txt:
-                continue
-            hits.append((txt, float(t), float(t + interval_seconds), conf))
-    return _aggregate_text_segments(hits=hits)
 
 
 def _tesseract_text_from_video(
@@ -4188,6 +3879,23 @@ def _upload_metadata_artifacts_to_gcs(*, job_id: str, payload: dict[str, Any]) -
     return out
 
 
+def _task_selection_requested_models(sel: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(sel.get("requested_models"), dict):
+        return dict(sel.get("requested_models") or {})
+    return {
+        "label_detection_model": sel.get("label_detection_model"),
+        "moderation_model": sel.get("moderation_model"),
+        "text_model": sel.get("text_model"),
+        "key_scene_detection_model": sel.get("key_scene_detection_model"),
+        "transcribe_model": sel.get("transcribe_model"),
+        "famous_location_detection_model": sel.get("famous_location_detection_model"),
+        "opening_closing_credit_detection_model": sel.get("opening_closing_credit_detection_model"),
+        "celebrity_detection_model": sel.get("celebrity_detection_model"),
+        "celebrity_bio_image_model": sel.get("celebrity_bio_image_model"),
+        "scene_by_scene_metadata_model": sel.get("scene_by_scene_metadata_model"),
+    }
+
+
 def _process_gcs_video_job_cloud_only(
     *,
     job_id: str,
@@ -4207,175 +3915,44 @@ def _process_gcs_video_job_cloud_only(
         _job_update(job_id, status="processing", progress=1, message="Processing", gcs_video_uri=gcs_uri)
 
         sel: Dict[str, Any] = task_selection if isinstance(task_selection, dict) else {}
-
-        def _sel_model(key: str, *, default: str = "auto") -> str:
-            raw = sel.get(key)
-            if raw is None:
-                return default
-            try:
-                s = str(raw).strip()
-            except Exception:
-                return default
-            return s or default
-
-        def _sel_enabled(key: str, *, default: bool = True) -> bool:
-            if key in sel:
-                try:
-                    return bool(sel.get(key))
-                except Exception:
-                    return default
-            return default
-
-        enable_label_detection = _sel_enabled("enable_label_detection", default=False)
-        enable_text_on_screen = _sel_enabled("enable_text", default=True)
-        enable_moderation = _sel_enabled("enable_moderation", default=True)
-        enable_transcribe = _sel_enabled("enable_transcribe", default=True)
-        enable_famous_locations = _sel_enabled("enable_famous_location_detection", default=True)
-        enable_scene_by_scene = _sel_enabled("enable_scene_by_scene_metadata", default=True)
-        enable_key_scene = _sel_enabled("enable_key_scene_detection", default=True)
-        # New UI ties high-point to key-scene. Preserve backward compatibility
-        # with older clients which send `enable_high_point` explicitly.
-        enable_high_point = _sel_enabled("enable_high_point", default=enable_key_scene)
-        enable_synopsis_generation = _sel_enabled("enable_synopsis_generation", default=True)
-        enable_opening_closing = _sel_enabled("enable_opening_closing_credit_detection", default=False)
-        enable_celebrity_detection = _sel_enabled("enable_celebrity_detection", default=True)
-        enable_celebrity_bio_image = _sel_enabled("enable_celebrity_bio_image", default=True)
-
-        # Enforce fixed product policy: no Google usage except label detection.
-        enable_label_detection = True
-        enable_famous_locations = False
-        enable_opening_closing = False
-
-        # Scene-by-scene metadata is designed to be "complete" by default.
-        # If the client enables scene-by-scene (or relies on the default enable), we automatically
-        # enable label detection unless the client explicitly provided enable_label_detection.
-        # This ensures no model selection is required to get useful scene-by-scene output.
-        if enable_scene_by_scene and "enable_label_detection" not in sel:
-            enable_label_detection = True
-
-        # When scene-by-scene is enabled and label detection is enabled, default to Google Video
-        # Intelligence labels so clients don't need to pick a label model.
-        label_model_default = "gcp_video_intelligence" if (enable_scene_by_scene and enable_label_detection) else ""
-
-        requested_models: Dict[str, str] = {
-            "celebrity_detection_model": _sel_model("celebrity_detection_model"),
-            "celebrity_bio_image_model": _sel_model("celebrity_bio_image_model"),
-            "label_detection_model": _sel_model("label_detection_model", default=label_model_default),
-            "famous_location_detection_model": _sel_model("famous_location_detection_model"),
-            "moderation_model": _sel_model("moderation_model"),
-            "text_model": _sel_model("text_model"),
-            "transcribe_model": _sel_model("transcribe_model"),
-            "key_scene_detection_model": _sel_model("key_scene_detection_model"),
-            "high_point_model": _sel_model("high_point_model"),
-            "scene_by_scene_metadata_model": _sel_model("scene_by_scene_metadata_model"),
-            "synopsis_generation_model": _sel_model("synopsis_generation_model"),
-            "opening_closing_credit_detection_model": _sel_model("opening_closing_credit_detection_model"),
-        }
-
-        # Force fixed models per requirement.
-        requested_models["label_detection_model"] = "gcp_video_intelligence"
-        requested_models["moderation_model"] = "nudenet"
-        requested_models["text_model"] = "tesseract"
-        requested_models["key_scene_detection_model"] = "transnetv2_clip_cluster"
-        requested_models["synopsis_generation_model"] = "openrouter_llama"
-
-        effective_models: Dict[str, str] = {}
-
-        _job_update(
-            job_id,
-            task_selection=sel,
-            task_selection_requested_models=requested_models,
-            task_selection_enabled={
-                "celebrity_detection": enable_celebrity_detection,
-                "celebrity_bio_image": enable_celebrity_bio_image,
-                "label_detection": enable_label_detection,
-                "famous_location_detection": enable_famous_locations,
-                "moderation": enable_moderation,
-                "text_on_screen": enable_text_on_screen,
-                "transcribe": enable_transcribe,
-                "scene_by_scene_metadata": enable_scene_by_scene,
-                "key_scene_detection": enable_key_scene,
-                "high_point": enable_high_point,
-                "synopsis_generation": enable_synopsis_generation,
-                "opening_closing_credit_detection": enable_opening_closing,
-            },
+        requested_models = _task_selection_requested_models(sel)
+        preflight = orchestrate_preflight(
+            inputs=OrchestratorInputs(job_id=job_id, task_selection=sel, requested_models=requested_models),
+            precheck_models=_precheck_models,
+            job_update=_job_update,
+            job_step_update=_job_step_update,
         )
+        selection = preflight.selection
+        precheck = preflight.precheck
 
-        video_intelligence: Dict[str, Any] = {}
-        local_labels: List[Dict[str, Any]] = []
+        enable_label_detection = selection.enable_label_detection
+        enable_text_on_screen = selection.enable_text_on_screen
+        enable_moderation = selection.enable_moderation
+        enable_transcribe = selection.enable_transcribe
+        enable_famous_locations = selection.enable_famous_locations
+        enable_scene_by_scene = selection.enable_scene_by_scene
+        enable_key_scene = selection.enable_key_scene
+        enable_high_point = selection.enable_high_point
+        enable_synopsis_generation = selection.enable_synopsis_generation
+        enable_opening_closing = selection.enable_opening_closing
+        enable_celebrity_detection = selection.enable_celebrity_detection
+        enable_celebrity_bio_image = selection.enable_celebrity_bio_image
 
-        transcript = ""
-        transcript_language_code = ""
-        languages_detected: List[str] = []
-        transcript_words: List[Dict[str, Any]] = []
-        transcript_segments: List[Dict[str, Any]] = []
-        transcript_meta: Dict[str, Any] = {}
-        local_text: List[Dict[str, Any]] = []
-        precomputed_scenes: List[Dict[str, Any]] = []
-        precomputed_scenes_source = "none"
-        local_moderation_frames: List[Dict[str, Any]] | None = None
-        local_moderation_source: str | None = None
+        requested_label_model_raw = selection.requested_label_model_raw
+        requested_label_model = selection.requested_label_model
+        requested_text_model = selection.requested_text_model
+        requested_moderation_model = selection.requested_moderation_model
+        requested_key_scene_model_raw = selection.requested_key_scene_model_raw
+        requested_key_scene_model = selection.requested_key_scene_model
 
-        enable_vi = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_VIDEO_INTELLIGENCE"), default=True)
+        label_engine = selection.label_engine
+        use_vi_label_detection = selection.use_vi_label_detection
+        use_local_ocr = selection.use_local_ocr
+        use_local_moderation = selection.use_local_moderation
+        allow_moderation_fallback = selection.allow_moderation_fallback
+        local_moderation_url_override = selection.local_moderation_url_override
 
-        # Transcription strategy: WhisperX only.
-        requested_transcribe_model = (requested_models.get("transcribe_model") or "whisperx").strip().lower() or "whisperx"
-        transcribe_effective_mode = "whisperx"
-        effective_models["transcribe"] = transcribe_effective_mode
-
-        # Text-on-screen model selection (fixed to local Tesseract).
-        requested_text_model = "tesseract"
-        use_local_ocr = True
-
-        # Moderation model selection (fixed to local NudeNet; no GCP fallback).
-        requested_moderation_model = "nudenet"
-        use_local_moderation = True
-        allow_moderation_fallback = False
-        local_moderation_url_override = _sel_model("local_moderation_url", default="").strip()
-
-        # Local label detection service URL override (optional).
-        local_label_detection_url_override = _sel_model("local_label_detection_url", default="").strip()
-
-        # Default label detection mode to frame-wise for Google Video Intelligence.
-        # Note: VI label detection is only used when explicitly selected.
-        vi_label_mode = (os.getenv("ENVID_METADATA_GCP_VI_LABEL_MODE") or "frame").strip().lower() or "frame"
-        if vi_label_mode not in {"segment", "shot", "frame"}:
-            vi_label_mode = "frame"
-
-        # Label detection engine selection (hard-coded to GCP Video Intelligence).
-        requested_label_model_raw = (requested_models.get("label_detection_model") or "").strip()
-        requested_label_model = "gcp_video_intelligence"
-        label_engine = "gcp_video_intelligence"
-        use_yolo_labels = False
-        use_local_label_detection_service = False
-        use_vi_label_detection = True
-
-        # Key scene model selection (fixed to TransNetV2 + CLIP).
-        # NOTE: For key scenes/high points we avoid any implicit fallback between engines.
         key_scene_step_finalized = False
-        requested_key_scene_model_raw = "transnetv2_clip_cluster" if enable_key_scene else requested_models.get("key_scene_detection_model")
-        requested_key_scene_model = (requested_key_scene_model_raw or "").strip().lower()
-        if requested_key_scene_model in {"", "auto"}:
-            requested_key_scene_model = "pyscenedetect_clip_cluster"
-        elif requested_key_scene_model in {"gcp_video_intelligence"}:
-            requested_key_scene_model = "gcp_video_intelligence"
-        elif requested_key_scene_model in {"gcp_vi", "video_intelligence", "vi", "google_video_intelligence"}:
-            requested_key_scene_model = "gcp_video_intelligence"
-        elif requested_key_scene_model in {"best_combo", "transnetv2_clip_cluster", "transnetv2+clip", "transnetv2_clip"}:
-            # Back-compat alias: old `best_combo` now means TransNetV2 + CLIP (strict; no fallback).
-            requested_key_scene_model = "transnetv2_clip_cluster"
-        elif requested_key_scene_model in {"pyscenedetect_clip_cluster", "pyscenedetect+clip", "pyscenedetect_clip"}:
-            requested_key_scene_model = "pyscenedetect_clip_cluster"
-        elif requested_key_scene_model in {"clip_cluster", "clip"}:
-            requested_key_scene_model = "clip_cluster"
-        elif requested_key_scene_model in {"pyscenedetect", "transnetv2"}:
-            # Standalone models are intentionally not supported/exposed.
-            # Users must choose one of the strict combos (or VI shots).
-            requested_key_scene_model = "unsupported"
-        else:
-            # Unknown value: do not guess; require an explicit supported value.
-            requested_key_scene_model = "unsupported"
-
         allowed_key_scene_models = {
             "gcp_video_intelligence",
             "transnetv2_clip_cluster",
@@ -4393,62 +3970,20 @@ def _process_gcs_video_job_cloud_only(
                     "pyscenedetect_clip_cluster (no fallback)."
                 ),
             )
-            # Disable key scene + high point so the rest of the pipeline can continue without fallback.
             key_scene_step_finalized = True
             enable_key_scene = False
             enable_high_point = False
 
-        use_transnetv2_for_scenes = bool(enable_key_scene and requested_key_scene_model in {"transnetv2_clip_cluster"})
-        use_pyscenedetect_for_scenes = bool(
-            (enable_key_scene and requested_key_scene_model in {"pyscenedetect_clip_cluster"})
-            or ((requested_models.get("opening_closing_credit_detection_model") or "").strip().lower() == "pyscenedetect")
-        )
-        use_clip_cluster_for_key_scenes = bool(
-            enable_key_scene and requested_key_scene_model in {"transnetv2_clip_cluster", "pyscenedetect_clip_cluster", "clip_cluster"}
-        )
+        use_transnetv2_for_scenes = selection.use_transnetv2_for_scenes
+        use_pyscenedetect_for_scenes = selection.use_pyscenedetect_for_scenes
+        use_clip_cluster_for_key_scenes = selection.use_clip_cluster_for_key_scenes
+        want_shots = selection.want_shots
+        want_vi_shots = selection.want_vi_shots
+        want_any_vi = selection.want_any_vi
 
-        # Sidecar availability is validated in precheck; no auto-disable here.
-
-        want_shots = bool(enable_scene_by_scene or enable_key_scene or enable_high_point)
-        # For scene-by-scene, allow VI shots as the default scene source when no local scene engine is selected.
-        want_vi_shots = bool(
-            want_shots
-            and (requested_key_scene_model in {"gcp_video_intelligence", "clip_cluster"} or enable_scene_by_scene)
-            and (not use_pyscenedetect_for_scenes)
-            and (not use_transnetv2_for_scenes)
-        )
-
-        # Only use Video Intelligence TEXT_DETECTION when local OCR is not selected.
-        want_any_vi = bool(
-            (enable_label_detection and use_vi_label_detection)
-            or (enable_text_on_screen and not use_local_ocr)
-            or (enable_moderation and (not use_local_moderation or allow_moderation_fallback))
-            or want_vi_shots
-        )
-
-        _job_step_update(job_id, "precheck_models", status="running", percent=0, message="Checking model availability")
-        precheck = _precheck_models(
-            enable_transcribe=enable_transcribe,
-            enable_synopsis_generation=enable_synopsis_generation,
-            enable_label_detection=enable_label_detection,
-            enable_moderation=enable_moderation,
-            enable_text_on_screen=enable_text_on_screen,
-            enable_key_scene=enable_key_scene,
-            enable_scene_by_scene=enable_scene_by_scene,
-            enable_famous_locations=enable_famous_locations,
-            requested_key_scene_model=requested_key_scene_model,
-            requested_label_model=requested_label_model,
-            requested_text_model=requested_text_model,
-            requested_moderation_model=requested_moderation_model,
-            use_local_label_detection_service=use_local_label_detection_service,
-            use_local_moderation=use_local_moderation,
-            allow_moderation_fallback=allow_moderation_fallback,
-            use_local_ocr=use_local_ocr,
-            want_any_vi=want_any_vi,
-            local_label_detection_url_override=local_label_detection_url_override,
-            local_moderation_url_override=local_moderation_url_override,
-        )
-        _job_update(job_id, precheck=precheck)
+        vi_label_mode = (os.getenv("ENVID_METADATA_GCP_VI_LABEL_MODE") or "frame").strip().lower() or "frame"
+        if vi_label_mode not in {"segment", "shot", "frame"}:
+            vi_label_mode = "frame"
         if not precheck.get("ok"):
             msg = "; ".join(precheck.get("errors") or [])[:240] or "Precheck failed"
             _job_step_update(job_id, "precheck_models", status="failed", percent=100, message=msg)
@@ -4728,6 +4263,19 @@ def _process_gcs_video_job_cloud_only(
             default=False,
         )
 
+        local_text: list[dict[str, Any]] = []
+        local_moderation_frames: list[dict[str, Any]] | None = None
+        local_moderation_source: str | None = None
+        effective_models: dict[str, Any] = {}
+        transcript = ""
+        transcript_language_code = ""
+        languages_detected: list[str] = []
+        transcript_words: list[dict[str, Any]] = []
+        transcript_segments: list[dict[str, Any]] = []
+        transcript_meta: dict[str, Any] = {}
+        precomputed_scenes: list[dict[str, Any]] | None = None
+        precomputed_scenes_source: str | None = None
+
         def _ensure_parallel_executor() -> ThreadPoolExecutor:
             nonlocal parallel_executor
             if parallel_executor is None:
@@ -4740,33 +4288,9 @@ def _process_gcs_video_job_cloud_only(
                 _job_update(job_id, progress=26, message="Text on Screen (OCR)")
                 interval = float(_parse_int(os.getenv("ENVID_METADATA_OCR_FRAME_INTERVAL_SECONDS"), default=2, min_value=1, max_value=30) or 2)
                 max_frames = int(_parse_int(os.getenv("ENVID_METADATA_OCR_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
-                ocr_lang = (os.getenv("ENVID_METADATA_OCR_LANG") or "en").strip() or "en"
-                ocr_timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_OCR_TIMEOUT_SECONDS"), default=600, min_value=10, max_value=3600) or 600)
-
                 _job_step_update(job_id, "text_on_screen", status="running", percent=0, message=f"Running ({requested_text_model})")
-                if requested_text_model == "tesseract":
-                    local_text = _tesseract_text_from_video(video_path=local_path, interval_seconds=interval, max_frames=max_frames)
-                    effective_models["text_on_screen"] = "tesseract"
-                else:
-                    paddle_service_url = (os.getenv("ENVID_METADATA_LOCAL_OCR_PADDLE_URL") or "").strip()
-                    if paddle_service_url:
-                        local_text = _local_ocr_paddle_service_text_from_video(
-                            video_path=local_path,
-                            interval_seconds=interval,
-                            max_frames=max_frames,
-                            service_base_url=paddle_service_url,
-                            lang=ocr_lang,
-                            timeout_seconds=ocr_timeout,
-                        )
-                        effective_models["text_on_screen"] = "paddleocr_service"
-                    else:
-                        local_text = _paddleocr_text_from_video(
-                            video_path=local_path,
-                            interval_seconds=interval,
-                            max_frames=max_frames,
-                            lang=ocr_lang,
-                        )
-                        effective_models["text_on_screen"] = "paddleocr"
+                local_text = _tesseract_text_from_video(video_path=local_path, interval_seconds=interval, max_frames=max_frames)
+                effective_models["text_on_screen"] = "tesseract"
                 _job_step_update(job_id, "text_on_screen", status="completed", percent=100, message=f"{len(local_text)} text entries ({effective_models.get('text_on_screen')})")
             except Exception as exc:
                 app.logger.warning("Local OCR failed: %s", exc)
@@ -4779,8 +4303,7 @@ def _process_gcs_video_job_cloud_only(
                 interval = float(_parse_int(os.getenv("ENVID_METADATA_MODERATION_FRAME_INTERVAL_SECONDS"), default=2, min_value=1, max_value=30) or 2)
                 max_frames = int(_parse_int(os.getenv("ENVID_METADATA_MODERATION_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
                 service_url_default = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_URL") or "").strip()
-                service_url_nsfwjs = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_NSFWJS_URL") or "").strip()
-                service_url = (local_moderation_url_override or (service_url_nsfwjs if requested_moderation_model == "nsfwjs" else "") or service_url_default).strip()
+                service_url = (local_moderation_url_override or service_url_default).strip()
                 service_timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_MODERATION_TIMEOUT_SECONDS"), default=60, min_value=1, max_value=600) or 60)
 
                 _job_step_update(job_id, "moderation", status="running", percent=0, message=f"Running ({requested_moderation_model})")
@@ -4802,21 +4325,6 @@ def _process_gcs_video_job_cloud_only(
                         )
                         local_moderation_source = "nudenet"
                     effective_models["moderation"] = "nudenet" if local_moderation_source == "nudenet" else "nudenet_service"
-                    _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(local_moderation_frames or [])} frames ({local_moderation_source})")
-                elif requested_moderation_model == "nsfwjs":
-                    if not service_url:
-                        raise RuntimeError(
-                            "nsfwjs requires a local moderation service; set ENVID_METADATA_LOCAL_MODERATION_URL (e.g. http://localhost:5081)"
-                        )
-                    local_moderation_frames = _local_moderation_service_explicit_frames_from_video(
-                        video_path=local_path,
-                        interval_seconds=interval,
-                        max_frames=max_frames,
-                        service_base_url=service_url,
-                        timeout_seconds=service_timeout,
-                    )
-                    local_moderation_source = "nsfwjs_service"
-                    effective_models["moderation"] = local_moderation_source
                     _job_step_update(job_id, "moderation", status="completed", percent=100, message=f"{len(local_moderation_frames or [])} frames ({local_moderation_source})")
                 else:
                     raise RuntimeError(f"Unsupported moderation model: {requested_moderation_model}")
@@ -5233,34 +4741,17 @@ def _process_gcs_video_job_cloud_only(
 
                 # Mark VI-backed steps based on user selection.
                 if enable_label_detection:
-                    if use_yolo_labels:
-                        _job_step_update(
-                            job_id,
-                            "label_detection",
-                            status="not_started",
-                            percent=0,
-                            message="Pending YOLO(Ultralytics)",
-                        )
-                    elif use_local_label_detection_service:
-                        _job_step_update(
-                            job_id,
-                            "label_detection",
-                            status="not_started",
-                            percent=0,
-                            message=f"Pending {label_engine}",
-                        )
-                    else:
-                        _job_step_update(
-                            job_id,
-                            "label_detection",
-                            status="running" if not sequential_vi else "not_started",
-                            percent=0,
-                            message=(
-                                f"Running (Google Video Intelligence; mode={vi_label_mode})"
-                                if not sequential_vi
-                                else "Queued (sequential)"
-                            ),
-                        )
+                    _job_step_update(
+                        job_id,
+                        "label_detection",
+                        status="running" if not sequential_vi else "not_started",
+                        percent=0,
+                        message=(
+                            f"Running (Google Video Intelligence; mode={vi_label_mode})"
+                            if not sequential_vi
+                            else "Queued (sequential)"
+                        ),
+                    )
                 else:
                     _job_step_update(job_id, "label_detection", status="skipped", percent=100, message="Disabled")
 
@@ -5680,90 +5171,6 @@ def _process_gcs_video_job_cloud_only(
                     percent=100,
                     message=f"{len(fallback_frames)} frames (fallback: gcp_video_intelligence)",
                 )
-
-        # Local label detection via Ultralytics YOLO (when requested).
-        if enable_label_detection and use_yolo_labels:
-            try:
-                _job_update(job_id, progress=22, message="Label detection (YOLO)")
-                yolo_model = (os.getenv("ENVID_METADATA_YOLO_MODEL") or "yolov8n.pt").strip() or "yolov8n.pt"
-                # Default to repo-root weights if present.
-                yolo_path = Path(yolo_model)
-                if not yolo_path.exists():
-                    candidate = _repo_root() / yolo_model
-                    if candidate.exists():
-                        yolo_path = candidate
-                interval = float(_parse_int(os.getenv("ENVID_METADATA_YOLO_FRAME_INTERVAL_SECONDS"), default=1, min_value=1, max_value=30) or 1)
-                max_frames = int(_parse_int(os.getenv("ENVID_METADATA_YOLO_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
-                conf = float(os.getenv("ENVID_METADATA_YOLO_CONF") or 0.25)
-
-                _job_step_update(job_id, "label_detection", status="running", percent=0, message=f"Running (YOLO; model={yolo_path.name})")
-                local_labels = _yolo_detect_labels_from_video(
-                    video_path=local_path,
-                    model_name_or_path=str(yolo_path),
-                    frame_interval_seconds=interval,
-                    max_frames=max_frames,
-                    conf=conf,
-                )
-                if not isinstance(video_intelligence, dict):
-                    video_intelligence = {}
-                video_intelligence["labels"] = local_labels
-                cfg = video_intelligence.get("config") if isinstance(video_intelligence.get("config"), dict) else {}
-                cfg["labels_engine"] = "yolo_ultralytics"
-                cfg["yolo"] = {
-                    "model": str(yolo_path),
-                    "frame_interval_seconds": interval,
-                    "max_frames": max_frames,
-                    "conf": conf,
-                }
-                video_intelligence["config"] = cfg
-                effective_models["label_detection"] = "yolo_ultralytics"
-                _job_step_update(job_id, "label_detection", status="completed", percent=100, message=f"{len(local_labels)} labels (YOLO)")
-            except Exception as exc:
-                app.logger.warning("YOLO label detection failed: %s", exc)
-                _job_step_update(job_id, "label_detection", status="failed", message=str(exc)[:240])
-
-        # Local label detection via external service (Detectron2/MMDetection).
-        if enable_label_detection and use_local_label_detection_service:
-            try:
-                _job_update(job_id, progress=22, message=f"Label detection ({label_engine})")
-                service_url = (
-                    local_label_detection_url_override
-                    or os.getenv("ENVID_METADATA_LOCAL_LABEL_DETECTION_URL")
-                    or ""
-                ).strip()
-                if not service_url:
-                    raise RuntimeError("ENVID_METADATA_LOCAL_LABEL_DETECTION_URL is not set")
-
-                interval = float(_parse_int(os.getenv("ENVID_METADATA_LOCAL_LABEL_FRAME_INTERVAL_SECONDS"), default=1, min_value=1, max_value=30) or 1)
-                max_frames = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_LABEL_MAX_FRAMES"), default=120, min_value=1, max_value=5000) or 120)
-                timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_LABEL_SERVICE_TIMEOUT_SECONDS"), default=120, min_value=5, max_value=3600) or 120)
-
-                _job_step_update(job_id, "label_detection", status="running", percent=0, message=f"Running ({label_engine})")
-                local_labels = _local_label_detection_service_labels_from_video(
-                    video_path=local_path,
-                    interval_seconds=interval,
-                    max_frames=max_frames,
-                    service_base_url=service_url,
-                    model=label_engine,
-                    timeout_seconds=timeout,
-                )
-                if not isinstance(video_intelligence, dict):
-                    video_intelligence = {}
-                video_intelligence["labels"] = local_labels
-                cfg = video_intelligence.get("config") if isinstance(video_intelligence.get("config"), dict) else {}
-                cfg["labels_engine"] = label_engine
-                cfg["local_label_detection_service"] = {
-                    "url": service_url,
-                    "frame_interval_seconds": interval,
-                    "max_frames": max_frames,
-                    "timeout_seconds": timeout,
-                }
-                video_intelligence["config"] = cfg
-                effective_models["label_detection"] = label_engine
-                _job_step_update(job_id, "label_detection", status="completed", percent=100, message=f"{len(local_labels)} labels ({label_engine})")
-            except Exception as exc:
-                app.logger.warning("Local label detection (%s) failed: %s", label_engine, exc)
-                _job_step_update(job_id, "label_detection", status="failed", message=str(exc)[:240])
 
         # Local Text-on-Screen OCR (when requested).
         if enable_text_on_screen and use_local_ocr and not local_ocr_started:
@@ -6706,7 +6113,7 @@ def health() -> Any:
     return jsonify(
         {
             "status": "ok",
-            "service": "envid-metadata-multimodal",
+            "service": os.getenv("ENVID_SERVICE_NAME", "backend"),
             "gcp_auth": _gcp_auth_status(),
             "gcp_location": _gcp_location(),
             "gcs_bucket": resolved_bucket,

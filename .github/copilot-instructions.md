@@ -24,7 +24,7 @@
 
 ## Integration points (URLs/ports)
 - Backend → sidecars URLs are env-driven (defaults set in [code/start-backend.sh](code/start-backend.sh)).
-- Frontend → backend uses `/envid-multimodal/*` proxy to port 5016.
+- Frontend → backend uses `/backend/*` proxy to port 5016.
 
 ## When adding or changing services
 - Add a new service under [code](code), wire it into [code/start-backend.sh](code/start-backend.sh) + [code/stop-backend.sh](code/stop-backend.sh), and document in [SERVICES_README.md](SERVICES_README.md).

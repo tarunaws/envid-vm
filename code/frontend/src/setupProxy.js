@@ -11,11 +11,11 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 module.exports = function(app) {
   // Envid Metadata (Multimodal)
   app.use(
-    '/envid-multimodal',
+    '/backend',
     createProxyMiddleware({
       target: 'http://localhost:5016',
       changeOrigin: true,
-      pathRewrite: { '^/envid-multimodal': '' },
+      pathRewrite: { '^/backend': '' },
       logLevel: 'warn',
     })
   );

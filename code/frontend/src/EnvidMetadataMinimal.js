@@ -4,7 +4,7 @@ import styled from 'styled-components';
 
 // Envid Metadata backend (Flask)
 // Default to CRA dev proxy (see src/setupProxy.js). Can be overridden via REACT_APP_ENVID_METADATA_BACKEND_URL.
-const BACKEND_URL = process.env.REACT_APP_ENVID_METADATA_BACKEND_URL || '/envid-multimodal';
+const BACKEND_URL = process.env.REACT_APP_ENVID_METADATA_BACKEND_URL || '/backend';
 const POLL_INTERVAL_MS = 2000;
 
 const PageWrapper = styled.div`

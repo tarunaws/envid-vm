@@ -20,7 +20,7 @@ import UseCases from './UseCases';
 import VideoGeneration from './VideoGeneration';
 import { VisibleUseCasesProvider } from './VisibleUseCasesContext';
 
-const BACKEND_URL = process.env.REACT_APP_ENVID_METADATA_BACKEND_URL || '/envid-multimodal';
+const BACKEND_URL = process.env.REACT_APP_ENVID_METADATA_BACKEND_URL || '/backend';
 const STATS_POLL_MS = 5000;
 
 function App() {

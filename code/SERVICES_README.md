@@ -105,7 +105,7 @@ REACT_APP_MODERATION_API_BASE=http://localhost:5006
 REACT_APP_TRAILER_API_BASE=http://localhost:5007
 
 # Envid Metadata UI routing (defaults use the dev proxy paths)
-REACT_APP_ENVID_MULTIMODAL_BASE=/envid-multimodal
+REACT_APP_ENVID_MULTIMODAL_BASE=/backend
 
 ```
 

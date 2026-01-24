@@ -15,13 +15,13 @@
 
 - src/index.js: mounts React app into the DOM.
 - src/App.js: main router, top nav, login gate, and route wiring.
-- src/setupProxy.js: dev proxy for /envid-multimodal → http://localhost:5016.
+- src/setupProxy.js: dev proxy for /backend → http://localhost:5016.
 
 ### Main UX for metadata
 
 - src/EnvidMetadataMinimal.js: main UI for upload, job status, and metadata result browsing.
   - Uses axios to call backend endpoints.
-  - Uses BACKEND_URL (REACT_APP_ENVID_METADATA_BACKEND_URL or /envid-multimodal).
+  - Uses BACKEND_URL (REACT_APP_ENVID_METADATA_BACKEND_URL or /backend).
   - Displays the pipeline steps list that mirrors backend job steps.
   - Polls job status and renders progress.
 
