@@ -7131,10 +7131,13 @@ def delete_video(video_id: str) -> Any:
     try:
         gcs_uri = (v.get("gcs_video_uri") or "").strip()
         if gcs_uri:
-            bucket, obj = _parse_allowed_gcs_video_source(gcs_uri)
-            # IMPORTANT: never delete the source/original video object.
-            # Deleting a history record should only remove temporary artifacts.
-            kept_gcs_objects.append(f"gs://{bucket}/{obj}")
+            try:
+                bucket, obj = _parse_allowed_gcs_video_source(gcs_uri)
+                # IMPORTANT: never delete the source/original video object.
+                # Deleting a history record should only remove temporary artifacts.
+                kept_gcs_objects.append(f"gs://{bucket}/{obj}")
+            except Exception as exc:
+                warnings.append(f"Source video retained (could not parse gcs uri): {exc}")
 
         try:
             artifacts_bucket = _gcs_artifacts_bucket(_gcs_bucket_name())
@@ -7180,7 +7183,7 @@ def delete_video(video_id: str) -> Any:
         with VIDEO_INDEX_LOCK:
             VIDEO_INDEX[:] = [x for x in VIDEO_INDEX if str(x.get("id")) != str(video_id)]
         _save_video_index()
-        return jsonify({"ok": True, "deleted_gcs_objects": deleted_gcs_objects, "kept_gcs_objects": kept_gcs_objects, "gcs_warnings": warnings}), 200
+        return jsonify({"ok": True, "message": f"Deleted video {video_id}", "deleted_gcs_objects": deleted_gcs_objects, "kept_gcs_objects": kept_gcs_objects, "gcs_warnings": warnings}), 200
     except Exception as exc:
         return jsonify({"error": str(exc), "deleted_gcs_objects": deleted_gcs_objects, "kept_gcs_objects": kept_gcs_objects, "gcs_warnings": warnings}), 500
 
