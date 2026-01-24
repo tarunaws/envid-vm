@@ -71,8 +71,8 @@ fi
 GCP_MOUNT=()
 GCP_ENV=()
 if [ -n "$GCP_FILE" ] && [ -f "$GCP_FILE" ]; then
-  GCP_MOUNT=(-v "$GCP_FILE:/opt/gcp.json:ro")
-  GCP_ENV=(-e "GOOGLE_APPLICATION_CREDENTIALS=/opt/gcp.json")
+  GCP_MOUNT=(-v "$GCP_FILE:$GCP_FILE:ro")
+  GCP_ENV=(-e "GOOGLE_APPLICATION_CREDENTIALS=$GCP_FILE")
 fi
 
 GPU_ARGS=()
