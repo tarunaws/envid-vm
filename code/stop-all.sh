@@ -84,6 +84,7 @@ echo "🔧 Stopping backend services..."
 # Function to stop a service
 stop_service() {
     local service_name=$1
+    local silent_if_missing=${2:-0}
     local pid_file="$PROJECT_ROOT/$service_name.pid"
     
     if [ -f "$pid_file" ]; then
@@ -97,15 +98,17 @@ stop_service() {
         fi
         rm -f "$pid_file"
     else
-        echo "⚠️  No $service_name PID file found"
+        if [[ "$silent_if_missing" != "1" ]]; then
+            echo "⚠️  No $service_name PID file found"
+        fi
     fi
 }
 
 # ✅ Local moderation service (NudeNet)
-stop_service "local-moderation-nudenet"
+stop_service "local-moderation-nudenet" 1
 
 # ✅ Local label detection service (Detectron2/MMDetection)
-stop_service "local-label-detection"
+stop_service "local-label-detection" 1
 stop_local_label_detection_docker_if_enabled
 
 # ✅ Envid Metadata (Multimodal only)
