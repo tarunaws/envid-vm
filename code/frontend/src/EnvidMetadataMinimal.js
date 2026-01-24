@@ -207,8 +207,9 @@ const StatusPanel = styled.div`
 
 const StatusTitleRow = styled.div`
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
   margin-bottom: 10px;
 `;
@@ -217,18 +218,25 @@ const StatusTitle = styled.div`
   font-weight: 900;
   letter-spacing: 0.2px;
   color: rgba(240, 242, 255, 0.95);
+  text-align: center;
 `;
 
 const StatusMeta = styled.div`
   color: rgba(230, 232, 242, 0.7);
   font-size: 12px;
+  text-align: center;
+  word-break: break-all;
+  line-height: 1.4;
 `;
 
 const StatusMetaRight = styled.div`
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
+  width: 100%;
 `;
 
 const SystemStatsRow = styled.div`
@@ -1981,15 +1989,10 @@ export default function EnvidMetadataMinimal() {
           <StatusTitle>Processing Status</StatusTitle>
           <StatusMetaRight>
             <StatusMeta>
-              {activeJob?.kind ? `${activeJob.kind} job` : 'job'}
-              {activeJob?.jobId ? ` • ${String(activeJob.jobId).slice(0, 8)}…` : ''}
+              <div>{activeJob?.kind ? `${activeJob.kind} job` : 'job'}</div>
+              {activeJob?.jobId ? <div>Job ID: {String(activeJob.jobId)}</div> : null}
+              <div>Status: {String(uploadJob?.status || 'processing')}</div>
             </StatusMeta>
-            {(activeJob?.jobId || uploading) && (
-              <SystemStatsRow>
-                <SystemStatPill>VM CPU: {cpuPercentLabel}</SystemStatPill>
-                <SystemStatPill>VM GPU: {gpuPercentLabel}</SystemStatPill>
-              </SystemStatsRow>
-            )}
           </StatusMetaRight>
         </StatusTitleRow>
 
