@@ -69,6 +69,7 @@ stop_local_label_detection_docker_if_enabled() {
 
 stop_service() {
   local service_name=$1
+  local silent_if_missing=${2:-0}
   local pid_file="$PROJECT_ROOT/$service_name.pid"
   if [ -f "$pid_file" ]; then
     local pid
@@ -96,18 +97,20 @@ stop_service() {
     fi
     rm -f "$pid_file"
   else
-    echo "⚠️  No $service_name PID file found"
+    if [[ "$silent_if_missing" != "1" ]]; then
+      echo "⚠️  No $service_name PID file found"
+    fi
   fi
 }
 
 # ✅ Local moderation service (NudeNet)
-stop_service "local-moderation-nudenet"
+stop_service "local-moderation-nudenet" 1
 
 # ✅ Local moderation service (nsfwjs)
 # Managed by systemd; do not stop here.
 
 # ✅ Local label detection service (Detectron2/MMDetection)
-stop_service "local-label-detection"
+stop_service "local-label-detection" 1
 stop_local_label_detection_docker_if_enabled
 
 # ✅ Local OCR service (PaddleOCR)

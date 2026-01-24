@@ -220,7 +220,6 @@ start_local_moderation_service() {
   fi
 
   if curl -fsS "$url/health" >/dev/null 2>&1; then
-    echo "✅ $service_name already healthy ($url)"
     return 0
   fi
 
@@ -423,7 +422,6 @@ start_local_label_detection_service() {
     elif command -v python3.12 >/dev/null 2>&1; then
       py_bin="python3.12"
     else
-      echo "⚠️  python3.11/python3.12 not found; skipping local label detection service autostart"
       return 0
     fi
   fi
@@ -548,7 +546,6 @@ PY
   fi
 
   if curl -fsS "$url/health" >/dev/null 2>&1; then
-    echo "✅ $service_name already healthy ($url)"
     maybe_fix_keyscene_clip_cache "$url/health" "$service_name"
     return 0
   fi
