@@ -34,6 +34,14 @@ load_env_file "$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.local"
 load_env_file "$PROJECT_ROOT/.env.multimodal.secrets.local"
 load_env_file "$PROJECT_ROOT/.env.multimodal.${ENV_TARGET}.secrets.local"
 
+LIBRE_URL_RAW="${ENVID_LIBRETRANSLATE_URL:-${LIBRETRANSLATE_URL:-}}"
+LIBRE_URL_CONTAINER="$LIBRE_URL_RAW"
+if [ -n "$LIBRE_URL_CONTAINER" ]; then
+  if echo "$LIBRE_URL_CONTAINER" | grep -Eq 'http://(localhost|127\.0\.0\.1)(:|/)'; then
+    LIBRE_URL_CONTAINER="$(echo "$LIBRE_URL_CONTAINER" | sed 's|http://localhost|http://host.docker.internal|g; s|http://127\.0\.0\.1|http://host.docker.internal|g')"
+  fi
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "❌ docker not found"
   exit 1
@@ -89,13 +97,17 @@ if docker ps -a --format '{{.Names}}' | grep -q "^${SERVICE_NAME}$"; then
   docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
 fi
 
+HOST_GATEWAY_ARGS=(--add-host=host.docker.internal:host-gateway)
+
 echo "🚀 Starting container with restart=always..."
 docker run -d --name "$SERVICE_NAME" \
+  "${HOST_GATEWAY_ARGS[@]}" \
   --restart=always \
   -p "${PORT}:5016" \
   -e PYTHONUNBUFFERED=1 \
   -e PYTHONPATH="/app:/app/code" \
   -e ENVID_METADATA_PORT="${PORT}" \
+  ${LIBRE_URL_CONTAINER:+-e ENVID_LIBRETRANSLATE_URL="$LIBRE_URL_CONTAINER"} \
   "${GPU_ARGS[@]}" \
   "${ENV_ARGS[@]}" \
   "${GCP_ENV[@]}" \
