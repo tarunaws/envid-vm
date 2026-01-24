@@ -1956,7 +1956,11 @@ def _precheck_models(
 
     # Text-on-screen OCR
     if enable_text_on_screen and use_local_ocr:
-        if requested_text_model == "paddleocr":
+        local_ocr_url = (os.getenv("ENVID_METADATA_LOCAL_OCR_PADDLE_URL") or "").strip()
+        if local_ocr_url:
+            health = _check_service_health(f"{local_ocr_url.rstrip('/')}/health")
+            _require(bool(health.get("ok")), "local_ocr", f"local ocr unhealthy: {health.get('error') or health.get('raw')}")
+        elif requested_text_model == "paddleocr":
             _require(PaddleOCR is not None, "paddleocr", "paddleocr is not installed")
             if PaddleOCR is not None:
                 try:
