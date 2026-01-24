@@ -25,7 +25,13 @@ const STATS_POLL_MS = 5000;
 
 function App() {
   const [scrolled, setScrolled] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+      return window.localStorage.getItem('envidAuth') === 'true';
+    } catch (err) {
+      return false;
+    }
+  });
   const buildId = process.env.REACT_APP_BUILD_ID || 'dev';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -44,6 +50,7 @@ function App() {
       const lastBuild = window.localStorage.getItem('envidBuildId');
       if (lastBuild && lastBuild !== buildId) {
         setIsAuthenticated(false);
+        window.localStorage.removeItem('envidAuth');
       }
       window.localStorage.setItem('envidBuildId', buildId);
     } catch (err) {
@@ -80,6 +87,11 @@ function App() {
       setIsAuthenticated(true);
       setAuthError('');
       setPassword('');
+      try {
+        window.localStorage.setItem('envidAuth', 'true');
+      } catch (err) {
+        // ignore storage errors
+      }
     } else {
       setAuthError('Invalid credentials.');
     }
@@ -90,6 +102,11 @@ function App() {
     setUsername('');
     setPassword('');
     setAuthError('');
+    try {
+      window.localStorage.removeItem('envidAuth');
+    } catch (err) {
+      // ignore storage errors
+    }
   };
 
   const formatPercent = (value) => {
