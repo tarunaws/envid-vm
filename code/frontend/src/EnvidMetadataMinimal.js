@@ -542,6 +542,52 @@ const CardBody = styled.div`
   padding: 12px 14px;
 `;
 
+const DownloadGrid = styled.div`
+  display: grid;
+  gap: 12px;
+
+  @media (min-width: 980px) {
+    grid-template-columns: 1fr 1fr;
+  }
+`;
+
+const DownloadGroup = styled.div`
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 12, 24, 0.55);
+  display: grid;
+  gap: 10px;
+`;
+
+const DownloadGroupTitle = styled.div`
+  color: rgba(230, 232, 242, 0.9);
+  font-weight: 900;
+  letter-spacing: 0.2px;
+`;
+
+const DownloadGroupHint = styled.div`
+  color: rgba(230, 232, 242, 0.6);
+  font-size: 12px;
+`;
+
+const DownloadList = styled.div`
+  display: grid;
+  gap: 8px;
+`;
+
+const DownloadRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+`;
+
+const DownloadLabel = styled.div`
+  color: rgba(230, 232, 242, 0.7);
+  font-weight: 800;
+`;
+
 const VideoFrame = styled.div`
   width: 100%;
   border-radius: 14px;
@@ -549,6 +595,15 @@ const VideoFrame = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.35);
   position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 280px;
+
+  & video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
 
   &:fullscreen {
     border-radius: 0;
@@ -2853,6 +2908,74 @@ export default function EnvidMetadataMinimal() {
                     <div style={{ color: '#ffd1d1', fontWeight: 900 }}>{selectedMetaError}</div>
                   ) : (
                     <>
+                      <Card>
+                        <CardHeader>
+                          <CardHeaderTitle>Downloads</CardHeaderTitle>
+                        </CardHeader>
+                        <CardBody>
+                          <DownloadGrid>
+                            <DownloadGroup>
+                              <div>
+                                <DownloadGroupTitle>Subtitles</DownloadGroupTitle>
+                                <DownloadGroupHint>Download SRT or VTT for each available language.</DownloadGroupHint>
+                              </div>
+                              <DownloadList>
+                                {subtitleLanguages.map((lang) => {
+                                  const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
+                                  const isOrig = lang === 'orig';
+                                  const srtLabel = isOrig ? '.srt' : `.${lang}.srt`;
+                                  const vttLabel = isOrig ? '.vtt' : `.${lang}.vtt`;
+                                  return (
+                                    <DownloadRow key={lang}>
+                                      <DownloadLabel>{label}</DownloadLabel>
+                                      <LinkA
+                                        href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.srt`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        Download {srtLabel}
+                                      </LinkA>
+                                      <LinkA
+                                        href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.vtt`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        Download {vttLabel}
+                                      </LinkA>
+                                    </DownloadRow>
+                                  );
+                                })}
+                              </DownloadList>
+                            </DownloadGroup>
+
+                            <DownloadGroup>
+                              <div>
+                                <DownloadGroupTitle>Complete Metadata</DownloadGroupTitle>
+                                <DownloadGroupHint>JSON files per language, including all pipeline outputs.</DownloadGroupHint>
+                              </div>
+                              <DownloadList>
+                                {metadataLanguages.map((lang) => {
+                                  const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
+                                  const suffix = lang === 'orig' ? '' : ` (${lang.toUpperCase()})`;
+                                  return (
+                                    <DownloadRow key={lang}>
+                                      <DownloadLabel>{label}</DownloadLabel>
+                                      <LinkA
+                                        href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=${lang}&download=1`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        Download Full Metadata JSON{suffix}
+                                      </LinkA>
+                                    </DownloadRow>
+                                  );
+                                })}
+                              </DownloadList>
+                            </DownloadGroup>
+                          </DownloadGrid>
+                        </CardBody>
+                      </Card>
+
                       <Grid2>
                         <div>
                           <Card>
@@ -2869,7 +2992,7 @@ export default function EnvidMetadataMinimal() {
                                   src={`${BACKEND_URL}/video-file/${selectedVideoId}`}
                                   controls
                                   controlsList="nofullscreen"
-                                  style={{ width: '100%', display: 'block', position: 'relative', zIndex: 1 }}
+                                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', position: 'relative', zIndex: 1 }}
                                   onTimeUpdate={(e) => setPlayerTime(Number(e.currentTarget?.currentTime || 0))}
                                   onPlay={() => {
                                     setPlayerIsPaused(false);
@@ -2941,68 +3064,6 @@ export default function EnvidMetadataMinimal() {
 
                         <div>
                           <Card>
-                            <CardHeader>
-                              <CardHeaderTitle>Downloads</CardHeaderTitle>
-                            </CardHeader>
-                            <CardBody>
-                              <div style={{ display: 'grid', gap: 10 }}>
-                                <div>
-                                  <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontWeight: 900, marginBottom: 6 }}>Subtitles</div>
-                                  <div style={{ display: 'grid', gap: 8 }}>
-                                    {subtitleLanguages.map((lang) => {
-                                      const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
-                                      const isOrig = lang === 'orig';
-                                      const srtLabel = isOrig ? '.srt' : `.${lang}.srt`;
-                                      const vttLabel = isOrig ? '.vtt' : `.${lang}.vtt`;
-                                      return (
-                                        <Row key={lang} style={{ gap: 10, flexWrap: 'wrap' }}>
-                                          <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>{label}</div>
-                                          <LinkA
-                                            href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.srt`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                          >
-                                            Download {srtLabel}
-                                          </LinkA>
-                                          <LinkA
-                                            href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.vtt`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                          >
-                                            Download {vttLabel}
-                                          </LinkA>
-                                        </Row>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontWeight: 900, marginBottom: 6 }}>Metadata</div>
-                                  <div style={{ display: 'grid', gap: 8 }}>
-                                    {metadataLanguages.map((lang) => {
-                                      const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
-                                      const suffix = lang === 'orig' ? '' : ` (${lang.toUpperCase()})`;
-                                      return (
-                                        <Row key={lang} style={{ gap: 10, flexWrap: 'wrap' }}>
-                                          <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontWeight: 800 }}>{label}</div>
-                                          <LinkA
-                                            href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=${lang}&download=1`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                          >
-                                            Download Full Metadata JSON{suffix}
-                                          </LinkA>
-                                        </Row>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            </CardBody>
-                          </Card>
-
-                          <Card style={{ marginTop: 16 }}>
                             <CardHeader>
                               <CardHeaderTitle>Technical</CardHeaderTitle>
                             </CardHeader>
