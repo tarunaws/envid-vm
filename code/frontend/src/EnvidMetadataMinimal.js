@@ -324,7 +324,11 @@ const EmptyIcon = styled.div`
 const Carousel = styled.div`
   display: flex;
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 4px 2px 10px 2px;
   scroll-snap-type: x mandatory;
   scroll-padding-left: 2px;
@@ -343,8 +347,9 @@ const Carousel = styled.div`
 `;
 
 const CarouselItem = styled.div`
-  width: 220px;
-  flex: 0 0 auto;
+  width: calc((100% - 36px) / 4);
+  max-width: calc((100% - 36px) / 4);
+  flex: 0 0 calc((100% - 36px) / 4);
   scroll-snap-align: start;
   border: 1px solid ${(props) => (props.$active ? 'rgba(102, 126, 234, 0.7)' : 'rgba(255, 255, 255, 0.08)')};
   border-radius: 14px;
@@ -2595,7 +2600,10 @@ export default function EnvidMetadataMinimal() {
                 <IconButton
                   type="button"
                   aria-label="Scroll history left"
-                  onClick={() => historyCarouselRef.current?.scrollBy?.({ left: -520, behavior: 'smooth' })}
+                  onClick={() => {
+                    const width = historyCarouselRef.current?.clientWidth || 520;
+                    historyCarouselRef.current?.scrollBy?.({ left: -width, behavior: 'smooth' });
+                  }}
                   disabled={!allVideos.length}
                 >
                   ‹
@@ -2603,7 +2611,10 @@ export default function EnvidMetadataMinimal() {
                 <IconButton
                   type="button"
                   aria-label="Scroll history right"
-                  onClick={() => historyCarouselRef.current?.scrollBy?.({ left: 520, behavior: 'smooth' })}
+                  onClick={() => {
+                    const width = historyCarouselRef.current?.clientWidth || 520;
+                    historyCarouselRef.current?.scrollBy?.({ left: width, behavior: 'smooth' });
+                  }}
                   disabled={!allVideos.length}
                 >
                   ›
