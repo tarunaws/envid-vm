@@ -1989,9 +1989,13 @@ export default function EnvidMetadataMinimal() {
           <StatusTitle>Processing Status</StatusTitle>
           <StatusMetaRight>
             <StatusMeta>
+              {(() => {
+                const backendStatus = uploadJob?.status || uploadJob?.processing_status || uploadJob?.state;
+                const label = backendStatus ? String(backendStatus) : uploading ? 'processing' : '—';
+                return <div>Processing: {label}</div>;
+              })()}
               <div>{activeJob?.kind ? `${activeJob.kind} job` : 'job'}</div>
               {activeJob?.jobId ? <div>Job ID: {String(activeJob.jobId)}</div> : null}
-              <div>Status: {String(uploadJob?.status || 'processing')}</div>
             </StatusMeta>
           </StatusMetaRight>
         </StatusTitleRow>
