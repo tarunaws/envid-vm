@@ -3652,6 +3652,7 @@ def _aggregate_text_segments(
     *,
     hits: List[Tuple[str, float, float, float]],
     max_items: int = 250,
+    merge_gap_seconds: float | None = None,
 ) -> List[Dict[str, Any]]:
     """Aggregate (text, start, end, conf) into [{text, segments:[...]}]"""
     min_conf = _safe_float(os.getenv("ENVID_METADATA_OCR_MIN_CONF"), 0.6)
@@ -3665,11 +3666,70 @@ def _aggregate_text_segments(
         by_text.setdefault(key, []).append({"start": float(st), "end": float(en), "confidence": float(conf)})
 
     out: List[Dict[str, Any]] = []
+    gap = float(merge_gap_seconds or 0.0)
     for txt, segs in by_text.items():
         segs.sort(key=lambda x: (float(x.get("start") or 0.0), float(x.get("end") or 0.0)))
-        out.append({"text": txt, "segments": segs})
+        if not segs:
+            continue
+        if gap <= 0:
+            out.append({"text": txt, "segments": segs})
+            continue
+        merged: List[Dict[str, Any]] = []
+        cur_st = float(segs[0].get("start") or 0.0)
+        cur_en = float(segs[0].get("end") or 0.0)
+        cur_conf = float(segs[0].get("confidence") or 0.0)
+        for seg in segs[1:]:
+            st = float(seg.get("start") or 0.0)
+            en = float(seg.get("end") or 0.0)
+            conf = float(seg.get("confidence") or 0.0)
+            if st <= cur_en + gap:
+                cur_en = max(cur_en, en)
+                cur_conf = max(cur_conf, conf)
+            else:
+                merged.append({"start": cur_st, "end": cur_en, "confidence": cur_conf})
+                cur_st, cur_en, cur_conf = st, en, conf
+        merged.append({"start": cur_st, "end": cur_en, "confidence": cur_conf})
+        out.append({"text": txt, "segments": merged})
     out.sort(key=lambda x: (len(x.get("segments") or []), len(str(x.get("text") or ""))), reverse=True)
     return out[:max_items]
+
+
+def _normalize_ocr_text(text: str) -> str:
+    out = re.sub(r"\s+", " ", str(text or "")).strip()
+    out = re.sub(r"[^\w\s\-\.:,?!@#%&()\[\]/+]+", "", out)
+    return out
+
+
+def _ocr_preprocess_frame(frame: Any, *, upscale: float, enable_clahe: bool, enable_sharpen: bool, enable_adaptive: bool) -> Any:
+    try:
+        import cv2  # type: ignore
+    except Exception as exc:
+        raise RuntimeError("opencv is not installed") from exc
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    denoised = cv2.bilateralFilter(gray, 5, 75, 75)
+    if enable_clahe:
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        denoised = clahe.apply(denoised)
+    if upscale > 1.01:
+        denoised = cv2.resize(denoised, None, fx=upscale, fy=upscale, interpolation=cv2.INTER_CUBIC)
+    if enable_sharpen:
+        kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype="float32")
+        sharpened = cv2.filter2D(denoised, -1, kernel)
+    else:
+        sharpened = denoised
+    if enable_adaptive:
+        thresh = cv2.adaptiveThreshold(
+            sharpened,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            31,
+            9,
+        )
+    else:
+        _, thresh = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
 
 
 @app.get("/local-label-detection/health")
@@ -3896,38 +3956,28 @@ def _tesseract_text_from_video(
         raise RuntimeError("opencv is not installed") from exc
 
     hits: List[Tuple[str, float, float, float]] = []
+    min_conf = _safe_float(os.getenv("ENVID_METADATA_OCR_MIN_CONF"), 0.6)
+    min_token_len = _parse_int(os.getenv("ENVID_METADATA_OCR_MIN_TOKEN_LEN"), default=2, min_value=1, max_value=10)
     tesseract_lang = (os.getenv("ENVID_METADATA_OCR_TESSERACT_LANG") or "eng+hin").strip() or "eng"
     tesseract_psm = _parse_int(os.getenv("ENVID_METADATA_OCR_TESSERACT_PSM"), default=6, min_value=3, max_value=13)
     tesseract_oem = _parse_int(os.getenv("ENVID_METADATA_OCR_TESSERACT_OEM"), default=1, min_value=0, max_value=3)
+    fallback_psm = _parse_int(os.getenv("ENVID_METADATA_OCR_TESSERACT_FALLBACK_PSM"), default=7, min_value=3, max_value=13)
+    fallback_trigger = _safe_float(os.getenv("ENVID_METADATA_OCR_TESSERACT_FALLBACK_TRIGGER_CONF"), 0.65)
     upscale = _safe_float(os.getenv("ENVID_METADATA_OCR_TESSERACT_UPSCALE"), 1.5)
     if upscale < 1.0:
         upscale = 1.0
-    tesseract_config = f"--oem {tesseract_oem} --psm {tesseract_psm}"
-    frames = _sample_video_frames(video_path=video_path, interval_seconds=interval_seconds, max_frames=max_frames)
-    for t, frame in frames:
-        try:
-            # Preprocess: grayscale + denoise + upsample + adaptive threshold.
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            denoised = cv2.bilateralFilter(gray, 5, 75, 75)
-            if upscale > 1.01:
-                denoised = cv2.resize(
-                    denoised,
-                    None,
-                    fx=upscale,
-                    fy=upscale,
-                    interpolation=cv2.INTER_CUBIC,
-                )
-            thresh = cv2.adaptiveThreshold(
-                denoised,
-                255,
-                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY,
-                31,
-                9,
-            )
-            rgb = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
-        except Exception:
-            continue
+
+    enable_clahe = _env_truthy(os.getenv("ENVID_METADATA_OCR_PREPROCESS_CLAHE"), default=True)
+    enable_sharpen = _env_truthy(os.getenv("ENVID_METADATA_OCR_PREPROCESS_SHARPEN"), default=True)
+    enable_adaptive = _env_truthy(os.getenv("ENVID_METADATA_OCR_PREPROCESS_ADAPTIVE"), default=True)
+    enable_dictionary = _env_truthy(os.getenv("ENVID_METADATA_OCR_DICTIONARY_ENABLE"), default=False)
+
+    burst_frames = _parse_int(os.getenv("ENVID_METADATA_OCR_BURST_FRAMES"), default=6, min_value=0, max_value=120)
+    burst_trigger = _safe_float(os.getenv("ENVID_METADATA_OCR_BURST_TRIGGER_CONF"), 0.75)
+    burst_interval = _safe_float(os.getenv("ENVID_METADATA_OCR_BURST_INTERVAL_SECONDS"), max(0.25, interval_seconds / 4))
+
+    def _run_tesseract(rgb: Any, psm: int) -> Tuple[List[str], List[float]]:
+        tesseract_config = f"--oem {tesseract_oem} --psm {psm}"
         try:
             data = pytesseract.image_to_data(
                 rgb,
@@ -3936,8 +3986,9 @@ def _tesseract_text_from_video(
                 output_type=pytesseract.Output.DICT,
             )
         except Exception:
-            continue
-
+            return [], []
+        tokens: List[str] = []
+        confs: List[float] = []
         n = len(data.get("text") or [])
         for i in range(n):
             txt = str((data.get("text") or [""])[i] or "").strip()
@@ -3947,10 +3998,91 @@ def _tesseract_text_from_video(
                 conf = float((data.get("conf") or [0])[i])
             except Exception:
                 conf = 0.0
-            # Normalize tesseract conf range.
             conf = max(0.0, min(100.0, conf)) / 100.0
-            hits.append((txt, float(t), float(t + interval_seconds), conf))
-    return _aggregate_text_segments(hits=hits)
+            tokens.append(txt)
+            confs.append(conf)
+        return tokens, confs
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError("failed to open video")
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+    fps = fps if fps > 0 else 30.0
+    base_every_n = max(1, int(round(float(interval_seconds) * fps)))
+    burst_every_n = max(1, int(round(float(burst_interval) * fps)))
+
+    frame_idx = 0
+    sampled = 0
+    burst_remaining = 0
+    conf_sum = 0.0
+    conf_count = 0
+    try:
+        while sampled < max_frames:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            should_sample = frame_idx % base_every_n == 0 or (burst_remaining > 0 and frame_idx % burst_every_n == 0)
+            if not should_sample:
+                frame_idx += 1
+                continue
+            t = float(frame_idx) / fps
+            sampled += 1
+            if burst_remaining > 0 and frame_idx % burst_every_n == 0:
+                burst_remaining -= 1
+            frame_idx += 1
+
+            try:
+                rgb = _ocr_preprocess_frame(
+                    frame,
+                    upscale=upscale,
+                    enable_clahe=enable_clahe,
+                    enable_sharpen=enable_sharpen,
+                    enable_adaptive=enable_adaptive,
+                )
+            except Exception:
+                continue
+
+            tokens, confs = _run_tesseract(rgb, tesseract_psm)
+            best_conf = max(confs) if confs else 0.0
+            if best_conf < fallback_trigger and fallback_psm != tesseract_psm:
+                fb_tokens, fb_confs = _run_tesseract(rgb, fallback_psm)
+                fb_best = max(fb_confs) if fb_confs else 0.0
+                if fb_best > best_conf:
+                    tokens, confs, best_conf = fb_tokens, fb_confs, fb_best
+
+            for txt, conf in zip(tokens, confs, strict=False):
+                if conf < min_conf:
+                    continue
+                cleaned = _normalize_ocr_text(txt)
+                if not cleaned:
+                    continue
+                if len(cleaned) < min_token_len and conf < (min_conf + 0.1):
+                    continue
+                if enable_dictionary and "eng" in tesseract_lang:
+                    cleaned = _dictionary_correct_text(text=cleaned, language_code="en")
+                hits.append((cleaned, float(t), float(t + interval_seconds), conf))
+                conf_sum += conf
+                conf_count += 1
+
+            if best_conf >= burst_trigger and burst_frames > 0:
+                burst_remaining = max(burst_remaining, burst_frames)
+    finally:
+        cap.release()
+
+    if conf_count:
+        mean_conf = conf_sum / conf_count
+        try:
+            app.logger.info(
+                "OCR stats: frames=%s hits=%s mean_conf=%.3f",
+                sampled,
+                len(hits),
+                mean_conf,
+            )
+        except Exception:
+            pass
+
+    merge_gap = max(0.25, float(interval_seconds) * 1.5)
+    return _aggregate_text_segments(hits=hits, merge_gap_seconds=merge_gap)
 
 
 def _gcs_presign_get_url(
