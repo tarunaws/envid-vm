@@ -1,8 +1,0 @@
-flask==3.0.3
-flask-cors==4.0.1
-numpy==1.26.4
-pillow==10.4.0
-opencv-python-headless==4.10.0.84
-paddleocr==2.7.3
-# GPU PaddlePaddle (CUDA 12.x compatible). Adjust if needed for your driver/CUDA.
-paddlepaddle-gpu==2.6.2

@@ -58,10 +58,8 @@ fi
 # Derive default local-service URLs for the backend/UI.
 # These must be set even when using default ports, because the backend expects the URL env vars.
 export ENVID_LOCAL_MODERATION_PORT="${ENVID_LOCAL_MODERATION_PORT:-5081}"
-export ENVID_LOCAL_LABEL_DETECTION_PORT="${ENVID_LOCAL_LABEL_DETECTION_PORT:-5083}"
 
 export ENVID_METADATA_LOCAL_MODERATION_URL="${ENVID_METADATA_LOCAL_MODERATION_URL:-http://localhost:${ENVID_LOCAL_MODERATION_PORT}}"
-export ENVID_METADATA_LOCAL_LABEL_DETECTION_URL="${ENVID_METADATA_LOCAL_LABEL_DETECTION_URL:-http://localhost:${ENVID_LOCAL_LABEL_DETECTION_PORT}}"
 
 
 # AWS/S3 has been removed from the default slim stack.
@@ -182,6 +180,7 @@ start_local_moderation_service() {
         return 0
     fi
     if curl -fsS "$url/health" >/dev/null 2>&1; then
+        echo "✅ $service_name already healthy ($url)"
         return 0
     fi
     if [[ ! -x "$runner" ]]; then
@@ -207,92 +206,7 @@ start_local_moderation_service() {
     echo "✅ $service_name started with PID $(cat "$PROJECT_ROOT/${service_name}.pid" 2>/dev/null || echo "?")"
 }
 
-# Optionally start local label-detection service (Detectron2/MMDetection) in a separate Python runtime.
-start_local_label_detection_service() {
-    local service_name="local-label-detection"
-    local runner="$PROJECT_ROOT/localLabelDetection/run_local_venv.sh"
-    local port="${ENVID_LOCAL_LABEL_DETECTION_PORT:-5083}"
-    local url="${ENVID_METADATA_LOCAL_LABEL_DETECTION_URL:-http://localhost:${port}}"
-    local pid_file="$PROJECT_ROOT/${service_name}.pid"
-    local log_file="$PROJECT_ROOT/${service_name}.log"
-
-    # Optional: run via Docker Compose (recommended for MMDetection on macOS).
-    # Enable with: ENVID_LOCAL_LABEL_DETECTION_RUNTIME=docker
-    local runtime="${ENVID_LOCAL_LABEL_DETECTION_RUNTIME:-venv}"
-    if [[ "${ENVID_LOCAL_LABEL_DETECTION_DOCKER:-0}" == "1" ]]; then
-        runtime="docker"
-    fi
-
-    if [[ "${ENVID_LOCAL_LABEL_DETECTION_AUTOSTART:-1}" == "0" ]]; then
-        echo "ℹ️  Local label detection autostart disabled (ENVID_LOCAL_LABEL_DETECTION_AUTOSTART=0)"
-        return 0
-    fi
-    if [[ "$url" != http://localhost:${port}* && "$url" != http://127.0.0.1:${port}* ]]; then
-        echo "ℹ️  Local label detection URL is non-local ($url); skipping autostart"
-        return 0
-    fi
-    if curl -fsS "$url/health" >/dev/null 2>&1; then
-        echo "✅ $service_name already healthy ($url)"
-        return 0
-    fi
-
-    if [[ "$runtime" == "docker" ]]; then
-        if ! command -v docker >/dev/null 2>&1; then
-            echo "⚠️  docker not found; cannot run $service_name via docker"
-            return 0
-        fi
-            local compose_file="${ENVID_LOCAL_LABEL_DETECTION_DOCKER_COMPOSE_FILE:-}"
-            if [[ -z "$compose_file" ]]; then
-                compose_file="docker-compose.yml"
-                if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" && -f "$PROJECT_ROOT/localLabelDetection/docker-compose.amd64.yml" ]]; then
-                    compose_file="docker-compose.amd64.yml"
-                    echo "ℹ️  Apple Silicon detected; defaulting localLabelDetection to $compose_file (override via ENVID_LOCAL_LABEL_DETECTION_DOCKER_COMPOSE_FILE)"
-                fi
-            fi
-        if [[ ! -f "$PROJECT_ROOT/localLabelDetection/$compose_file" ]]; then
-            echo "⚠️  $compose_file not found for localLabelDetection; cannot run via docker"
-            return 0
-        fi
-
-        echo "🐳 Starting $service_name via docker compose on port $port..."
-        (
-            cd "$PROJECT_ROOT/localLabelDetection" || exit 0
-
-            # Clean up any stale container names from previous runs (common when switching compose files/platforms).
-            docker compose -f "$compose_file" down --remove-orphans >/dev/null 2>&1 || true
-            docker rm -f locallabeldetection-local-label-detection-1 >/dev/null 2>&1 || true
-
-            docker compose -f "$compose_file" up -d --build
-        ) || true
-        wait_for_health "$service_name" "$url/health" "$log_file" 120 || true
-        return 0
-    fi
-    if [[ ! -x "$runner" ]]; then
-        echo "⚠️  Local label detection runner not found/executable: $runner"
-        return 0
-    fi
-
-    local py_bin="${ENVID_LOCAL_LABEL_DETECTION_PY_BIN:-}"
-    if [[ -z "$py_bin" ]]; then
-        if command -v python3.11 >/dev/null 2>&1; then
-            py_bin="python3.11"
-        elif command -v python3.12 >/dev/null 2>&1; then
-            py_bin="python3.12"
-        else
-            return 0
-        fi
-    fi
-
-    echo "🔄 Starting $service_name on port $port..."
-    nohup env PYTHONUNBUFFERED=1 PY_BIN="$py_bin" PORT="$port" "$runner" > "$log_file" 2>&1 &
-    echo $! > "$pid_file"
-    echo "✅ $service_name started with PID $(cat "$pid_file" 2>/dev/null || echo "?")"
-
-    wait_for_health "$service_name" "$url/health" "$log_file" 60 || true
-}
-
 start_local_moderation_service
-start_local_label_detection_service
 
 # ✅ Envid Metadata (Multimodal only)
 start_service "envid-metadata-multimodal" "envidMetadataGCP" "app.py" "5016" "$ENV_MULTIMODAL_LOCAL_FILE,$ENV_MULTIMODAL_SECRETS_FILE"

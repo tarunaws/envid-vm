@@ -6,8 +6,6 @@
 - code/frontend/: React UI (Create React App) that drives the multimodal backend.
 - code/localKeySceneBest/: TransNetV2 + optional CLIP clustering sidecar (key scenes).
 - code/localModerationNudeNet/: NudeNet sidecar (local moderation).
-- code/localOcrPaddle/: PaddleOCR sidecar (unused in current fixed pipeline).
-- code/localLabelDetection/: optional Detectron2/MMDetection sidecar (unused in fixed pipeline).
 - start-all.sh / start-backend.sh / stop-backend.sh: local orchestration scripts.
 - SERVICES_README.md: service list and ports.
 
@@ -114,8 +112,6 @@ The backend relies on environment variables defined in code/.env.multimodal.loca
 
 - localKeySceneBest (port 5085): TransNetV2 + optional CLIP clustering; called via ENVID_METADATA_LOCAL_KEYSCENE_URL.
 - localModerationNudeNet (port 5081): NudeNet; called via ENVID_METADATA_LOCAL_MODERATION_URL.
-- localOcrPaddle (port 5084): PaddleOCR sidecar; not used by the fixed policy.
-- localLabelDetection (port 5083): Detectron2/MMDetection; not used by the fixed policy.
 
 ## Scripts
 

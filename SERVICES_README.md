@@ -36,73 +36,6 @@ Other services exist in this repo but are disabled in the startup scripts by def
 ./stop-backend.sh
 ```
 
-### Optional: Local Label Detection (Detectron2 / MMDetection)
-The Envid Metadata (Multimodal) backend can call a separate local label-detection service (default `http://localhost:5083`) when you select **Detectron2** or **MMDetection** in the UI.
-
-On macOS, **MMDetection** often fails in a native venv due to missing MMCV ops (`mmcv.ops`); Docker/Linux is recommended.
-
-If `docker compose up` starts but `/health` still looks like a local venv response, make sure port `5083` isn’t already in use:
-```bash
-lsof -tiTCP:5083 -sTCP:LISTEN | xargs -r kill -9
-```
-
-Run it via the repo scripts:
-```bash
-cd code
-ENVID_LOCAL_LABEL_DETECTION_RUNTIME=docker ./start-backend.sh
-```
-
-On Apple Silicon, the start scripts will automatically default to `docker-compose.amd64.yml` when Docker runtime is enabled (you can still override explicitly).
-
-If you need to force `linux/amd64` (Apple Silicon; slower due to emulation):
-```bash
-cd code
-ENVID_LOCAL_LABEL_DETECTION_RUNTIME=docker \
-ENVID_LOCAL_LABEL_DETECTION_DOCKER_COMPOSE_FILE=docker-compose.amd64.yml \
-./start-backend.sh
-```
-
-Stop it via:
-```bash
-cd code
-./stop-backend.sh
-```
-
-Manual run:
-```bash
-cd code/localLabelDetection
-# Apple Silicon (recommended; runs linux/amd64 via emulation for mmcv/detectron2 wheels)
-docker compose -f docker-compose.amd64.yml up -d --build
-
-# Intel macs / Linux
-# docker compose up -d --build
-```
-
-If you see a container-name conflict like:
-`container name "/locallabeldetection-local-label-detection-1" is already in use`, clean up and retry:
-```bash
-cd code/localLabelDetection
-docker compose down --remove-orphans || true
-docker rm -f locallabeldetection-local-label-detection-1 || true
-docker compose -f docker-compose.amd64.yml up -d --build
-```
-
-Optional: change the host port mapping:
-```bash
-cd code/localLabelDetection
-ENVID_LOCAL_LABEL_DETECTION_PORT=5084 docker compose -f docker-compose.amd64.yml up -d --build
-```
-
-Docker image notes (MMDetection “known-good”):
-- Base image uses Python 3.10 to match available prebuilt MMCV wheels.
-- MMCV is installed from the OpenMMLab wheel index (Torch 2.2 CPU).
-
-Health:
-- Label service: `http://localhost:5083/health`
-- Backend proxy: `http://localhost:5016/local-label-detection/health`
-
-> Tip: The default slim stack does not require AWS. Some optional services (for example Movie Script Creation) require AWS credentials / Bedrock access.
-
 ### Optional: Local Key Scene Best (TransNetV2 + CLIP)
 The Envid Metadata (Multimodal) backend can call a separate local key-scene sidecar (default `http://localhost:5085`) when you select:
 - `transnetv2_clip_cluster`
@@ -145,6 +78,7 @@ npm start
 - **Movie Script Creation Service**: http://localhost:5005
 - **Content Moderation Service**: http://localhost:5006
 - **Personalized Trailer Service**: http://localhost:5007
+- **WhisperX Service**: http://localhost:5088
 
 ## 📊 Port Configuration
 
@@ -159,6 +93,7 @@ npm start
 | Movie Script Creation Service | 5005 | Feature-length screenplay generation with audience and region targeting |
 | Content Moderation Service | 5006 | Video upload with automated moderation timelines |
 | Personalized Trailer Service | 5007 | AI-generated trailer planning and packaging workflows |
+| WhisperX Service | 5088 | GPU-first transcription with streaming subtitles |
 ## 🔧 Configuration
 
 ### Environment Variables

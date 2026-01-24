@@ -1,1 +1,0 @@
- Container locallabeldetection-local-label-detection-1  Running
