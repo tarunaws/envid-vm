@@ -1,37 +1,33 @@
-# Copilot Instructions: Envid Metadata Services
+# Copilot Instructions for Envid Metadata
 
-## Big picture (where to start)
-- Primary stack is **React UI + multimodal backend**: [code/frontend](code/frontend) on port 3000, [code/envidMetadataGCP/app.py](code/envidMetadataGCP/app.py) on port 5016.
-- Optional local CV sidecars are separate services invoked over HTTP (ports 5081–5085); see [SERVICES_README.md](SERVICES_README.md).
-- Legacy AWS-based services live under [code/envidMetadata](code/envidMetadata) and are not part of the slim stack.
+## Big picture
+- Two stacks coexist: the active monolith in [code/envidMetadataGCP](code/envidMetadataGCP) and the microservices migration in [microservices](microservices).
+- The monolith orchestrator lives in [code/envidMetadataGCP/envidMetadataGCP.py](code/envidMetadataGCP/envidMetadataGCP.py) and drives upload → processing → artifact storage → metadata APIs.
+- Frontend (CRA) in [code/frontend](code/frontend) calls the backend over REST and polls job status; proxy rules live in [code/frontend/src/setupProxy.js](code/frontend/src/setupProxy.js).
+- Target service boundaries are captured in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml); all service Dockerfiles/configs belong under [microservices](microservices).
 
 ## Critical workflows
-- Start/stop the slim stack via [start-all.sh](start-all.sh) / [stop-all.sh](stop-all.sh). Backend-only: [code/start-backend.sh](code/start-backend.sh).
-- Env load order is enforced in [code/start-backend.sh](code/start-backend.sh): `code/.env` → `code/.env.local` → `code/.env.multimodal.local` → `code/.env.multimodal.secrets.local`.
-- Main backend venv requires **Python 3.14+**; sidecars often need **Python 3.10/3.11** due to ML wheels.
-- Logs and PIDs are created by startup scripts: `code/<service>.log` and `code/<service>.pid`.
+- Monolith stack: [allInOne/start-all.sh](allInOne/start-all.sh) / [allInOne/stop-all.sh](allInOne/stop-all.sh). Backend-only: [allInOne/start-backend.sh](allInOne/start-backend.sh).
+- Microservices stack: [microservices/start-services.sh](microservices/start-services.sh) / [microservices/stop-services.sh](microservices/stop-services.sh).
+- Backend env load order (scripted): code/.env → code/.env.local → code/.env.multimodal.local → code/.env.multimodal.secrets.local (see [allInOne/.github/copilot-instructions.md](allInOne/.github/copilot-instructions.md)).
+- LibreTranslate local setup lives under [allInOne](allInOne) and uses make up/down/logs + make models (see [allInOne/README.md](allInOne/README.md)).
 
-## Service boundaries & data flow
-- Backend orchestrates GCS I/O, FFmpeg preprocess, Whisper transcription, LLM summarization, and proxies to sidecars. See [code/envidMetadataGCP/app.py](code/envidMetadataGCP/app.py).
-- Frontend calls backend through the proxy in [code/frontend/src/setupProxy.js](code/frontend/src/setupProxy.js), using `REACT_APP_ENVID_MULTIMODAL_BASE`.
-- GCS layout: raw videos in `gs://<GCP_GCS_BUCKET>/rawVideo/`; artifacts in `gs://<ARTIFACTS_BUCKET>/<ARTIFACTS_PREFIX>/`.
+## Integration points & data flow
+- Offload steps via ENVID_*_SERVICE_URL env vars (ingest, ffmpeg, OCR, moderation, WhisperX, scenes, synopsis, export) wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml).
+- Services expose /health; backend also provides proxy health routes for sidecars.
+- Artifacts and raw videos are stored in GCS buckets as described in [code/envidMetadataGCP/README.md](code/envidMetadataGCP/README.md).
 
-## Project-specific conventions
-- Fixed model policy is enforced in [code/envidMetadataGCP/app.py](code/envidMetadataGCP/app.py) (see pipeline steps in [CODEBASE_OVERVIEW.md](CODEBASE_OVERVIEW.md)); do not re-enable deprecated model paths.
-- Local translation uses LibreTranslate via `ENVID_METADATA_TRANSLATE_PROVIDER=libretranslate` and `ENVID_LIBRETRANSLATE_URL` (see [CODEBASE_OVERVIEW.md](CODEBASE_OVERVIEW.md)).
-- Env parsing helper `_env_truthy` in [code/envidMetadataGCP/app.py](code/envidMetadataGCP/app.py) is the canonical pattern for booleans.
-- Health endpoints are required for services (`/health`); backend also exposes proxy health routes for sidecars.
-
-## Integration points (URLs/ports)
-- Backend → sidecars URLs are env-driven (defaults set in [code/start-backend.sh](code/start-backend.sh)).
-- Frontend → backend uses `/backend/*` proxy to port 5016.
+## Project-specific patterns
+- Boolean env parsing uses _env_truthy in [code/envidMetadataGCP/app.py](code/envidMetadataGCP/app.py).
+- New services should be HTTP-based with small request/response contracts; preserve output schemas consumed by [code/frontend/src/EnvidMetadataMinimal.js](code/frontend/src/EnvidMetadataMinimal.js).
+- Wire new services through Envoy ([microservices/gateway](microservices/gateway)) and Nginx ([microservices/reverseproxy](microservices/reverseproxy)).
 
 ## When adding or changing services
-- Add a new service under [code](code), wire it into [code/start-backend.sh](code/start-backend.sh) + [code/stop-backend.sh](code/stop-backend.sh), and document in [SERVICES_README.md](SERVICES_README.md).
+1. Put Dockerfile/config in [microservices](microservices) and add the service to [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml).
+2. Add the corresponding ENVID_*_SERVICE_URL and update the monolith integration in [code/envidMetadataGCP/envidMetadataGCP.py](code/envidMetadataGCP/envidMetadataGCP.py).
+3. If the API output changes, update the UI in [code/frontend/src/EnvidMetadataMinimal.js](code/frontend/src/EnvidMetadataMinimal.js).
 
-## High-signal files
-- Backend core: [code/envidMetadataGCP/app.py](code/envidMetadataGCP/app.py)
-- Frontend entry & routing: [code/frontend/src/App.js](code/frontend/src/App.js)
-- Proxy config: [code/frontend/src/setupProxy.js](code/frontend/src/setupProxy.js)
-- Service catalog & ports: [SERVICES_README.md](SERVICES_README.md)
-- Pipeline overview: [CODEBASE_OVERVIEW.md](CODEBASE_OVERVIEW.md)
+## High-signal docs
+- [allInOne/CODEBASE_OVERVIEW.md](allInOne/CODEBASE_OVERVIEW.md)
+- [microservices/README.md](microservices/README.md)
+- [code/envidMetadataGCP/README.md](code/envidMetadataGCP/README.md)

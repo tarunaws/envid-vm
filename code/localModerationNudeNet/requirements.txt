@@ -1,6 +1,0 @@
-flask==3.0.3
-flask-cors==4.0.1
-pillow==10.4.0
-# NudeNet 3.4.x uses ONNXRuntime (no TensorFlow). We keep this service in a
-# separate Python 3.11/3.12 venv because the main repo venv is Python 3.14+.
-nudenet==3.4.2

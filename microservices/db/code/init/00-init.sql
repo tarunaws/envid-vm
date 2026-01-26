@@ -1,0 +1,2 @@
+-- Optional init script for Envid metadata DB.
+-- Add schema/seed data here if needed.

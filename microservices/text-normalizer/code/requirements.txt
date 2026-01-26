@@ -1,0 +1,4 @@
+Flask==2.3.3
+requests==2.32.5
+wordfreq==3.1.1
+rapidfuzz==3.14.3

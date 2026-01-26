@@ -1,0 +1,447 @@
+version: "3.9"
+
+services:
+  dns:
+    container_name: dns
+    build:
+      context: ..
+      dockerfile: microservices/dns/Dockerfile
+    image: dns
+    restart: always
+    ports:
+      - "5353:53/udp"
+      - "5353:53/tcp"
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.2
+
+  gateway:
+    container_name: gateway
+    build:
+      context: ..
+      dockerfile: microservices/gateway/Dockerfile
+    image: gateway
+    restart: always
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
+    ports:
+      - "5016:5016"
+    dns:
+      - 172.28.0.2
+    volumes:
+      - ./gateway/code/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - /mnt/gcs:/mnt/gcs
+    depends_on:
+      - backend
+      - keycloak
+      - otel-collector
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.3
+        aliases:
+          - backend
+
+  backend:
+    container_name: backend
+    build:
+      context: ..
+      dockerfile: microservices/backend/Dockerfile
+    image: backend
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ./.env
+    dns:
+      - 172.28.0.2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ./code:/app/code
+      - /mnt/gcs:/mnt/gcs
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.4
+    depends_on:
+      - db
+
+  ingest:
+    container_name: ingest
+    build:
+      context: ..
+      dockerfile: microservices/ingest/Dockerfile
+    image: ingest
+    restart: always
+    env_file:
+      - ./.env
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5090:5090"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.18
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ..
+      dockerfile: microservices/frontend/Dockerfile
+    image: frontend
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.5
+
+  audio-translation:
+    container_name: audio-translation
+    build:
+      context: ..
+      dockerfile: microservices/audio-translation/Dockerfile
+    image: audio-translation
+    restart: always
+    volumes:
+      - ./audio-translation/code/whisperxService.py:/app/whisperxService.py:ro
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5088:5088"
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.6
+        aliases:
+          - whisperx-service
+    dns:
+      - 172.28.0.2
+
+  moderation:
+    container_name: moderation
+    build:
+      context: ..
+      dockerfile: microservices/moderation/Dockerfile
+    image: moderation
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5081:5081"
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.7
+    dns:
+      - 172.28.0.2
+
+
+  keyscene:
+    container_name: keyscene
+    build:
+      context: ..
+      dockerfile: microservices/keyscene/Dockerfile
+    image: keyscene
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5085:5085"
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.8
+    dns:
+      - 172.28.0.2
+
+  transcoder:
+    container_name: transcoder
+    build:
+      context: ..
+      dockerfile: microservices/transcoder/Dockerfile
+    image: transcoder
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5091:5091"
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.9
+
+  scene-detect:
+    container_name: scene-detect
+    build:
+      context: ..
+      dockerfile: microservices/scene-detect/Dockerfile
+    image: scene-detect
+    restart: always
+    volumes:
+      - /mnt/processing:/tmp
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5094:5094"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.21
+
+  synopsys:
+    container_name: synopsys
+    build:
+      context: ..
+      dockerfile: microservices/synopsys/Dockerfile
+    image: synopsys
+    restart: always
+    env_file:
+      - ./.env
+    volumes:
+      - /mnt/processing:/tmp
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5099:5099"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.22
+
+  metadata-export:
+    container_name: metadata-export
+    build:
+      context: ..
+      dockerfile: microservices/metadata-export/Dockerfile
+    image: metadata-export
+    restart: always
+    env_file:
+      - ./.env
+    volumes:
+      - /tmp:/tmp
+    ports:
+      - "5096:5096"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.23
+
+  translate:
+    container_name: translate
+    build:
+      context: ..
+      dockerfile: microservices/translate/Dockerfile
+    image: translate
+    restart: always
+    env_file:
+      - ./.env
+    ports:
+      - "5000:5000"
+      - "8010:8010"
+    volumes:
+      - /mnt/gcs/translate/models:/home/libretranslate/.local/share/argos-translate
+      - /mnt/gcs/translate/cache:/home/libretranslate/.local/cache
+      - /mnt/gcs:/mnt/gcs
+    user: "0:0"
+    cpus: "${LT_CPU_LIMIT:-1.0}"
+    mem_limit: "${LT_MEM_LIMIT:-2g}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/languages').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.14
+        aliases:
+          - translategrammer
+
+  text-on-video:
+    container_name: text-on-video
+    build:
+      context: ..
+      dockerfile: microservices/text-on-video/Dockerfile
+    image: text-on-video
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5083:5083"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.17
+        aliases:
+          - textonvideo
+
+  frame-extractor:
+    container_name: frame-extractor
+    build:
+      context: ..
+      dockerfile: microservices/frame-extractor/Dockerfile
+    image: frame-extractor
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5093:5093"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.26
+
+  document-extractor:
+    container_name: document-extractor
+    build:
+      context: ..
+      dockerfile: microservices/document-extractor/Dockerfile
+    image: document-extractor
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5097:5097"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.27
+
+  text-normalizer:
+    container_name: text-normalizer
+    build:
+      context: ..
+      dockerfile: microservices/text-normalizer/Dockerfile
+    image: text-normalizer
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "5098:5098"
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.28
+
+  keycloak:
+    container_name: keycloak
+    build:
+      context: ..
+      dockerfile: microservices/keycloak/Dockerfile
+    image: keycloak
+    restart: always
+    command:
+      - start-dev
+      - --import-realm
+    volumes:
+      - ./keycloak/code/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "8081:8080"
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.10
+    dns:
+      - 172.28.0.2
+
+  tracing:
+    container_name: tracing
+    build:
+      context: ..
+      dockerfile: microservices/tracing/Dockerfile
+    image: tracing
+    restart: always
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "16686:16686"
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.11
+    dns:
+      - 172.28.0.2
+
+  otel-collector:
+    container_name: otel-collector
+    build:
+      context: ..
+      dockerfile: microservices/otel-collector/Dockerfile
+    image: otel-collector
+    restart: always
+    command: ["--config=/etc/otel-collector.yaml"]
+    volumes:
+      - ./otel-collector/code/otel-collector.yaml:/etc/otel-collector.yaml:ro
+      - /mnt/processing:/tmp
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - tracing
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.12
+
+  db:
+    container_name: db
+    build:
+      context: ..
+      dockerfile: microservices/db/Dockerfile
+    image: db
+    restart: always
+    volumes:
+      - /mnt/gcs/db:/var/lib/mysql
+      - /mnt/gcs:/mnt/gcs
+    ports:
+      - "3306:3306"
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.24
+    dns:
+      - 172.28.0.2
+
+  reverseproxy:
+    container_name: reverseproxy
+    build:
+      context: ..
+      dockerfile: microservices/reverseproxy/Dockerfile
+    image: reverseproxy
+    restart: always
+    depends_on:
+      - frontend
+      - gateway
+    ports:
+      - "80:80"
+    volumes:
+      - /mnt/gcs:/mnt/gcs
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.13
+        aliases:
+          - reverproxy
+    dns:
+      - 172.28.0.2
+
+networks:
+  envid-net:
+    name: envid-net
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes: {}

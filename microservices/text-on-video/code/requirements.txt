@@ -1,0 +1,4 @@
+Flask==2.3.3
+requests==2.32.3
+pytesseract==0.3.13
+Pillow==11.3.0

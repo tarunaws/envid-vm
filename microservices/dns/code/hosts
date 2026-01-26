@@ -1,0 +1,23 @@
+# Update these IPs if you change the docker-compose static addresses
+172.28.0.2   dns
+172.28.0.3   gateway backend
+172.28.0.4   backend
+172.28.0.18  ingest
+172.28.0.5   frontend
+172.28.0.6   audio-translation whisperx-service
+172.28.0.7   moderation
+172.28.0.8   keyscene
+172.28.0.9   transcoder
+172.28.0.21  scene-detect
+172.28.0.22  synopsys
+172.28.0.23  metadata-export
+172.28.0.14  translate translategrammer
+172.28.0.17  text-on-video textonvideo
+172.28.0.26  frame-extractor
+172.28.0.27  document-extractor
+172.28.0.28  text-normalizer
+172.28.0.10  keycloak
+172.28.0.11  tracing
+172.28.0.12  otel-collector
+172.28.0.24  db
+172.28.0.13  reverseproxy reverproxy
