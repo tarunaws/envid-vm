@@ -1,8 +1,7 @@
 # Microservices migration plan
 
 ## Current state
-- The core orchestration still lives in the monolith at [code/envidMetadataGCP/envidMetadataGCP.py](code/envidMetadataGCP/envidMetadataGCP.py).
-- The backend service is the orchestrator; there is no separate orchestrator microservice.
+- The backend service is the orchestrator; the entrypoint is [backend/code/backend.py](backend/code/backend.py).
 - [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml) already models the target service topology (gateway, backend, sidecars, auth, observability).
 - Base Dockerfiles/configs now live under [microservices/](microservices) (gateway, backend, frontend, sidecars, auth, observability). Use this folder for all microservice assets.
 
@@ -34,7 +33,7 @@ Split the pipeline into discrete services aligned with existing steps in [CODEBA
 
 ## Phase 2 (extraction)
 - Carve out each step above into an HTTP service with `/health` and a small request/response contract.
-- Replace in-process calls inside [code/envidMetadataGCP/envidMetadataGCP.py](code/envidMetadataGCP/envidMetadataGCP.py) with HTTP calls to the new services.
+- Replace in-process calls inside [backend/code/backend.py](backend/code/backend.py) with HTTP calls to the new services.
 - Version API contracts and preserve output schemas consumed by [code/frontend/src/EnvidMetadataMinimal.js](code/frontend/src/EnvidMetadataMinimal.js).
 
 ## Phase 3 (stabilization)

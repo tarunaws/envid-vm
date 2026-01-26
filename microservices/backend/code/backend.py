@@ -1,3 +1,74 @@
+from __future__ import annotations
+
+import base64
+import difflib
+import io
+import json
+import mimetypes
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import threading
+import time
+import uuid
+import zipfile
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import requests
+from flask import Flask, Response, jsonify, redirect, request, send_file
+from werkzeug.exceptions import RequestEntityTooLarge
+
+try:
+    from PIL import Image  # type: ignore
+except Exception:
+    Image = None
+
+try:
+    import language_tool_python  # type: ignore
+except Exception:
+    language_tool_python = None
+
+try:
+    from mysql.connector import pooling as mysql_pooling  # type: ignore
+except Exception:
+    mysql_pooling = None
+
+try:
+    from google.cloud import storage as gcs_storage  # type: ignore
+    from google.cloud import speech as gcp_speech  # type: ignore
+    from google.cloud import translate as gcp_translate  # type: ignore
+    from google.cloud import language_v1 as gcp_language  # type: ignore
+    from google.cloud import videointelligence as gcp_video_intelligence  # type: ignore
+except Exception:
+    gcs_storage = None
+    gcp_speech = None
+    gcp_translate = None
+    gcp_language = None
+    gcp_video_intelligence = None
+
+try:
+    from rapidfuzz import process as rapid_process, fuzz as rapid_fuzz  # type: ignore
+except Exception:
+    rapid_process = None
+    rapid_fuzz = None
+
+try:
+    from wordfreq import zipf_frequency, top_n_list  # type: ignore
+except Exception:
+    zipf_frequency = None
+    top_n_list = None
+
+app = Flask(__name__)
+
 
 def _translate_provider() -> str:
     pref = (os.getenv("ENVID_METADATA_TRANSLATE_PROVIDER") or "auto").strip().lower()
@@ -21,33 +92,34 @@ def _translate_provider() -> str:
 _LIBRE_LANG_CACHE: tuple[set[str], float] = (set(), 0.0)
 
 
+def _libretranslate_languages_raw(base_url: str) -> list[dict[str, Any]]:
+    url = base_url.rstrip("/") + "/languages"
+    resp = requests.get(url, timeout=10)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"LibreTranslate /languages failed ({resp.status_code}): {resp.text}")
+    data = resp.json()
+    if not isinstance(data, list):
+        return []
+    return [x for x in data if isinstance(x, dict)]
+
+
 def _libretranslate_supported_langs(base_url: str) -> set[str]:
     global _LIBRE_LANG_CACHE
-    endpoint = base_url.rstrip("/") + "/languages"
     cached, ts = _LIBRE_LANG_CACHE
     if cached and (time.time() - ts) < 600:
         return cached
-            if (res.stdout or "").strip():
-                return [docker_bin, "exec", "-i", "audio-translation", "python3", "-m", "whisperx"]
-        except Exception:
-    if not target_lang:
-        return raw
-    src = (source_lang or "").strip()
-    tgt = target_lang.strip().lower()
-    if src and (src.lower() == tgt or src.lower().startswith(f"{tgt}-")):
-        return raw
-    if provider == "libretranslate":
-        return _libretranslate_translate(text=raw[:4500], source_lang=(src if src and len(src) >= 2 else None), target_lang=tgt)
-    if provider == "gcp_translate":
-        if gcp_client is None or gcp_parent is None:
-            raise RuntimeError("GCP Translate client not initialized")
-        req: Dict[str, Any] = {"parent": gcp_parent, "contents": [raw[:4500]], "mime_type": "text/plain", "target_language_code": tgt}
-        if src and len(src) >= 2:
-            req["source_language_code"] = src
-        resp = gcp_client.translate_text(request=req)
-        if resp and resp.translations:
-            return (resp.translations[0].translated_text or "").strip()
-    return raw
+    try:
+        langs = _libretranslate_languages_raw(base_url)
+        codes = {
+            str(item.get("code") or item.get("language") or "").strip()
+            for item in langs
+            if isinstance(item, dict)
+        }
+        codes = {c for c in codes if c}
+    except Exception:
+        return cached
+    _LIBRE_LANG_CACHE = (codes, time.time())
+    return codes
 
 
 def _translate_segments(
@@ -3051,7 +3123,7 @@ def _local_keyscene_best_clip_cluster(
 
 
 def _repo_root() -> Path:
-    # envidMetadataGCP.py is in microservices/backend/code/envidMetadataGCP.py
+    # backend.py is in microservices/backend/code/backend.py
     return Path(__file__).resolve().parents[2]
 
 

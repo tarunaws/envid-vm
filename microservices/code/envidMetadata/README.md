@@ -3,16 +3,16 @@
 > **Deprecated:** This folder is the legacy AWS-based Envid Metadata service and is no longer part of the default (slim) stack.
 >
 > Use the multimodal metadata service instead:
-> - Envid metadata service (multimodal) (port 5016): `microservices/backend/envidMetadataGCP/` (with `microservices/backend/.env.multimodal.local` overlay)
+> - Envid metadata service (multimodal) (port 5016): `microservices/backend/code/backend.py` (backend/orchestrator entrypoint)
 >
-> See: `microservices/backend/envidMetadataGCP/README.md`.
+> See: `microservices/backend/code/backend.py`.
 
 ## Overview
 Extract metadata from videos (tags, transcript, emotions, on-screen text, celebrities).
 
 Note: semantic/vector search has been removed; `/search` and `/search-text` return `410 Gone`.
 
-This README is retained for historical reference. The current local-first/GCS-first implementation lives under `microservices/backend/envidMetadataGCP/`.
+This README is retained for historical reference. The current local-first/GCS-first implementation lives under `microservices/backend/code/backend.py`.
 
 ## Features
 

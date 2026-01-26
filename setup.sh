@@ -2,11 +2,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ROOT_DIR="${SCRIPT_DIR}"
 MICROSERVICES_DIR="${ROOT_DIR}/microservices"
+DOCKERHUB_REPO="${DOCKERHUB_REPO:-tarunaws/envid-metadata}"
 
 if ! command -v docker >/dev/null 2>&1; then
 	echo "❌ docker not found. Install Docker before continuing."
+	exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+	echo "❌ Docker daemon is not running. Start Docker and re-run setup."
 	exit 1
 fi
 
@@ -35,9 +41,9 @@ MICROSERVICES_DIR="${MICROSERVICES_DIR}" python3 - <<'PY'
 from pathlib import Path
 import re
 
-root_dir = Path((__import__("os").environ.get("MICROSERVICES_DIR") or ".")).resolve().parent
-compose_path = root_dir / "microservices" / "docker-compose.app.yml"
-hosts_path = root_dir / "microservices" / "dns" / "code" / "hosts"
+root_dir = Path((__import__("os").environ.get("MICROSERVICES_DIR") or ".")).resolve()
+compose_path = root_dir / "docker-compose.app.yml"
+hosts_path = root_dir / "dns" / "code" / "hosts"
 
 text = compose_path.read_text()
 lines = text.splitlines()
@@ -108,7 +114,63 @@ hosts_path.write_text("\n".join(rows) + "\n")
 print("✅ Updated dns/hosts from docker-compose.app.yml")
 PY
 
-compose_file="${SCRIPT_DIR}/docker-compose.app.yml"
+compose_file="${MICROSERVICES_DIR}/docker-compose.app.yml"
+
+get_latest_tag() {
+	python3 - "$DOCKERHUB_REPO" "$1" <<'PY'
+import json
+import sys
+import urllib.request
+from urllib.parse import quote
+
+repo = sys.argv[1]
+image = sys.argv[2]
+
+tags = []
+url = f"https://hub.docker.com/v2/repositories/{repo}/tags?page_size=100&name={quote(image + '-v')}"
+while url:
+	try:
+		with urllib.request.urlopen(url, timeout=15) as resp:
+			data = json.load(resp)
+	except Exception:
+		break
+	for item in data.get("results", []) or []:
+		name = str(item.get("name") or "")
+		if name.startswith(f"{image}-v"):
+			tags.append(name)
+	url = data.get("next")
+
+def ver(tag: str) -> int:
+	try:
+		return int(tag.rsplit("-v", 1)[1])
+	except Exception:
+		return -1
+
+tags = sorted(tags, key=ver, reverse=True)
+print(tags[0] if tags else "")
+PY
+}
+
+ensure_image() {
+	local image_name="$1"
+	if docker images --format '{{.Repository}}' | grep -q "^${image_name}$"; then
+		echo "✅ Image ${image_name} exists locally."
+		return 0
+	fi
+
+	latest_tag="$(get_latest_tag "${image_name}")"
+	if [ -n "${latest_tag}" ]; then
+		echo "⬇️  Pulling ${DOCKERHUB_REPO}:${latest_tag}"
+		if docker pull "${DOCKERHUB_REPO}:${latest_tag}"; then
+			docker tag "${DOCKERHUB_REPO}:${latest_tag}" "${image_name}:latest"
+			echo "✅ Tagged ${image_name}:latest from Docker Hub"
+			return 0
+		fi
+	fi
+
+	echo "🛠️  Building ${image_name} from Dockerfile"
+	return 1
+}
 
 while IFS=$'\t' read -r service container_name image_name; do
 	if [ -z "${service}" ]; then
@@ -133,19 +195,16 @@ while IFS=$'\t' read -r service container_name image_name; do
 	fi
 
 	if docker ps -a --format '{{.Names}}' | grep -q "^${container_name}$"; then
-		echo "▶️  Starting ${service} (${container_name})..."
+		echo "▶️  Starting existing ${service} (${container_name})..."
 		"${COMPOSE_CMD[@]}" -f "${compose_file}" up -d "${service}"
 	else
-		if docker images --format '{{.Repository}}' | grep -q "^${image_name}$"; then
-			echo "✅ Image ${image_name} exists (tag ignored). Skipping build."
-		else
-			echo "🛠️  Building ${service} (${container_name})..."
+		if ! ensure_image "${image_name}"; then
 			"${COMPOSE_CMD[@]}" -f "${compose_file}" build "${service}"
 		fi
 		echo "▶️  Starting ${service} (${container_name})..."
 		"${COMPOSE_CMD[@]}" -f "${compose_file}" up -d "${service}"
 	fi
-done < <(MICROSERVICES_DIR="${SCRIPT_DIR}" python3 - <<'PY'
+done < <(MICROSERVICES_DIR="${MICROSERVICES_DIR}" python3 - <<'PY'
 from pathlib import Path
 import re
 
@@ -200,13 +259,10 @@ if docker ps --format '{{.Names}}' | grep -q "^${dns_container}$"; then
 	echo "✅ ${dns_container} already running. Skipping."
 else
 	if docker ps -a --format '{{.Names}}' | grep -q "^${dns_container}$"; then
-		echo "▶️  Starting ${dns_service} (${dns_container})..."
+		echo "▶️  Starting existing ${dns_service} (${dns_container})..."
 		"${COMPOSE_CMD[@]}" -f "${compose_file}" up -d "${dns_service}"
 	else
-		if docker images --format '{{.Repository}}' | grep -q "^${dns_image}$"; then
-			echo "✅ Image ${dns_image} exists (tag ignored). Skipping build."
-		else
-			echo "🛠️  Building ${dns_service} (${dns_container})..."
+		if ! ensure_image "${dns_image}"; then
 			"${COMPOSE_CMD[@]}" -f "${compose_file}" build "${dns_service}"
 		fi
 		echo "▶️  Starting ${dns_service} (${dns_container})..."
