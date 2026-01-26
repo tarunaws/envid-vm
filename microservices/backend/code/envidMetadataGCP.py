@@ -1020,7 +1020,7 @@ def _looks_like_uuid(value: str) -> bool:
 
 
 def _persist_local_video_copy() -> bool:
-    return _env_truthy(os.getenv("ENVID_METADATA_PERSIST_LOCAL_VIDEO"), default=False)
+    return _env_truthy(os.getenv("ENVID_METADATA_PERSIST_LOCAL_VIDEO"), default=True)
 
 
 FFMPEG_PATH = os.environ.get("FFMPEG_PATH")
@@ -1518,6 +1518,193 @@ def _job_steps_default() -> List[Dict[str, Any]]:
     ]
 
 
+@dataclass(slots=True)
+class OrchestratorInputs:
+    job_id: str
+    task_selection: Dict[str, Any]
+    requested_models: Dict[str, Any]
+
+
+@dataclass(slots=True)
+class Selection:
+    enable_label_detection: bool
+    enable_text_on_screen: bool
+    enable_moderation: bool
+    enable_transcribe: bool
+    enable_famous_locations: bool
+    enable_scene_by_scene: bool
+    enable_key_scene: bool
+    enable_high_point: bool
+    enable_synopsis_generation: bool
+    enable_opening_closing: bool
+    enable_celebrity_detection: bool
+    enable_celebrity_bio_image: bool
+    requested_label_model_raw: str
+    requested_label_model: str
+    requested_text_model: str
+    requested_moderation_model: str
+    requested_key_scene_model_raw: str
+    requested_key_scene_model: str
+    label_engine: str
+    use_vi_label_detection: bool
+    use_local_ocr: bool
+    use_local_moderation: bool
+    allow_moderation_fallback: bool
+    local_moderation_url_override: str
+    use_transnetv2_for_scenes: bool
+    use_pyscenedetect_for_scenes: bool
+    use_clip_cluster_for_key_scenes: bool
+    want_shots: bool
+    want_vi_shots: bool
+    want_any_vi: bool
+
+
+@dataclass(slots=True)
+class PreflightResult:
+    selection: Selection
+    precheck: Dict[str, Any]
+
+
+def _orchestrator_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    return bool(value)
+
+
+def _orchestrator_str(value: Any, default: str) -> str:
+    raw = str(value).strip() if value is not None else ""
+    return raw or default
+
+
+def _build_selection(inputs: OrchestratorInputs) -> Selection:
+    sel = inputs.task_selection or {}
+    requested = inputs.requested_models or {}
+
+    enable_label_detection = _orchestrator_bool(sel.get("enable_label_detection"), True)
+    enable_text_on_screen = _orchestrator_bool(sel.get("enable_text_on_screen"), True)
+    enable_moderation = _orchestrator_bool(sel.get("enable_moderation"), True)
+    enable_transcribe = _orchestrator_bool(sel.get("enable_transcribe"), True)
+    enable_famous_locations = _orchestrator_bool(sel.get("enable_famous_locations"), False)
+    enable_scene_by_scene = _orchestrator_bool(sel.get("enable_scene_by_scene"), True)
+    enable_key_scene = _orchestrator_bool(sel.get("enable_key_scene"), True)
+    enable_high_point = _orchestrator_bool(sel.get("enable_high_point"), True)
+    enable_synopsis_generation = _orchestrator_bool(sel.get("enable_synopsis_generation"), False)
+    enable_opening_closing = _orchestrator_bool(sel.get("enable_opening_closing"), False)
+    enable_celebrity_detection = _orchestrator_bool(sel.get("enable_celebrity_detection"), False)
+    enable_celebrity_bio_image = _orchestrator_bool(sel.get("enable_celebrity_bio_image"), False)
+
+    requested_label_model_raw = _orchestrator_str(
+        requested.get("label_detection_model") or sel.get("label_detection_model"), "auto"
+    )
+    requested_label_model = _orchestrator_str(sel.get("label_detection_model_normalized"), requested_label_model_raw)
+
+    requested_text_model = _orchestrator_str(requested.get("text_model") or sel.get("text_model"), "tesseract")
+    requested_moderation_model = _orchestrator_str(
+        requested.get("moderation_model") or sel.get("moderation_model"), "nudenet"
+    )
+
+    requested_key_scene_model_raw = _orchestrator_str(
+        requested.get("key_scene_detection_model") or sel.get("key_scene_detection_model"),
+        "pyscenedetect_clip_cluster",
+    )
+    requested_key_scene_model = _orchestrator_str(
+        sel.get("key_scene_detection_model_normalized"), requested_key_scene_model_raw
+    )
+
+    label_engine = _orchestrator_str(sel.get("label_engine"), "gcp_video_intelligence")
+    use_vi_label_detection = _orchestrator_bool(
+        sel.get("use_vi_label_detection"), label_engine.lower() in {"gcp_video_intelligence", "vi"}
+    )
+
+    use_local_ocr = _orchestrator_bool(sel.get("use_local_ocr"), True)
+    use_local_moderation = _orchestrator_bool(sel.get("use_local_moderation"), True)
+    allow_moderation_fallback = _orchestrator_bool(sel.get("allow_moderation_fallback"), True)
+    local_moderation_url_override = _orchestrator_str(sel.get("local_moderation_url_override"), "")
+
+    use_transnetv2_for_scenes = _orchestrator_bool(sel.get("use_transnetv2_for_scenes"), False)
+    use_pyscenedetect_for_scenes = _orchestrator_bool(sel.get("use_pyscenedetect_for_scenes"), True)
+    use_clip_cluster_for_key_scenes = _orchestrator_bool(sel.get("use_clip_cluster_for_key_scenes"), True)
+
+    want_vi_shots = _orchestrator_bool(sel.get("want_vi_shots"), False)
+    want_any_vi = _orchestrator_bool(sel.get("want_any_vi"), want_vi_shots)
+    want_shots = _orchestrator_bool(
+        sel.get("want_shots"),
+        enable_scene_by_scene or enable_key_scene or enable_high_point,
+    )
+
+    return Selection(
+        enable_label_detection=enable_label_detection,
+        enable_text_on_screen=enable_text_on_screen,
+        enable_moderation=enable_moderation,
+        enable_transcribe=enable_transcribe,
+        enable_famous_locations=enable_famous_locations,
+        enable_scene_by_scene=enable_scene_by_scene,
+        enable_key_scene=enable_key_scene,
+        enable_high_point=enable_high_point,
+        enable_synopsis_generation=enable_synopsis_generation,
+        enable_opening_closing=enable_opening_closing,
+        enable_celebrity_detection=enable_celebrity_detection,
+        enable_celebrity_bio_image=enable_celebrity_bio_image,
+        requested_label_model_raw=requested_label_model_raw,
+        requested_label_model=requested_label_model,
+        requested_text_model=requested_text_model,
+        requested_moderation_model=requested_moderation_model,
+        requested_key_scene_model_raw=requested_key_scene_model_raw,
+        requested_key_scene_model=requested_key_scene_model,
+        label_engine=label_engine,
+        use_vi_label_detection=use_vi_label_detection,
+        use_local_ocr=use_local_ocr,
+        use_local_moderation=use_local_moderation,
+        allow_moderation_fallback=allow_moderation_fallback,
+        local_moderation_url_override=local_moderation_url_override,
+        use_transnetv2_for_scenes=use_transnetv2_for_scenes,
+        use_pyscenedetect_for_scenes=use_pyscenedetect_for_scenes,
+        use_clip_cluster_for_key_scenes=use_clip_cluster_for_key_scenes,
+        want_shots=want_shots,
+        want_vi_shots=want_vi_shots,
+        want_any_vi=want_any_vi,
+    )
+
+
+def orchestrate_preflight(
+    *,
+    inputs: OrchestratorInputs,
+    precheck_models: Callable[..., Dict[str, Any]] | None = None,
+    job_update: Callable[..., Any] | None = None,
+    job_step_update: Callable[..., Any] | None = None,
+) -> PreflightResult:
+    selection = _build_selection(inputs)
+
+    precheck: Dict[str, Any] = {}
+    if precheck_models is not None:
+        precheck = precheck_models(
+            enable_transcribe=selection.enable_transcribe,
+            enable_synopsis_generation=selection.enable_synopsis_generation,
+            enable_label_detection=selection.enable_label_detection,
+            enable_moderation=selection.enable_moderation,
+            enable_text_on_screen=selection.enable_text_on_screen,
+            enable_key_scene=selection.enable_key_scene,
+            enable_scene_by_scene=selection.enable_scene_by_scene,
+            enable_famous_locations=selection.enable_famous_locations,
+            requested_key_scene_model=selection.requested_key_scene_model,
+            requested_label_model=selection.requested_label_model,
+            requested_text_model=selection.requested_text_model,
+            requested_moderation_model=selection.requested_moderation_model,
+            use_local_moderation=selection.use_local_moderation,
+            allow_moderation_fallback=selection.allow_moderation_fallback,
+            use_local_ocr=selection.use_local_ocr,
+            want_any_vi=selection.want_any_vi,
+            local_moderation_url_override=selection.local_moderation_url_override,
+        )
+
+    if job_update is not None:
+        job_update(inputs.job_id, status="preflight", progress=0, message="Preflight completed")
+    if job_step_update is not None:
+        job_step_update(inputs.job_id, "preflight", status="completed", percent=100, message="Preflight completed")
+
+    return PreflightResult(selection=selection, precheck=precheck)
+
+
 def _db_config() -> Dict[str, Any]:
     return {
         "host": (os.getenv("ENVID_METADATA_DB_HOST") or "").strip(),
@@ -1693,6 +1880,17 @@ def _db_file_insert(job_id: str, *, kind: str, path: str | None, gcs_uri: str | 
     )
 
 
+def _db_file_upsert(job_id: str, *, kind: str, path: str | None, gcs_uri: str | None = None) -> None:
+    _db_execute(
+        """
+        DELETE FROM job_files
+        WHERE job_id = %s AND kind = %s
+        """,
+        (job_id, kind),
+    )
+    _db_file_insert(job_id, kind=kind, path=path, gcs_uri=gcs_uri)
+
+
 def _db_payload_insert(job_id: str, *, kind: str, payload: Dict[str, Any]) -> None:
     now = datetime.utcnow()
     _db_execute(
@@ -1701,6 +1899,33 @@ def _db_payload_insert(job_id: str, *, kind: str, payload: Dict[str, Any]) -> No
         VALUES (%s, %s, %s, %s)
         """,
         (job_id, kind, json.dumps(payload, ensure_ascii=False), now),
+    )
+
+
+def _db_delete_job(job_id: str) -> None:
+    _db_execute(
+        """
+        DELETE FROM job_files WHERE job_id = %s
+        """,
+        (job_id,),
+    )
+    _db_execute(
+        """
+        DELETE FROM job_payloads WHERE job_id = %s
+        """,
+        (job_id,),
+    )
+    _db_execute(
+        """
+        DELETE FROM job_steps WHERE job_id = %s
+        """,
+        (job_id,),
+    )
+    _db_execute(
+        """
+        DELETE FROM jobs WHERE id = %s
+        """,
+        (job_id,),
     )
 
 
@@ -2826,7 +3051,7 @@ def _local_keyscene_best_clip_cluster(
 
 
 def _repo_root() -> Path:
-    # envidMetadataGCP.py is in microservices/backend/code/envidMetadataGCP/envidMetadataGCP.py
+    # envidMetadataGCP.py is in microservices/backend/code/envidMetadataGCP.py
     return Path(__file__).resolve().parents[2]
 
 
@@ -4943,6 +5168,12 @@ def _process_gcs_video_job_cloud_only(
             file_extension = Path(gcs_object).suffix or ".mp4"
             stored_filename = f"{job_id}{file_extension}"
             shutil.copy2(local_path, VIDEOS_DIR / stored_filename)
+            _db_file_upsert(
+                job_id,
+                kind="history_video",
+                path=str(VIDEOS_DIR / stored_filename),
+                gcs_uri=gcs_uri,
+            )
 
         file_size_bytes: int | None = None
         try:
@@ -6042,6 +6273,7 @@ def delete_video(video_id: str) -> Any:
         with VIDEO_INDEX_LOCK:
             VIDEO_INDEX[:] = [x for x in VIDEO_INDEX if str(x.get("id")) != str(video_id)]
         _save_video_index()
+        _db_delete_job(video_id)
         return jsonify({"ok": True, "message": f"Deleted video {video_id}", "deleted_gcs_objects": deleted_gcs_objects, "kept_gcs_objects": kept_gcs_objects, "gcs_warnings": warnings}), 200
     except Exception as exc:
         return jsonify({"error": str(exc), "deleted_gcs_objects": deleted_gcs_objects, "kept_gcs_objects": kept_gcs_objects, "gcs_warnings": warnings}), 500

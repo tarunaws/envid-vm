@@ -52,13 +52,13 @@ COPY microservices/backend/code/requirements.txt /app/requirements.txt
 RUN python -m pip install --upgrade pip \
     && python -m pip install -r /app/requirements.txt
 
-COPY microservices/backend/code/envidMetadataGCP /app/envidMetadataGCP
+COPY microservices/backend/code/envidMetadataGCP.py /app/envidMetadataGCP.py
 
 ENV PYTHONPATH="/app"
 
-RUN if [ -f /app/envidMetadataGCP/ffmpeg_proxy.sh ]; then chmod +x /app/envidMetadataGCP/ffmpeg_proxy.sh; fi \
-    && if [ -f /app/envidMetadataGCP/ffprobe_proxy.sh ]; then chmod +x /app/envidMetadataGCP/ffprobe_proxy.sh; fi
+RUN if [ -f /app/ffmpeg_proxy.sh ]; then chmod +x /app/ffmpeg_proxy.sh; fi \
+    && if [ -f /app/ffprobe_proxy.sh ]; then chmod +x /app/ffprobe_proxy.sh; fi
 
 EXPOSE 5016
 
-CMD ["python", "envidMetadataGCP/envidMetadataGCP.py"]
+CMD ["python", "envidMetadataGCP.py"]
