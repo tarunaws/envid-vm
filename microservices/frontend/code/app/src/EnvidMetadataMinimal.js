@@ -6,82 +6,198 @@ import styled from 'styled-components';
 // Default to CRA dev proxy (see src/setupProxy.js). Can be overridden via REACT_APP_ENVID_METADATA_BACKEND_URL.
 const BACKEND_URL = process.env.REACT_APP_ENVID_METADATA_BACKEND_URL || '/backend';
 const POLL_INTERVAL_MS = 2000;
+const WHISPER_LANGUAGE_OPTIONS = [
+  { value: 'auto', label: 'Auto Detect' },
+  { value: 'af', label: 'Afrikaans' },
+  { value: 'am', label: 'Amharic' },
+  { value: 'ar', label: 'Arabic' },
+  { value: 'as', label: 'Assamese' },
+  { value: 'az', label: 'Azerbaijani' },
+  { value: 'ba', label: 'Bashkir' },
+  { value: 'be', label: 'Belarusian' },
+  { value: 'bg', label: 'Bulgarian' },
+  { value: 'bn', label: 'Bengali' },
+  { value: 'bo', label: 'Tibetan' },
+  { value: 'br', label: 'Breton' },
+  { value: 'bs', label: 'Bosnian' },
+  { value: 'ca', label: 'Catalan' },
+  { value: 'cs', label: 'Czech' },
+  { value: 'cy', label: 'Welsh' },
+  { value: 'da', label: 'Danish' },
+  { value: 'de', label: 'German' },
+  { value: 'el', label: 'Greek' },
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'et', label: 'Estonian' },
+  { value: 'eu', label: 'Basque' },
+  { value: 'fa', label: 'Persian' },
+  { value: 'fi', label: 'Finnish' },
+  { value: 'fo', label: 'Faroese' },
+  { value: 'fr', label: 'French' },
+  { value: 'gl', label: 'Galician' },
+  { value: 'gu', label: 'Gujarati' },
+  { value: 'ha', label: 'Hausa' },
+  { value: 'haw', label: 'Hawaiian' },
+  { value: 'he', label: 'Hebrew' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'hr', label: 'Croatian' },
+  { value: 'ht', label: 'Haitian Creole' },
+  { value: 'hu', label: 'Hungarian' },
+  { value: 'hy', label: 'Armenian' },
+  { value: 'id', label: 'Indonesian' },
+  { value: 'is', label: 'Icelandic' },
+  { value: 'it', label: 'Italian' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'jw', label: 'Javanese' },
+  { value: 'ka', label: 'Georgian' },
+  { value: 'kk', label: 'Kazakh' },
+  { value: 'km', label: 'Khmer' },
+  { value: 'kn', label: 'Kannada' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'la', label: 'Latin' },
+  { value: 'lb', label: 'Luxembourgish' },
+  { value: 'ln', label: 'Lingala' },
+  { value: 'lo', label: 'Lao' },
+  { value: 'lt', label: 'Lithuanian' },
+  { value: 'lv', label: 'Latvian' },
+  { value: 'mg', label: 'Malagasy' },
+  { value: 'mi', label: 'Maori' },
+  { value: 'mk', label: 'Macedonian' },
+  { value: 'ml', label: 'Malayalam' },
+  { value: 'mn', label: 'Mongolian' },
+  { value: 'mr', label: 'Marathi' },
+  { value: 'ms', label: 'Malay' },
+  { value: 'mt', label: 'Maltese' },
+  { value: 'my', label: 'Burmese' },
+  { value: 'ne', label: 'Nepali' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'nn', label: 'Norwegian Nynorsk' },
+  { value: 'no', label: 'Norwegian' },
+  { value: 'oc', label: 'Occitan' },
+  { value: 'pa', label: 'Punjabi' },
+  { value: 'pl', label: 'Polish' },
+  { value: 'ps', label: 'Pashto' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'ro', label: 'Romanian' },
+  { value: 'ru', label: 'Russian' },
+  { value: 'sa', label: 'Sanskrit' },
+  { value: 'sd', label: 'Sindhi' },
+  { value: 'si', label: 'Sinhala' },
+  { value: 'sk', label: 'Slovak' },
+  { value: 'sl', label: 'Slovenian' },
+  { value: 'sn', label: 'Shona' },
+  { value: 'so', label: 'Somali' },
+  { value: 'sq', label: 'Albanian' },
+  { value: 'sr', label: 'Serbian' },
+  { value: 'su', label: 'Sundanese' },
+  { value: 'sv', label: 'Swedish' },
+  { value: 'sw', label: 'Swahili' },
+  { value: 'ta', label: 'Tamil' },
+  { value: 'te', label: 'Telugu' },
+  { value: 'tg', label: 'Tajik' },
+  { value: 'th', label: 'Thai' },
+  { value: 'tk', label: 'Turkmen' },
+  { value: 'tl', label: 'Tagalog' },
+  { value: 'tr', label: 'Turkish' },
+  { value: 'tt', label: 'Tatar' },
+  { value: 'uk', label: 'Ukrainian' },
+  { value: 'ur', label: 'Urdu' },
+  { value: 'uz', label: 'Uzbek' },
+  { value: 'vi', label: 'Vietnamese' },
+  { value: 'yi', label: 'Yiddish' },
+  { value: 'yo', label: 'Yoruba' },
+  { value: 'zh', label: 'Chinese' }
+];
 
 const PageWrapper = styled.div`
   min-height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: radial-gradient(1200px circle at 20% 10%, rgba(102, 126, 234, 0.18) 0%, rgba(0, 0, 0, 0) 55%),
-    linear-gradient(135deg, #0b1020 0%, #05070f 100%);
-  padding: 24px;
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: radial-gradient(1200px circle at 20% 0%, rgba(37, 99, 235, 0.12) 0%, rgba(0, 0, 0, 0) 55%),
+    linear-gradient(135deg, #05070f 0%, #0b1222 60%, #0b1020 100%);
+  color: #e6edff;
+  padding: 30px 22px 64px;
   overflow-x: hidden;
+  --panel: rgba(9, 14, 26, 0.82);
+  --panel-border: rgba(59, 130, 246, 0.18);
+  --muted: rgba(170, 181, 206, 0.82);
+  --accent: #3b82f6;
+  --accent-2: #2563eb;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --chip: rgba(59, 130, 246, 0.14);
 `;
 
 const Container = styled.div`
-  max-width: 980px;
+  max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
 `;
 
 const Header = styled.div`
   text-align: center;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 `;
 
 const Title = styled.h1`
   font-size: 2.1rem;
-  font-weight: 900;
+  font-weight: 800;
   margin: 0;
-  color: #e6e8f2;
+  color: #eef3ff;
+  letter-spacing: -0.015em;
 `;
 
 const Subtitle = styled.p`
-  font-size: 1rem;
+  font-size: 0.95rem;
   margin: 8px 0 0 0;
-  color: rgba(230, 232, 242, 0.7);
+  color: var(--muted);
 `;
 
 const Section = styled.div`
-  background: rgba(16, 20, 34, 0.72);
+  background: var(--panel);
   border-radius: 14px;
   padding: 20px;
-  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--panel-border);
   backdrop-filter: blur(12px);
   max-width: 100%;
+  min-width: 0;
 `;
 
 const SectionTitle = styled.div`
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 900;
-  color: #e6e8f2;
-  margin-bottom: 14px;
+  font-weight: 800;
+  color: #eaf1ff;
+  margin-bottom: 12px;
 `;
 
 const Icon = styled.span`
   display: inline-flex;
+  font-size: 1.1rem;
 `;
 
 const Message = styled.div`
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 12px;
   margin: 10px 0 18px 0;
   font-weight: 700;
   color: ${(props) => (props.type === 'error' ? '#ffd1d1' : props.type === 'success' ? '#d7ffe7' : '#d8e8ff')};
   background: ${(props) =>
     props.type === 'error'
-      ? 'rgba(229, 62, 62, 0.18)'
+      ? 'rgba(239, 68, 68, 0.15)'
       : props.type === 'success'
         ? 'rgba(34, 197, 94, 0.16)'
-        : 'rgba(56, 189, 248, 0.14)'};
+        : 'rgba(59, 130, 246, 0.18)'};
   border: 1px solid
     ${(props) =>
       props.type === 'error'
-        ? 'rgba(229, 62, 62, 0.25)'
+        ? 'rgba(239, 68, 68, 0.25)'
         : props.type === 'success'
           ? 'rgba(34, 197, 94, 0.22)'
-          : 'rgba(56, 189, 248, 0.2)'};
+          : 'rgba(59, 130, 246, 0.28)'};
 `;
 
 const Row = styled.div`
@@ -92,14 +208,42 @@ const Row = styled.div`
 `;
 
 const Button = styled.button`
-  background: linear-gradient(90deg, #667eea 0%, #7c3aed 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%);
   color: white;
   border: none;
   padding: 10px 16px;
   border-radius: 10px;
   cursor: pointer;
   font-weight: 800;
-  box-shadow: 0 10px 24px rgba(102, 126, 234, 0.28);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(37, 99, 235, 0.35);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+`;
+
+const SecondaryButton = styled.button`
+  background: rgba(59, 130, 246, 0.08);
+  color: #cfe0ff;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
 
   &:disabled {
     opacity: 0.6;
@@ -107,14 +251,18 @@ const Button = styled.button`
   }
 `;
 
-const SecondaryButton = styled.button`
-  background: rgba(255, 255, 255, 0.06);
-  color: #cbd5ff;
-  border: 1px solid rgba(102, 126, 234, 0.35);
-  padding: 10px 16px;
+const IconButton = styled.button`
+  width: 34px;
+  height: 34px;
   border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.12);
+  color: #dbe7ff;
   cursor: pointer;
-  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
 
   &:disabled {
     opacity: 0.6;
@@ -123,7 +271,7 @@ const SecondaryButton = styled.button`
 `;
 
 const DeleteButton = styled.button`
-  background: rgba(229, 62, 62, 0.9);
+  background: rgba(239, 68, 68, 0.9);
   color: white;
   border: none;
   padding: 8px 12px;
@@ -138,7 +286,7 @@ const DeleteButton = styled.button`
 `;
 
 const ReprocessButton = styled.button`
-  background: rgba(102, 126, 234, 0.92);
+  background: rgba(59, 130, 246, 0.9);
   color: white;
   border: none;
   padding: 8px 12px;
@@ -153,9 +301,9 @@ const ReprocessButton = styled.button`
 `;
 
 const UploadArea = styled.div`
-  border: 2px dashed ${(props) => (props.$dragging ? 'rgba(102, 126, 234, 0.95)' : 'rgba(255, 255, 255, 0.18)')};
-  background: ${(props) => (props.$dragging ? 'rgba(102, 126, 234, 0.14)' : 'rgba(255, 255, 255, 0.04)')};
-  border-radius: 14px;
+  border: 2px dashed ${(props) => (props.$dragging ? 'rgba(59, 130, 246, 0.95)' : 'rgba(255, 255, 255, 0.18)')};
+  background: ${(props) => (props.$dragging ? 'rgba(59, 130, 246, 0.14)' : 'rgba(255, 255, 255, 0.04)')};
+  border-radius: 16px;
   padding: 26px;
   text-align: center;
   cursor: pointer;
@@ -175,33 +323,14 @@ const ProgressBar = styled.div`
 const ProgressFill = styled.div`
   height: 100%;
   width: ${(props) => props.$percent}%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
   transition: width 0.2s ease;
 `;
 
-const DEFAULT_PIPELINE_STEPS = [
-  { id: 'upload_to_cloud_storage', label: 'Upload to cloud storage', status: 'not_started', percent: 0, message: null },
-  { id: 'technical_metadata', label: 'Technical Metadata', status: 'not_started', percent: 0, message: null },
-  { id: 'transcode_normalize', label: 'Transcode to Normalize @ 1.5 mbps', status: 'not_started', percent: 0, message: null },
-  { id: 'label_detection', label: 'Label detection', status: 'not_started', percent: 0, message: null },
-  { id: 'moderation', label: 'Moderation', status: 'not_started', percent: 0, message: null },
-  { id: 'text_on_screen', label: 'Text on Screen', status: 'not_started', percent: 0, message: null },
-  { id: 'key_scene_detection', label: 'Key scene & high point detection', status: 'not_started', percent: 0, message: null },
-  { id: 'transcribe', label: 'Audio Transcription', status: 'not_started', percent: 0, message: null },
-  { id: 'synopsis_generation', label: 'Synopsis Generation', status: 'not_started', percent: 0, message: null },
-  { id: 'scene_by_scene_metadata', label: 'Scene by scene metadata', status: 'not_started', percent: 0, message: null },
-  { id: 'famous_location_detection', label: 'Famous location detection', status: 'not_started', percent: 0, message: null },
-  { id: 'translate_output', label: 'Translate everything in English, Arabic,Indonesian', status: 'not_started', percent: 0, message: null },
-  { id: 'opening_closing_credit_detection', label: 'Opening/Closing credit detection', status: 'not_started', percent: 0, message: null },
-  { id: 'celebrity_detection', label: 'Celebrity detection', status: 'not_started', percent: 0, message: null },
-  { id: 'celebrity_bio_image', label: 'Celebrity bio & Image', status: 'not_started', percent: 0, message: null },
-  { id: 'save_as_json', label: 'Save as Json', status: 'not_started', percent: 0, message: null },
-];
-
 const StatusPanel = styled.div`
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 14px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: rgba(9, 14, 26, 0.6);
+  border-radius: 12px;
   padding: 14px;
 `;
 
@@ -221,8 +350,94 @@ const StatusTitle = styled.div`
   text-align: center;
 `;
 
+const StatusTable = styled.div`
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+`;
+
+const StatusTableHeader = styled.div`
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 160px;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: rgba(210, 214, 240, 0.7);
+  padding: 0 6px;
+`;
+
+const StatusTableRow = styled.div`
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 160px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(12, 18, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+`;
+
+const StatusTableCell = styled.div`
+  font-size: 13px;
+  color: rgba(240, 242, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const StatusPill = styled.div`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: ${({ $tone }) => {
+    if ($tone === 'completed') return 'rgba(56, 193, 114, 0.2)';
+    if ($tone === 'in_progress') return 'rgba(245, 158, 11, 0.2)';
+    return 'rgba(148, 163, 184, 0.2)';
+  }};
+  color: ${({ $tone }) => {
+    if ($tone === 'completed') return '#4ade80';
+    if ($tone === 'in_progress') return '#fbbf24';
+    return '#cbd5f5';
+  }};
+`;
+
+const StatusBucketsGrid = styled.div`
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+`;
+
+const StatusBucket = styled.div`
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 18, 42, 0.5);
+  padding: 10px;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const StatusBucketTitle = styled.div`
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: rgba(210, 214, 240, 0.7);
+`;
+
 const StatusMeta = styled.div`
-  color: rgba(230, 232, 242, 0.7);
+  color: var(--muted);
   font-size: 12px;
   text-align: center;
   word-break: break-all;
@@ -237,26 +452,6 @@ const StatusMetaRight = styled.div`
   gap: 8px;
   flex-wrap: wrap;
   width: 100%;
-`;
-
-const SystemStatsRow = styled.div`
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin: 8px 0 12px 0;
-`;
-
-const SystemStatPill = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(230, 232, 242, 0.9);
-  background: rgba(102, 126, 234, 0.16);
-  border: 1px solid rgba(102, 126, 234, 0.3);
 `;
 
 const StepList = styled.div`
@@ -291,22 +486,22 @@ const StepLabel = styled.div`
 
 const StepHint = styled.div`
   font-size: 12px;
-  color: rgba(230, 232, 242, 0.65);
+  color: var(--muted);
 `;
 
 const StepBadge = styled.div`
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: ${(props) => {
     const v = String(props.$variant || 'neutral');
-    if (v === 'ok') return 'rgba(16, 185, 129, 0.18)';
-    if (v === 'run') return 'rgba(102, 126, 234, 0.18)';
-    if (v === 'warn') return 'rgba(245, 158, 11, 0.18)';
-    if (v === 'bad') return 'rgba(229, 62, 62, 0.18)';
-    return 'rgba(255, 255, 255, 0.06)';
+    if (v === 'ok') return 'rgba(34, 197, 94, 0.16)';
+    if (v === 'run') return 'rgba(59, 130, 246, 0.16)';
+    if (v === 'warn') return 'rgba(245, 158, 11, 0.16)';
+    if (v === 'bad') return 'rgba(239, 68, 68, 0.16)';
+    return 'rgba(255, 255, 255, 0.05)';
   }};
   color: ${(props) => {
     const v = String(props.$variant || 'neutral');
@@ -316,6 +511,584 @@ const StepBadge = styled.div`
     if (v === 'bad') return 'rgba(254, 202, 202, 0.95)';
     return 'rgba(230, 232, 242, 0.85)';
   }};
+`;
+
+const SubtleNote = styled.div`
+  color: var(--muted);
+  font-size: 12px;
+`;
+
+const TabsRow = styled.div`
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+`;
+
+const TabButton = styled.button`
+  background: ${(props) => (props.$active ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.03)')};
+  color: ${(props) => (props.$active ? '#eaf1ff' : 'rgba(210, 220, 238, 0.8)')};
+  border: 1px solid ${(props) => (props.$active ? 'rgba(59, 130, 246, 0.45)' : 'rgba(255, 255, 255, 0.08)')};
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  cursor: pointer;
+`;
+
+const RunningJobsList = styled.div`
+  display: grid;
+  gap: 12px;
+`;
+
+const RunningJobRow = styled.div`
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: rgba(10, 16, 32, 0.6);
+  border-radius: 14px;
+  padding: 14px;
+`;
+
+const RunningJobTitle = styled.div`
+  font-weight: 900;
+  color: #eaf1ff;
+`;
+
+const RunningJobStatus = styled.div`
+  font-size: 12px;
+  font-weight: 800;
+  color: #9fb7ff;
+`;
+
+const RunningJobMeta = styled.div`
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+`;
+
+const RunningJobSteps = styled.div`
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;
+
+const RunningJobId = styled.div`
+  font-size: 12px;
+  color: rgba(59, 130, 246, 0.9);
+  font-weight: 800;
+`;
+
+const CompletedJobActions = styled.div`
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  align-content: center;
+  justify-self: end;
+`;
+
+const CompletedDetailButton = styled.button`
+  background: rgba(34, 197, 94, 0.92);
+  color: white;
+  border: none;
+  padding: 5px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 11px;
+`;
+
+const CompletedDownloadTable = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+`;
+
+const CompletedDownloadCell = styled.div`
+  padding: 10px 12px 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  align-content: start;
+
+  &:last-child {
+    border-right: none;
+  }
+`;
+
+const ExpandButton = styled.button`
+  background: rgba(59, 130, 246, 0.18);
+  color: #cfe0ff;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+`;
+
+const Card = styled.div`
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  background: rgba(9, 14, 26, 0.6);
+  border-radius: 12px;
+  padding: 14px;
+`;
+
+const CardHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+`;
+
+const CardHeaderTitle = styled.div`
+  font-weight: 900;
+  color: #eaf1ff;
+`;
+
+const CardBody = styled.div`
+  color: rgba(230, 232, 242, 0.9);
+`;
+
+const Grid2 = styled.div`
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+`;
+
+const CountPill = styled.div`
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(59, 130, 246, 0.18);
+  color: #cfe0ff;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+`;
+
+const DownloadGrid = styled.div`
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+`;
+
+const DownloadGroup = styled.div`
+  display: grid;
+  gap: 10px;
+`;
+
+const DownloadGroupTitle = styled.div`
+  font-weight: 900;
+  color: #eaf1ff;
+`;
+
+const DownloadGroupHint = styled.div`
+  color: var(--muted);
+  font-size: 12px;
+`;
+
+const DownloadList = styled.div`
+  display: grid;
+  gap: 8px;
+`;
+
+const DownloadRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  background: rgba(9, 14, 26, 0.6);
+`;
+
+const DownloadLabel = styled.div`
+  font-weight: 800;
+  color: #eaf1ff;
+`;
+
+const LinkA = styled.a`
+  color: #93c5fd;
+  text-decoration: none;
+  font-weight: 800;
+
+  &:hover {
+    color: #bfdbfe;
+    text-decoration: underline;
+  }
+`;
+
+const VideoFrame = styled.div`
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+`;
+
+const PlayerFullscreenButton = styled.button`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: rgba(15, 23, 42, 0.8);
+  color: #eaf1ff;
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-weight: 800;
+  cursor: pointer;
+`;
+
+const VideoOverlayBar = styled.div`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(7, 10, 20, 0.8) 100%);
+`;
+
+const OverlayScroller = styled.div`
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+`;
+
+const OverlayChip = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.22);
+  color: #eaf1ff;
+  font-size: 12px;
+  font-weight: 800;
+`;
+
+const OverlayChipThumb = styled.div`
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+`;
+
+const OverlayChipName = styled.div``;
+
+const VideoOverlaySidePanel = styled.div`
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  bottom: 10px;
+  width: 220px;
+  background: rgba(10, 16, 32, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  padding: 8px;
+`;
+
+const OverlaySideList = styled.div`
+  display: grid;
+  gap: 8px;
+  max-height: 100%;
+  overflow-y: auto;
+`;
+
+const OverlaySideItem = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+`;
+
+const OverlayThumb = styled.div`
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+`;
+
+const OverlayName = styled.div`
+  font-weight: 800;
+  color: #eaf1ff;
+  font-size: 12px;
+`;
+
+const SegmentChip = styled.button`
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #cfe0ff;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  cursor: pointer;
+  font-size: 12px;
+`;
+
+const StepChip = styled.button`
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: ${(props) => (props.$restartable ? 'pointer' : 'default')};
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.14);
+  color: #cfe0ff;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: ${(props) => (props.$restartable ? '24px' : '10px')};
+
+  ${(props) => {
+    const s = String(props.$status || '').toLowerCase();
+    if (s === 'completed') {
+      return `
+        background: rgba(34, 197, 94, 0.18);
+        border-color: rgba(34, 197, 94, 0.35);
+        color: #d1fae5;
+      `;
+    }
+    if (s === 'running') {
+      return `
+        background: rgba(245, 158, 11, 0.2);
+        border-color: rgba(245, 158, 11, 0.4);
+        color: #fde68a;
+      `;
+    }
+    if (s === 'failed') {
+      return `
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.4);
+        color: #fecaca;
+      `;
+    }
+    if (s === 'skipped') {
+      return `
+        background: rgba(148, 163, 184, 0.18);
+        border-color: rgba(148, 163, 184, 0.35);
+        color: rgba(226, 232, 240, 0.9);
+      `;
+    }
+    return '';
+  }}
+
+  &::after {
+    content: '⟲';
+    position: absolute;
+    right: 8px;
+    opacity: 0;
+    font-size: 18px;
+    transition: opacity 0.15s ease;
+  }
+
+  ${(props) =>
+    props.$restartable
+      ? `
+    &:hover::after {
+      opacity: 0.85;
+    }
+  `
+      : `
+    &::after {
+      display: none;
+    }
+  `}
+`;
+
+const StepDot = styled.span`
+  display: none;
+`;
+
+const DetailPanel = styled.div`
+  margin-top: 14px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 14px;
+  background: rgba(9, 14, 26, 0.7);
+  padding: 16px;
+`;
+
+const DetailHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+`;
+
+const DetailTitle = styled.div`
+  font-weight: 900;
+  color: #eaf1ff;
+`;
+
+const DetailBody = styled.div`
+  display: grid;
+  gap: 16px;
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 15, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+`;
+
+const ModalCard = styled.div`
+  background: rgba(9, 14, 26, 0.96);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 14px;
+  width: min(720px, 95vw);
+  padding: 16px;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.45);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+`;
+
+const ModalTitle = styled.div`
+  font-weight: 900;
+  color: #eaf1ff;
+`;
+
+const ModalSubtitle = styled.div`
+  color: var(--muted);
+  font-size: 12px;
+`;
+
+const ModalBody = styled.div`
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+`;
+
+const ModalActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+`;
+
+const BrowserPath = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+`;
+
+const BrowserList = styled.div`
+  display: grid;
+  gap: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 4px;
+`;
+
+const BrowserRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  background: rgba(15, 23, 42, 0.6);
+  cursor: pointer;
+`;
+
+const BrowserIcon = styled.span`
+  font-size: 16px;
+`;
+
+const MultiColumnList = styled.div`
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+`;
+
+const MultiColumnItem = styled.div`
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+`;
+
+const JobDetailPanel = styled.div`
+  background: rgba(10, 16, 32, 0.7);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 12px;
+  padding: 12px;
+`;
+
+const JobThumb = styled.div`
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const TopStatsBar = styled.div`
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+`;
+
+const TopStatsItem = styled.div`
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.16);
+  font-size: 12px;
+  font-weight: 800;
+  color: #cfe0ff;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+`;
+
+const Th = styled.th`
+  text-align: left;
+  padding: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #eaf1ff;
+  font-weight: 800;
+`;
+
+const Td = styled.td`
+  padding: 10px;
+  border-top: 1px solid rgba(59, 130, 246, 0.12);
+  color: rgba(230, 232, 242, 0.85);
 `;
 
 const EmptyState = styled.div`
@@ -331,9 +1104,11 @@ const EmptyIcon = styled.div`
 
 const Carousel = styled.div`
   display: flex;
+  flex-wrap: nowrap;
   gap: 12px;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   overflow-x: auto;
   overflow-y: hidden;
@@ -355,9 +1130,10 @@ const Carousel = styled.div`
 `;
 
 const CarouselItem = styled.div`
-  width: calc((100% - 36px) / 4);
-  max-width: calc((100% - 36px) / 4);
-  flex: 0 0 calc((100% - 36px) / 4);
+  width: 260px;
+  max-width: 260px;
+  min-width: 220px;
+  flex: 0 0 260px;
   scroll-snap-align: start;
   border: 1px solid ${(props) => (props.$active ? 'rgba(102, 126, 234, 0.7)' : 'rgba(255, 255, 255, 0.08)')};
   border-radius: 14px;
@@ -402,6 +1178,7 @@ const CarouselThumbImg = styled.img`
 
 const CarouselBody = styled.div`
   padding: 10px 12px 12px 12px;
+  min-width: 0;
 `;
 
 const CarouselTitle = styled.div`
@@ -417,571 +1194,12 @@ const CarouselMeta = styled.div`
   color: rgba(230, 232, 242, 0.7);
   font-size: 12px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 `;
 
 const TinyButton = styled.button`
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: #e6e8f2;
-  padding: 4px 8px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-weight: 900;
-  font-size: 11px;
-  line-height: 1;
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-`;
-
-const DetailPanel = styled.div`
-  margin-top: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  overflow: hidden;
-`;
-
-const DetailHeader = styled.div`
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-`;
-
-const DetailTitle = styled.div`
-  color: #e6e8f2;
-  font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const DetailBody = styled.div`
-  padding: 16px;
-  display: grid;
-  gap: 16px;
-`;
-
-const Grid2 = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-
-  @media (min-width: 980px) {
-    grid-template-columns: 1.15fr 0.85fr;
-  }
-`;
-
-const Card = styled.div`
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(16, 20, 34, 0.55);
-  overflow: hidden;
-`;
-
-const CardHeader = styled.div`
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-`;
-
-const CardHeaderTitle = styled.div`
-  color: #e6e8f2;
-  font-weight: 900;
-`;
-
-const CountPill = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(230, 232, 242, 0.9);
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-weight: 900;
-  font-size: 12px;
-  line-height: 1;
-`;
-
-const MultiColumnList = styled.div`
-  column-count: 1;
-  column-gap: 14px;
-
-  @media (min-width: 980px) {
-    column-count: 2;
-  }
-
-  @media (min-width: 1280px) {
-    column-count: 3;
-  }
-`;
-
-const MultiColumnItem = styled.div`
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  page-break-inside: avoid;
-  display: block;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-`;
-
-const SubtleNote = styled.div`
-  margin-top: 10px;
-  color: rgba(230, 232, 242, 0.6);
-  font-size: 12px;
-`;
-
-const CardBody = styled.div`
-  padding: 12px 14px;
-`;
-
-const DownloadGrid = styled.div`
-  display: grid;
-  gap: 12px;
-
-  @media (min-width: 980px) {
-    grid-template-columns: 1fr 1fr;
-  }
-`;
-
-const DownloadGroup = styled.div`
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(7, 12, 24, 0.55);
-  display: grid;
-  gap: 10px;
-`;
-
-const DownloadGroupTitle = styled.div`
-  color: rgba(230, 232, 242, 0.9);
-  font-weight: 900;
-  letter-spacing: 0.2px;
-`;
-
-const DownloadGroupHint = styled.div`
-  color: rgba(230, 232, 242, 0.6);
-  font-size: 12px;
-`;
-
-const DownloadList = styled.div`
-  display: grid;
-  gap: 8px;
-`;
-
-const DownloadRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-`;
-
-const DownloadLabel = styled.div`
-  color: rgba(230, 232, 242, 0.7);
-  font-weight: 800;
-`;
-
-const VideoFrame = styled.div`
-  width: 100%;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.35);
-  position: relative;
-  aspect-ratio: 16 / 9;
-  min-height: 280px;
-
-  & video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
-  }
-
-  &:fullscreen {
-    border-radius: 0;
-    border: none;
-    background: #000;
-  }
-
-  &:-webkit-full-screen {
-    border-radius: 0;
-    border: none;
-    background: #000;
-  }
-
-  &:fullscreen video,
-  &:-webkit-full-screen video {
-    width: 100vw;
-    height: 100vh;
-    max-width: 100vw;
-    max-height: 100vh;
-    object-fit: contain;
-    background: #000;
-  }
-`;
-
-const VideoOverlayBar = styled.div`
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  top: 10px;
-  z-index: 5;
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  align-items: center;
-  pointer-events: none;
-`;
-
-const PlayerFullscreenButton = styled.button`
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  z-index: 8;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(0, 0, 0, 0.45);
-  color: #e6e8f2;
-  cursor: pointer;
-  font-weight: 900;
-  pointer-events: auto;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.6);
-  }
-`;
-
-const VideoOverlaySidePanel = styled.div`
-  position: absolute;
-  /* Exact left edge; start ~30% down from top */
-  left: 0;
-  top: 30%;
-  /* Content-sized panel; cap height so it never covers the control bar */
-  max-height: min(420px, calc(70% - 88px));
-  width: 240px;
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  pointer-events: none;
-
-  @media (max-width: 520px) {
-    width: 200px;
-    max-height: min(360px, calc(70% - 104px));
-  }
-`;
-
-const OverlaySideList = styled.div`
-  display: grid;
-  gap: 8px;
-  overflow-y: ${(props) => (props.$scrollable ? 'auto' : 'hidden')};
-  overflow-x: hidden;
-  padding: 10px;
-  padding-right: 12px;
-  -webkit-overflow-scrolling: touch;
-  flex: 0 0 auto;
-  max-height: ${(props) => (props.$scrollable ? '100%' : 'none')};
-  pointer-events: auto;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-  &::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 999px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 999px;
-  }
-`;
-
-const OverlaySideItem = styled.div`
-  display: grid;
-  grid-template-columns: 68px 1fr;
-  gap: 10px;
-  align-items: center;
-  padding: 8px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-`;
-
-const OverlayThumb = styled.div`
-  width: 68px;
-  height: 68px;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(230, 232, 242, 0.9);
-  font-weight: 900;
-  font-size: 12px;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-`;
-
-const OverlayName = styled.div`
-  color: #e6e8f2;
-  font-weight: 900;
-  font-size: 13px;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const OverlayChip = styled.div`
-  pointer-events: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #e6e8f2;
-  font-weight: 900;
-  font-size: 12px;
-  min-width: 0;
-`;
-
-const OverlayChipThumb = styled.div`
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  color: rgba(230, 232, 242, 0.95);
-  font-weight: 900;
-  font-size: 10px;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-`;
-
-const OverlayChipName = styled.div`
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const OverlayScroller = styled.div`
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  overflow-x: ${(props) => (props.$scrollable ? 'auto' : 'hidden')};
-  overflow-y: hidden;
-  white-space: nowrap;
-  pointer-events: ${(props) => (props.$scrollable ? 'auto' : 'none')};
-  -webkit-overflow-scrolling: touch;
-
-  &::-webkit-scrollbar {
-    height: ${(props) => (props.$scrollable ? '8px' : '0px')};
-  }
-  &::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 999px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 999px;
-  }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-`;
-
-const Th = styled.th`
-  text-align: left;
-  color: rgba(230, 232, 242, 0.75);
-  font-weight: 900;
-  padding: 10px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-`;
-
-const Td = styled.td`
-  vertical-align: top;
-  color: rgba(230, 232, 242, 0.85);
-  padding: 10px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-`;
-
-const LinkA = styled.a`
-  color: #cbd5ff;
-  font-weight: 900;
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
-`;
-
-const SegmentChip = styled.button`
-  border: 1px solid rgba(102, 126, 234, 0.35);
-  background: rgba(102, 126, 234, 0.12);
-  color: #e6e8f2;
-  padding: 4px 8px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-weight: 900;
-  font-size: 11px;
-  line-height: 1;
-`;
-
-const IconButton = styled.button`
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: #e6e8f2;
-  cursor: pointer;
-  font-weight: 900;
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-`;
-
-function formatBytes(bytes) {
-  const b = Number(bytes);
-  if (!Number.isFinite(b) || b < 0) return '—';
-  if (b < 1024) return `${b} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = b;
-  let i = -1;
-  do {
-    value /= 1024;
-    i++;
-  } while (value >= 1024 && i < units.length - 1);
-  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[i]}`;
-}
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(2, 4, 12, 0.7);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 40;
-`;
-
-const ModalCard = styled.div`
-  width: min(760px, 100%);
-  max-height: 80vh;
-  background: rgba(12, 16, 32, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-`;
-
-const ModalHeader = styled.div`
-  padding: 18px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-`;
-
-const ModalTitle = styled.div`
-  font-weight: 900;
-  font-size: 1.1rem;
-  color: #e6e8f2;
-`;
-
-const ModalSubtitle = styled.div`
-  color: rgba(230, 232, 242, 0.7);
-  font-size: 0.85rem;
-`;
-
-const ModalBody = styled.div`
-  padding: 18px 20px 22px;
-  overflow: auto;
-`;
-
-const BrowserPath = styled.div`
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: rgba(230, 232, 242, 0.7);
-  font-size: 0.85rem;
-  margin-bottom: 12px;
-
-  strong {
-    color: #e6e8f2;
-  }
-`;
-
-const BrowserList = styled.div`
-  display: grid;
-  gap: 8px;
-`;
-
-const BrowserRow = styled.button`
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e6e8f2;
-  cursor: pointer;
-  text-align: left;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.06);
-  }
-`;
-
-const BrowserIcon = styled.span`
   width: 24px;
   display: inline-flex;
   align-items: center;
@@ -1013,6 +1231,39 @@ const ConfirmActions = styled.div`
   gap: 10px;
 `;
 
+const DEFAULT_PIPELINE_STEPS = [
+  { id: 'upload_to_cloud_storage', label: 'Upload to cloud storage', status: 'not_started', percent: 0, message: null },
+  { id: 'technical_metadata', label: 'Technical Metadata', status: 'not_started', percent: 0, message: null },
+  { id: 'transcode_normalize', label: 'Transcode to Normalize @ 1.5 mbps', status: 'not_started', percent: 0, message: null },
+  { id: 'label_detection', label: 'Label detection', status: 'not_started', percent: 0, message: null },
+  { id: 'moderation', label: 'Moderation', status: 'not_started', percent: 0, message: null },
+  { id: 'text_on_screen', label: 'Text on Screen', status: 'not_started', percent: 0, message: null },
+  { id: 'key_scene_detection', label: 'Key scene & high point detection', status: 'not_started', percent: 0, message: null },
+  { id: 'transcribe', label: 'Audio Transcription', status: 'not_started', percent: 0, message: null },
+  { id: 'synopsis_generation', label: 'Synopsis Generation', status: 'not_started', percent: 0, message: null },
+  { id: 'scene_by_scene_metadata', label: 'Scene by scene metadata', status: 'not_started', percent: 0, message: null },
+  { id: 'famous_location_detection', label: 'Famous location detection', status: 'not_started', percent: 0, message: null },
+  { id: 'translate_output', label: 'Translate output', status: 'not_started', percent: 0, message: null },
+  { id: 'opening_closing_credit_detection', label: 'Opening/Closing credit detection', status: 'not_started', percent: 0, message: null },
+  { id: 'celebrity_detection', label: 'Celebrity detection', status: 'not_started', percent: 0, message: null },
+  { id: 'celebrity_bio_image', label: 'Celebrity bio & Image', status: 'not_started', percent: 0, message: null },
+  { id: 'save_as_json', label: 'Save as Json', status: 'not_started', percent: 0, message: null },
+];
+
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value)) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let out = value;
+  let idx = 0;
+  while (out >= 1024 && idx < units.length - 1) {
+    out /= 1024;
+    idx += 1;
+  }
+  const precision = out >= 10 || idx === 0 ? 0 : 1;
+  return `${out.toFixed(precision)} ${units[idx]}`;
+}
+
 function formatTimestamp(value) {
   try {
     if (!value) return '—';
@@ -1022,6 +1273,20 @@ function formatTimestamp(value) {
   } catch {
     return String(value || '—');
   }
+}
+
+function formatDurationMs(startValue, endValue) {
+  if (!startValue || !endValue) return '—';
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '—';
+  const diffMs = Math.max(0, end.getTime() - start.getTime());
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
 
 function asJpegDataUri(maybeBase64) {
@@ -1161,22 +1426,65 @@ function buildParagraphsFromTranscriptSegments(segments) {
 }
 
 
-export default function EnvidMetadataMinimal() {
+export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   const fileInputRef = useRef(null);
   const pollRef = useRef(null);
-  const historyCarouselRef = useRef(null);
   const playerRef = useRef(null);
   const playerContainerRef = useRef(null);
 
+  const normalizeTab = (tab) => {
+    const key = String(tab || '').toLowerCase();
+    if (['running', 'completed', 'failed', 'workflow'].includes(key)) return key;
+    return 'workflow';
+  };
+
   const [message, setMessage] = useState(null);
+  const [activeTab, setActiveTab] = useState(normalizeTab(initialTab));
+  const [runningJobs, setRunningJobs] = useState([]);
+  const [runningJobsLoading, setRunningJobsLoading] = useState(false);
+  const [runningJobsError, setRunningJobsError] = useState('');
+  const [completedJobs, setCompletedJobs] = useState([]);
+  const [completedJobsLoading, setCompletedJobsLoading] = useState(false);
+  const [completedJobsError, setCompletedJobsError] = useState('');
+  const [failedJobs, setFailedJobs] = useState([]);
+  const [failedJobsLoading, setFailedJobsLoading] = useState(false);
+  const [failedJobsError, setFailedJobsError] = useState('');
+  const [deletedJobIds, setDeletedJobIds] = useState(() => new Set());
+  const [expandedCompletedJobId, setExpandedCompletedJobId] = useState('');
+  const [jobSubmitModal, setJobSubmitModal] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [expandedJobId, setExpandedJobId] = useState('');
+  const [expandedJobDetail, setExpandedJobDetail] = useState(null);
+  const [expandedJobLoading, setExpandedJobLoading] = useState(false);
 
   // Multimodal task selection.
-  // Defaults: everything is OFF until the user explicitly enables it.
+  // Defaults: core tasks ON, future/disabled tasks OFF.
   const [taskSelection, setTaskSelection] = useState(() => ({
-    enable_famous_location_detection: false,
+    enable_label_detection: true,
+    label_detection_model: 'gcp_video_intelligence',
+
+    enable_text_on_screen: true,
+    text_model: 'tesseract',
+
+    enable_moderation: true,
+    moderation_model: 'nudenet',
+
+    enable_key_scene: true,
+    key_scene_detection_model: 'transnetv2_clip_cluster',
+
+    enable_scene_by_scene: true,
+    enable_high_point: true,
+
+    enable_transcribe: true,
+    transcribe_model: 'openai-whisper',
+
+    enable_synopsis_generation: true,
+    enable_translate_output: true,
+
+    enable_famous_locations: false,
     famous_location_detection_model: 'auto',
 
-    enable_opening_closing_credit_detection: false,
+    enable_opening_closing: false,
     opening_closing_credit_detection_model: 'auto',
 
     enable_celebrity_detection: false,
@@ -1187,36 +1495,45 @@ export default function EnvidMetadataMinimal() {
   }));
 
   const [targetTranslateLanguages, setTargetTranslateLanguages] = useState([]);
+  const [transcribeLanguage, setTranscribeLanguage] = useState('auto');
 
   const taskSelectionPayload = useMemo(() => {
     const sel = taskSelection || {};
     return {
-      // Backend-controlled (scene detection + transcript + Meta Llama).
       enable_scene_by_scene_metadata: true,
+      enable_scene_by_scene: true,
 
-      enable_label_detection: true,
+      enable_label_detection: Boolean(sel.enable_label_detection),
       label_detection_model: String(sel.label_detection_model || '').trim() || 'gcp_video_intelligence',
 
       enable_moderation: true,
-      moderation_model: String(sel.moderation_model || '').trim() || 'nsfwjs',
+      moderation_model: String(sel.moderation_model || '').trim() || 'nudenet',
 
       enable_text: true,
+      enable_text_on_screen: true,
       text_model: String(sel.text_model || '').trim() || 'tesseract',
 
       enable_key_scene_detection: true,
-      key_scene_detection_model: String(sel.key_scene_detection_model || '').trim() || 'pyscenedetect_clip_cluster',
+      enable_key_scene: true,
+      key_scene_detection_model: String(sel.key_scene_detection_model || '').trim() || 'transnetv2_clip_cluster',
+
+      enable_high_point: true,
 
       enable_transcribe: true,
-      transcribe_model: String(sel.transcribe_model || '').trim() || 'whisper',
+      transcribe_model: String(sel.transcribe_model || '').trim() || 'openai-whisper',
+      transcribe_language: String(transcribeLanguage || '').trim() || 'auto',
 
-      enable_famous_location_detection: Boolean(sel.enable_famous_location_detection),
-      famous_location_detection_model: String(sel.famous_location_detection_model || '').trim() || 'auto',
-
-      // Backend-controlled (Meta Llama).
       enable_synopsis_generation: true,
       synopsis_generation_model: 'auto',
 
-      enable_opening_closing_credit_detection: Boolean(sel.enable_opening_closing_credit_detection),
+      enable_translate_output: true,
+
+      enable_famous_location_detection: Boolean(sel.enable_famous_locations),
+      enable_famous_locations: Boolean(sel.enable_famous_locations),
+      famous_location_detection_model: String(sel.famous_location_detection_model || '').trim() || 'auto',
+
+      enable_opening_closing_credit_detection: Boolean(sel.enable_opening_closing),
+      enable_opening_closing: Boolean(sel.enable_opening_closing),
       opening_closing_credit_detection_model: String(sel.opening_closing_credit_detection_model || '').trim() || 'auto',
 
       enable_celebrity_detection: Boolean(sel.enable_celebrity_detection),
@@ -1227,7 +1544,7 @@ export default function EnvidMetadataMinimal() {
 
       translate_targets: Array.isArray(targetTranslateLanguages) ? targetTranslateLanguages : [],
     };
-  }, [taskSelection, targetTranslateLanguages]);
+  }, [taskSelection, targetTranslateLanguages, transcribeLanguage]);
 
   const [videoSource, setVideoSource] = useState('gcs'); // 'local' | 'gcs'
   const [selectedFile, setSelectedFile] = useState(null);
@@ -1244,8 +1561,6 @@ export default function EnvidMetadataMinimal() {
   const [gcsBrowserQuery, setGcsBrowserQuery] = useState('');
   const [gcsBrowserObjects, setGcsBrowserObjects] = useState([]);
   const [gcsBrowserPrefixes, setGcsBrowserPrefixes] = useState([]);
-  const [deletePending, setDeletePending] = useState(null);
-  const [reprocessPending, setReprocessPending] = useState(null);
   const [gcsBuckets, setGcsBuckets] = useState([]);
   const [gcsBucket, setGcsBucket] = useState('');
   const [gcsBucketLoading, setGcsBucketLoading] = useState(false);
@@ -1257,7 +1572,7 @@ export default function EnvidMetadataMinimal() {
   const [activeJob, setActiveJob] = useState(null); // { kind: 'upload'|'reprocess', jobId: string, videoId?: string }
   const [systemStats, setSystemStats] = useState(null);
 
-  const [allVideos, setAllVideos] = useState([]);
+
 
   const [selectedVideoId, setSelectedVideoId] = useState(null);
   const [selectedVideoTitle, setSelectedVideoTitle] = useState(null);
@@ -1268,6 +1583,27 @@ export default function EnvidMetadataMinimal() {
   const [playerIsPaused, setPlayerIsPaused] = useState(false);
   const [playerIsFullscreen, setPlayerIsFullscreen] = useState(false);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+  const getJobFileName = (job) => {
+    const uri = String(
+      job?.gcs_video_uri || job?.gcs_working_uri || job?.result?.gcs_video_uri || job?.result?.gcs_uri || ''
+    ).trim();
+    if (uri) {
+      const parts = uri.split('/');
+      const name = parts[parts.length - 1] || '';
+      if (name) return name;
+    }
+    return String(job?.title || job?.name || job?.id || job?.job_id || 'Unknown').trim();
+  };
+
+  const subtitleDownloadUrl = (jobId, lang, fmt) => {
+    const code = String(lang || '').toLowerCase();
+    if (!jobId) return '#';
+    if (code === 'orig' || code === 'original') {
+      return `${BACKEND_URL}/video/${jobId}/subtitles.${fmt}`;
+    }
+    return `${BACKEND_URL}/video/${jobId}/subtitles.${code}.${fmt}`;
+  };
 
   useEffect(() => {
     const onFsChange = () => {
@@ -1285,6 +1621,242 @@ export default function EnvidMetadataMinimal() {
       document.removeEventListener('webkitfullscreenchange', onFsChange);
     };
   }, []);
+
+  useEffect(() => {
+    setActiveTab(normalizeTab(initialTab));
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (!gcsBrowserOpen) return undefined;
+    const { body } = document;
+    const previous = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = previous || '';
+    };
+  }, [gcsBrowserOpen]);
+
+  const manualRefreshRunningJobs = async () => {
+    if (activeTab !== 'running') return;
+    setRunningJobsLoading(true);
+    setRunningJobsError('');
+    try {
+      const resp = await axios.get(`${BACKEND_URL}/jobs`, {
+        params: {
+          status: 'processing,preflight,queued,running,stopping,stopped',
+          limit: 50,
+        },
+      });
+      const list = Array.isArray(resp.data?.jobs) ? resp.data.jobs : [];
+      const filtered = list.filter((j) => !deletedJobIds.has(String(j?.id || j?.job_id || '').trim()));
+      setRunningJobs(filtered);
+      setRunningJobsError('');
+    } catch (err) {
+      setRunningJobsError(err?.response?.data?.error || 'Failed to load running jobs');
+    } finally {
+      setRunningJobsLoading(false);
+    }
+  };
+
+
+  const requestDeleteJob = (jobId) => {
+    const id = String(jobId || '').trim();
+    if (!id) return;
+    setDeleteConfirm({ jobId: id });
+  };
+
+  const confirmDeleteJob = (jobId) => {
+    const id = String(jobId || '').trim();
+    if (!id) return;
+    setDeleteConfirm(null);
+    deleteJob(id);
+  };
+
+  const deleteJob = async (jobId) => {
+    const id = String(jobId || '').trim();
+    if (!id) return;
+    const prevRunning = runningJobs;
+    const prevCompleted = completedJobs;
+    const prevFailed = failedJobs;
+
+    setDeletedJobIds((prev) => new Set(prev).add(id));
+    setRunningJobs((prev) => prev.filter((j) => String(j?.id || j?.job_id || '') !== id));
+    setCompletedJobs((prev) => prev.filter((j) => String(j?.id || j?.job_id || '') !== id));
+    setFailedJobs((prev) => prev.filter((j) => String(j?.id || j?.job_id || '') !== id));
+    try {
+      await axios.delete(`${BACKEND_URL}/jobs/${id}`);
+      setMessage({ type: 'success', text: `Deleted job ${id}.` });
+    } catch (err) {
+      setDeletedJobIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setRunningJobs(prevRunning);
+      setCompletedJobs(prevCompleted);
+      setFailedJobs(prevFailed);
+      setMessage({ type: 'error', text: err?.response?.data?.error || `Failed to delete job ${id}.` });
+    } finally {
+      setDeleteConfirm(null);
+    }
+  };
+
+  const stopJob = async (jobId) => {
+    const id = String(jobId || '').trim();
+    if (!id) return;
+    try {
+      await axios.post(`${BACKEND_URL}/jobs/${id}/stop`);
+      await manualRefreshRunningJobs();
+      setMessage({ type: 'success', text: `Stop requested for job ${id}.` });
+    } catch (err) {
+      setMessage({ type: 'error', text: err?.response?.data?.error || `Failed to stop job ${id}.` });
+    }
+  };
+
+  const restartJob = async (jobId) => {
+    const id = String(jobId || '').trim();
+    if (!id) return;
+    try {
+      await axios.post(`${BACKEND_URL}/jobs/${id}/restart`);
+      setActiveTab('running');
+      setMessage({ type: 'success', text: `Job ${id} restarted.` });
+    } catch (err) {
+      setMessage({ type: 'error', text: err?.response?.data?.error || `Failed to restart job ${id}.` });
+    }
+  };
+
+  const restartJobStep = async (jobId, stepId) => {
+    const id = String(jobId || '').trim();
+    const step = String(stepId || '').trim();
+    if (!id || !step) return;
+    try {
+      await axios.post(`${BACKEND_URL}/jobs/${id}/steps/${step}/restart`);
+      setActiveTab('running');
+      await manualRefreshRunningJobs();
+      setMessage({ type: 'success', text: `Restarted step ${step} for job ${id}.` });
+    } catch (err) {
+      setMessage({ type: 'error', text: err?.response?.data?.error || `Failed to restart step ${step}.` });
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'running') return undefined;
+
+    let cancelled = false;
+    const loadRunningJobs = async (isInitial) => {
+      if (isInitial) {
+        setRunningJobsLoading(true);
+        setRunningJobsError('');
+      }
+      try {
+        const resp = await axios.get(`${BACKEND_URL}/jobs`, {
+          params: {
+            status: 'processing,preflight,queued,running,stopping,stopped',
+            limit: 50,
+          },
+        });
+        const list = Array.isArray(resp.data?.jobs) ? resp.data.jobs : [];
+        const filtered = list.filter((j) => !deletedJobIds.has(String(j?.id || j?.job_id || '').trim()));
+        if (!cancelled) {
+          setRunningJobs(filtered);
+          setRunningJobsError('');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRunningJobsError(err?.response?.data?.error || 'Failed to load running jobs');
+        }
+      } finally {
+        if (!cancelled && isInitial) setRunningJobsLoading(false);
+      }
+    };
+
+    loadRunningJobs(true);
+    const intervalId = setInterval(() => loadRunningJobs(false), POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, deletedJobIds]);
+
+  useEffect(() => {
+    if (activeTab !== 'completed') return undefined;
+
+    let cancelled = false;
+    const loadCompletedJobs = async (isInitial) => {
+      if (isInitial) {
+        setCompletedJobsLoading(true);
+        setCompletedJobsError('');
+      }
+      try {
+        const resp = await axios.get(`${BACKEND_URL}/jobs`, {
+          params: {
+            status: 'completed',
+            limit: 100,
+          },
+        });
+        const list = Array.isArray(resp.data?.jobs) ? resp.data.jobs : [];
+        const filtered = list.filter((j) => !deletedJobIds.has(String(j?.id || j?.job_id || '').trim()));
+        if (!cancelled) {
+          setCompletedJobs(filtered);
+          setCompletedJobsError('');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCompletedJobsError(err?.response?.data?.error || 'Failed to load completed jobs');
+        }
+      } finally {
+        if (!cancelled && isInitial) setCompletedJobsLoading(false);
+      }
+    };
+
+    loadCompletedJobs(true);
+    const intervalId = setInterval(() => {
+      loadCompletedJobs(false);
+    }, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, deletedJobIds]);
+
+  useEffect(() => {
+    if (activeTab !== 'failed') return undefined;
+
+    let cancelled = false;
+    const loadFailedJobs = async (isInitial) => {
+      if (isInitial) {
+        setFailedJobsLoading(true);
+        setFailedJobsError('');
+      }
+      try {
+        const resp = await axios.get(`${BACKEND_URL}/jobs`, {
+          params: {
+            status: 'failed',
+            limit: 100,
+          },
+        });
+        const list = Array.isArray(resp.data?.jobs) ? resp.data.jobs : [];
+        const filtered = list.filter((j) => !deletedJobIds.has(String(j?.id || j?.job_id || '').trim()));
+        if (!cancelled) {
+          setFailedJobs(filtered);
+          setFailedJobsError('');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setFailedJobsError(err?.response?.data?.error || 'Failed to load failed jobs');
+        }
+      } finally {
+        if (!cancelled && isInitial) setFailedJobsLoading(false);
+      }
+    };
+
+    loadFailedJobs(true);
+    const intervalId = setInterval(() => loadFailedJobs(false), POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, deletedJobIds]);
 
   useEffect(() => {
     const showStats =
@@ -1460,6 +2032,19 @@ export default function EnvidMetadataMinimal() {
   );
   const detectedContent = useMemo(() => selectedCategories?.detected_content || {}, [selectedCategories]);
   const locations = useMemo(() => selectedCategories?.famous_locations || {}, [selectedCategories]);
+  const moderationDownloadUrl = useMemo(
+    () => (selectedVideoId ? `${BACKEND_URL}/jobs/${selectedVideoId}/outputs/moderation_output/download` : ''),
+    [selectedVideoId]
+  );
+  const outputTaskSelection = useMemo(
+    () => selectedMeta?.task_selection_effective || selectedMeta?.task_selection || selectedMeta?.task_selection_requested || null,
+    [selectedMeta]
+  );
+  const isOutputTaskEnabled = (key) => {
+    const selection = outputTaskSelection || null;
+    if (selection && Object.prototype.hasOwnProperty.call(selection, key)) return Boolean(selection[key]);
+    return true;
+  };
   const technical = useMemo(() => {
     const rawTech = selectedCategories?.technical_metadata || selectedCategories?.technical || {};
     const raw = rawTech?.raw && typeof rawTech.raw === 'object' ? rawTech.raw : null;
@@ -1502,7 +2087,7 @@ export default function EnvidMetadataMinimal() {
 
     return derived;
   }, [selectedCategories]);
-  const synopsesByAge = useMemo(() => selectedCategories?.synopses_by_age_group || {}, [selectedCategories]);
+  const synopsisPayload = useMemo(() => (selectedCategories?.synopsis && typeof selectedCategories.synopsis === 'object' ? selectedCategories.synopsis : null), [selectedCategories]);
   const synopsisStep = useMemo(() => {
     const steps = Array.isArray(uploadJob?.steps) ? uploadJob.steps : [];
     return steps.find((s) => String(s?.id || '').toLowerCase() === 'synopsis_generation') || null;
@@ -1627,41 +2212,6 @@ export default function EnvidMetadataMinimal() {
     return n;
   }, [technical]);
 
-  const loadAllVideos = async () => {
-    try {
-      const response = await axios.get(`${BACKEND_URL}/videos`);
-      const videos = Array.isArray(response.data?.videos) ? response.data.videos : [];
-      setAllVideos(videos);
-
-      if (!videos.length) {
-        if (selectedVideoId) {
-          setSelectedVideoId(null);
-          setSelectedVideoTitle(null);
-        }
-        return;
-      }
-
-      const hasSelected = videos.some((video) => {
-        const videoId = video?.video_id || video?.id;
-        return videoId && selectedVideoId && String(videoId) === String(selectedVideoId);
-      });
-
-      if (!hasSelected) {
-        const latest = [...videos].sort((a, b) => {
-          const aTime = a?.uploaded_at ? Date.parse(a.uploaded_at) : 0;
-          const bTime = b?.uploaded_at ? Date.parse(b.uploaded_at) : 0;
-          return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
-        })[0];
-        const latestId = latest?.video_id || latest?.id;
-        if (latestId) {
-          setSelectedVideoId(String(latestId));
-          setSelectedVideoTitle(latest?.title || latest?.filename || latest?.name || null);
-        }
-      }
-    } catch (error) {
-      // Non-fatal.
-    }
-  };
 
   const loadGcsBucketList = async () => {
     setGcsBucketLoading(true);
@@ -1718,10 +2268,6 @@ export default function EnvidMetadataMinimal() {
   };
 
   const isVideoFile = (name) => /\.(mp4|mov|m4v|mkv|avi|webm|mxf)$/i.test(String(name || ''));
-
-  useEffect(() => {
-    loadAllVideos();
-  }, []);
 
   useEffect(() => {
     if (videoSource === 'gcs') {
@@ -1789,8 +2335,6 @@ export default function EnvidMetadataMinimal() {
           setGcsRawVideoObject('');
           if (fileInputRef.current) fileInputRef.current.value = '';
 
-          await loadAllVideos();
-
           setUploading(false);
           setClientUploadProgress(0);
           setUploadProgress(0);
@@ -1812,6 +2356,12 @@ export default function EnvidMetadataMinimal() {
     }, POLL_INTERVAL_MS);
   };
 
+  const resetUploadForm = () => {
+    setSelectedFile(null);
+    setGcsRawVideoObject('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleUpload = async () => {
     setMessage(null);
 
@@ -1819,8 +2369,6 @@ export default function EnvidMetadataMinimal() {
       setMessage({ type: 'error', text: 'Select at least one target translation language before analyzing.' });
       return;
     }
-
-    let handedOffToPoller = false;
 
     if (videoSource === 'gcs') {
       const raw = String(gcsRawVideoObject || '').trim();
@@ -1854,20 +2402,22 @@ export default function EnvidMetadataMinimal() {
         const response = await axios.post(`${BACKEND_URL}/process-gcs-video-cloud`, payload);
         if (response.status === 202 && response.data?.job_id) {
           setUploadProgress(5);
-          if (response.data?.job) setUploadJob(response.data.job);
-          setActiveJob({ kind: 'upload', jobId: response.data.job_id });
-          handedOffToPoller = true;
-          await pollJob(response.data.job_id);
+          setJobSubmitModal({ jobId: String(response.data.job_id) });
+          resetUploadForm();
+          setActiveJob(null);
+          setUploading(false);
+          setClientUploadProgress(0);
+          setUploadProgress(0);
+          setUploadJob(null);
+          setActiveTab('running');
           return;
         }
         setMessage({ type: 'error', text: response.data?.error || 'Failed to start Cloud Storage processing' });
       } catch (e) {
         setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to start Cloud Storage processing' });
       } finally {
-        if (!handedOffToPoller) {
-          setUploading(false);
-          setActiveJob(null);
-        }
+        setUploading(false);
+        setActiveJob(null);
       }
 
       return;
@@ -1907,26 +2457,103 @@ export default function EnvidMetadataMinimal() {
       if (response.status === 202 && response.data?.job_id) {
         setClientUploadProgress(100);
         setUploadProgress((p) => Math.max(p, 55));
-        if (response.data?.job) setUploadJob(response.data.job);
-        setActiveJob({ kind: 'upload', jobId: response.data.job_id });
-        handedOffToPoller = true;
-        await pollJob(response.data.job_id);
-        return;
-      }
-
-      setMessage({ type: 'success', text: response.data?.message || 'Uploaded.' });
-      await loadAllVideos();
-    } catch (e) {
-      setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to upload video' });
-    } finally {
-      if (!handedOffToPoller) {
+        setJobSubmitModal({ jobId: String(response.data.job_id) });
+        resetUploadForm();
+        setActiveJob(null);
         setUploading(false);
         setClientUploadProgress(0);
         setUploadProgress(0);
         setUploadJob(null);
-        setActiveJob(null);
+        setActiveTab('running');
+        return;
       }
+
+      setMessage({ type: 'success', text: response.data?.message || 'Uploaded.' });
+    } catch (e) {
+      setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to upload video' });
+    } finally {
+      setUploading(false);
+      setClientUploadProgress(0);
+      setUploadProgress(0);
+      setUploadJob(null);
+      setActiveJob(null);
     }
+  };
+
+  const taskSelectionOptions = useMemo(
+    () => [
+      {
+        enableKey: 'enable_label_detection',
+        label: 'Label detection',
+        modelKey: 'label_detection_model',
+        models: [
+          { value: 'gcp_video_intelligence', label: 'Google Video Intelligence' },
+        ],
+      },
+      {
+        enableKey: 'enable_famous_locations',
+        label: 'Famous location detection (future)',
+        disabled: true,
+        modelKey: 'famous_location_detection_model',
+        models: [
+          { value: 'auto', label: 'Auto (backend default)' },
+          { value: 'gcp_language', label: 'Google Cloud Natural Language' },
+        ],
+      },
+      {
+        enableKey: 'enable_opening_closing',
+        label: 'Opening and closing credit (future)',
+        disabled: true,
+        modelKey: 'opening_closing_credit_detection_model',
+        models: [
+          { value: 'auto', label: 'Auto (backend default)' },
+          { value: 'ffmpeg_blackdetect', label: 'FFmpeg blackdetect' },
+          { value: 'pyscenedetect', label: 'PySceneDetect' },
+        ],
+      },
+      {
+        enableKey: 'enable_celebrity_detection',
+        label: 'Celebrity detection (future)',
+        disabled: true,
+        modelKey: 'celebrity_detection_model',
+        models: [{ value: 'auto', label: 'Auto (backend default)' }],
+      },
+      {
+        enableKey: 'enable_celebrity_bio_image',
+        label: 'Celebrity bio & image (future)',
+        disabled: true,
+        modelKey: 'celebrity_bio_image_model',
+        models: [{ value: 'auto', label: 'Auto (backend default)' }],
+      },
+    ],
+    []
+  );
+
+  const stepSelection = useMemo(
+    () => uploadJob?.task_selection_effective || uploadJob?.task_selection || uploadJob?.task_selection_requested || taskSelection || {},
+    [uploadJob, taskSelection]
+  );
+
+  const isPipelineStepEnabled = (stepId) => {
+    const id = String(stepId || '').toLowerCase();
+    const selection = stepSelection || {};
+    const allCoreSelected = taskSelectionOptions
+      .filter((t) => !t.disabled)
+      .every((t) => selection?.[t.enableKey] === true);
+    if (id === 'save_as_json') return allCoreSelected;
+    if (id === 'label_detection') return Boolean(selection.enable_label_detection);
+    if (id === 'moderation') return Boolean(selection.enable_moderation);
+    if (id === 'text_on_screen') return Boolean(selection.enable_text_on_screen);
+    if (id === 'key_scene_detection') return Boolean(selection.enable_key_scene);
+    if (id === 'transcribe') return Boolean(selection.enable_transcribe);
+    if (id === 'synopsis_generation') return Boolean(selection.enable_synopsis_generation);
+    if (id === 'scene_by_scene_metadata') return Boolean(selection.enable_scene_by_scene);
+    if (id === 'famous_location_detection') return Boolean(selection.enable_famous_locations);
+    if (id === 'translate_output') return Boolean(selection.enable_translate_output);
+    if (id === 'opening_closing_credit_detection') return Boolean(selection.enable_opening_closing);
+    if (id === 'celebrity_detection') return Boolean(selection.enable_celebrity_detection);
+    if (id === 'celebrity_bio_image') return Boolean(selection.enable_celebrity_bio_image);
+    return true;
   };
 
   const pipelineSteps = useMemo(() => {
@@ -1936,15 +2563,18 @@ export default function EnvidMetadataMinimal() {
         if (!s || typeof s !== 'object') return false;
         const id = String(s.id || '').toLowerCase();
         const label = String(s.label || '').toLowerCase();
-        return id !== 'overall' && label !== 'overall';
+        if (id === 'overall' || label === 'overall') return false;
+        if (id === 'precheck_models' || label === 'precheck models') return false;
+        if (id === 'preflight' || label.includes('preflight') || label.includes('precheck')) return false;
+        return isPipelineStepEnabled(id);
       });
     }
 
     const hasSelectedInput =
       videoSource === 'local' ? Boolean(selectedFile) : Boolean(String(gcsRawVideoObject || '').trim());
 
-    return hasSelectedInput ? DEFAULT_PIPELINE_STEPS : [];
-  }, [uploadJob, videoSource, selectedFile, gcsRawVideoObject]);
+    return hasSelectedInput ? DEFAULT_PIPELINE_STEPS.filter((step) => isPipelineStepEnabled(step?.id)) : [];
+  }, [uploadJob, videoSource, selectedFile, gcsRawVideoObject, taskSelection, stepSelection]);
 
   const statusBadgeFor = (rawStatus) => {
     const s = String(rawStatus || '').toLowerCase();
@@ -1953,6 +2583,450 @@ export default function EnvidMetadataMinimal() {
     if (s === 'failed') return { text: 'Failed', variant: 'bad' };
     if (s === 'skipped') return { text: 'Skipped', variant: 'warn' };
     return { text: 'Not started', variant: 'neutral' };
+  };
+
+  const tableStatusFor = (rawStatus) => {
+    const s = String(rawStatus || '').toLowerCase();
+    if (s === 'completed') return { text: 'Completed', tone: 'completed' };
+    if (s === 'running' || s === 'processing') return { text: 'In progress', tone: 'in_progress' };
+    return { text: 'Not started', tone: 'not_started' };
+  };
+
+  const buildStepMap = (steps, jobStatus) => {
+    const map = new Map();
+    if (!Array.isArray(steps)) return map;
+    steps.forEach((step) => {
+      if (!step || typeof step !== 'object') return;
+      const id = String(step.id || step.step_id || '').trim();
+      if (id) map.set(id, step);
+    });
+    if (String(jobStatus || '').toLowerCase() === 'completed') {
+      const step = map.get('save_as_json');
+      if (step && String(step.status || '').toLowerCase() !== 'completed') {
+        map.set('save_as_json', {
+          ...step,
+          status: 'completed',
+          percent: 100,
+          message: step.message || 'Completed',
+        });
+      }
+    }
+    return map;
+  };
+
+  const loadJobDetail = async (jobId) => {
+    if (!jobId) return;
+    setExpandedJobLoading(true);
+    try {
+      const jobResp = await axios.get(`${BACKEND_URL}/jobs/${jobId}`);
+      let metadata = null;
+      try {
+        const metaResp = await axios.get(`${BACKEND_URL}/video/${jobId}`);
+        metadata = metaResp?.data || null;
+      } catch {
+        metadata = null;
+      }
+      setExpandedJobDetail({ job: jobResp?.data || null, metadata });
+    } catch (err) {
+      setExpandedJobDetail({ error: err?.response?.data?.error || 'Failed to load job detail' });
+    } finally {
+      setExpandedJobLoading(false);
+    }
+  };
+
+  const runningJobRow = (job) => {
+    const jobId = String(job?.id || job?.job_id || '').trim();
+    const title = String(job?.title || job?.name || '').trim();
+    const status = String(job?.status || '').toLowerCase();
+    const stopRequested = Boolean(job?.stop_requested);
+    const stepsMap = buildStepMap(job?.steps, status);
+    const displaySteps = DEFAULT_PIPELINE_STEPS;
+    const isExpanded = expandedJobId === jobId;
+    const reportedProgress = Number(job?.progress ?? job?.overall_progress ?? job?.percent);
+    const derivedProgress = (() => {
+      if (!displaySteps.length) return 0;
+      const sum = displaySteps.reduce((acc, step) => {
+        const id = String(step?.id || '');
+        const stepObj = stepsMap.get(id);
+        const stepStatus = String(stepObj?.status || '').toLowerCase();
+        const computed = deriveStepPercent(stepObj);
+        if (Number.isFinite(computed)) return acc + computed;
+        if (['completed', 'failed', 'skipped'].includes(stepStatus)) return acc + 100;
+        if (stepStatus === 'running') return acc + 5;
+        return acc;
+      }, 0);
+      return clampPercent(Math.round(sum / displaySteps.length));
+    })();
+    const overallPercent = Number.isFinite(reportedProgress) ? clampPercent(reportedProgress) : derivedProgress;
+    const currentStep = displaySteps.find((step) => {
+      const stepObj = stepsMap.get(String(step?.id || ''));
+      return String(stepObj?.status || '').toLowerCase() === 'running';
+    });
+    const currentStepLabel = currentStep?.label || '';
+
+    return (
+      <div key={jobId || title}>
+        <RunningJobRow>
+          <RunningJobMeta>
+            <RunningJobId>{jobId || 'Unknown job'}</RunningJobId>
+            <RunningJobTitle>{title || 'Untitled job'}</RunningJobTitle>
+            <Row style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <RunningJobStatus>
+                Overall Status: {status || 'running'}
+                {stopRequested ? ' (stop requested)' : ''}
+              </RunningJobStatus>
+              <div
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 900,
+                  background: 'rgba(102, 126, 234, 0.18)',
+                  border: '1px solid rgba(102, 126, 234, 0.35)',
+                  color: '#e6e8f2',
+                }}
+              >
+                {overallPercent}%
+              </div>
+            </Row>
+            <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>
+              <ProgressBar style={{ height: 6, marginTop: 0 }}>
+                <ProgressFill $percent={overallPercent} />
+              </ProgressBar>
+              {currentStepLabel ? (
+                <div style={{ fontSize: 11, color: 'rgba(230, 232, 242, 0.65)' }}>Current Task: {currentStepLabel}</div>
+              ) : null}
+            </div>
+          </RunningJobMeta>
+          {(() => {
+            const buckets = {
+              not_started: [],
+              in_progress: [],
+              completed: [],
+              skipped: [],
+            };
+            displaySteps.forEach((step) => {
+              const id = String(step?.id || '');
+              const label = String(step?.label || id || 'Step');
+              const stepObj = stepsMap.get(id);
+              const statusRaw = String(stepObj?.status || '').toLowerCase();
+              const statusInfo = tableStatusFor(stepObj?.status);
+              if (statusRaw === 'failed' || statusRaw === 'skipped') buckets.skipped.push({ id, label });
+              else if (statusInfo.tone === 'completed') buckets.completed.push({ id, label });
+              else if (statusInfo.tone === 'in_progress') buckets.in_progress.push({ id, label });
+              else buckets.not_started.push({ id, label });
+            });
+
+            return (
+              <StatusBucketsGrid>
+                <StatusBucket>
+                  <StatusBucketTitle>Not Started</StatusBucketTitle>
+                  <RunningJobSteps>
+                    {buckets.not_started.length ? (
+                      buckets.not_started.map((item) => (
+                        <StepChip
+                          key={`${jobId}-ns-${item.id}`}
+                          $status="not_started"
+                          $restartable
+                          title={`Restart ${item.label}`}
+                          onClick={() => restartJobStep(jobId, item.id)}
+                        >
+                          {item.label}
+                        </StepChip>
+                      ))
+                    ) : (
+                      <SubtleNote>None</SubtleNote>
+                    )}
+                  </RunningJobSteps>
+                </StatusBucket>
+
+                <StatusBucket>
+                  <StatusBucketTitle>In Progress</StatusBucketTitle>
+                  <RunningJobSteps>
+                    {buckets.in_progress.length ? (
+                      buckets.in_progress.map((item) => (
+                        <StepChip
+                          key={`${jobId}-ip-${item.id}`}
+                          $status="running"
+                          $restartable
+                          title={`Restart ${item.label}`}
+                          onClick={() => restartJobStep(jobId, item.id)}
+                        >
+                          {item.label}
+                        </StepChip>
+                      ))
+                    ) : (
+                      <SubtleNote>None</SubtleNote>
+                    )}
+                  </RunningJobSteps>
+                </StatusBucket>
+
+                <StatusBucket>
+                  <StatusBucketTitle>Completed</StatusBucketTitle>
+                  <RunningJobSteps>
+                    {buckets.completed.length ? (
+                      buckets.completed.map((item) => (
+                        <StepChip
+                          key={`${jobId}-c-${item.id}`}
+                          $status="completed"
+                          $restartable
+                          title={`Restart ${item.label}`}
+                          onClick={() => restartJobStep(jobId, item.id)}
+                        >
+                          {item.label}
+                        </StepChip>
+                      ))
+                    ) : (
+                      <SubtleNote>None</SubtleNote>
+                    )}
+                  </RunningJobSteps>
+                </StatusBucket>
+
+                <StatusBucket>
+                  <StatusBucketTitle>Skipped</StatusBucketTitle>
+                  <RunningJobSteps>
+                    {buckets.skipped.length ? (
+                      buckets.skipped.map((item) => (
+                        <StepChip
+                          key={`${jobId}-s-${item.id}`}
+                          $status="skipped"
+                          $restartable
+                          title={`Restart ${item.label}`}
+                          onClick={() => restartJobStep(jobId, item.id)}
+                        >
+                          {item.label}
+                        </StepChip>
+                      ))
+                    ) : (
+                      <SubtleNote>None</SubtleNote>
+                    )}
+                  </RunningJobSteps>
+                </StatusBucket>
+              </StatusBucketsGrid>
+            );
+          })()}
+          <Row style={{ gap: 8, justifyContent: 'flex-end' }}>
+            <SecondaryButton type="button" onClick={() => restartJob(jobId)} disabled={!jobId}>
+              Restart
+            </SecondaryButton>
+            <SecondaryButton type="button" onClick={() => stopJob(jobId)} disabled={!jobId}>
+              Stop
+            </SecondaryButton>
+            <DeleteButton type="button" onClick={() => requestDeleteJob(jobId)} disabled={!jobId}>
+              Delete
+            </DeleteButton>
+            <ExpandButton
+              type="button"
+              onClick={async () => {
+                if (isExpanded) {
+                  setExpandedJobId('');
+                  setExpandedJobDetail(null);
+                  return;
+                }
+                setExpandedJobId(jobId);
+                await loadJobDetail(jobId);
+              }}
+            >
+              {isExpanded ? 'Hide details' : 'Show details'}
+            </ExpandButton>
+          </Row>
+        </RunningJobRow>
+        {isExpanded && (
+          <JobDetailPanel>
+            {expandedJobLoading ? 'Loading job details…' : null}
+            {!expandedJobLoading && expandedJobDetail?.error ? expandedJobDetail.error : null}
+            {!expandedJobLoading && !expandedJobDetail?.error ? (
+              <>
+                {expandedJobDetail?.job ? `Job:\n${JSON.stringify(expandedJobDetail.job, null, 2)}\n\n` : ''}
+                {expandedJobDetail?.metadata
+                  ? `Metadata:\n${JSON.stringify(expandedJobDetail.metadata, null, 2)}`
+                  : 'Metadata: not available yet'}
+              </>
+            ) : null}
+          </JobDetailPanel>
+        )}
+      </div>
+    );
+  };
+
+  const completedJobRow = (job) => {
+    const jobId = String(job?.id || job?.job_id || '').trim();
+    const fileName = getJobFileName(job);
+    const isExpanded = expandedCompletedJobId === jobId;
+    const thumbSrc = asJpegDataUri(job?.thumbnail || job?.video?.thumbnail || job?.metadata?.thumbnail);
+    const startedAt = job?.started_at || job?.created_at || job?.job_started_at || null;
+    const completedAt = job?.completed_at || job?.job_completed_at || job?.updated_at || null;
+    const durationLabel = formatDurationMs(startedAt, completedAt);
+    const jobTargets =
+      job?.task_selection_effective?.translate_targets ||
+      job?.task_selection?.translate_targets ||
+      job?.task_selection_requested?.translate_targets ||
+      job?.task_selection_requested_models?.translate_targets ||
+      [];
+    const targetLangs = (Array.isArray(jobTargets) && jobTargets.length ? jobTargets : [])
+      .map((l) => String(l || '').toLowerCase())
+      .filter(Boolean);
+    const downloadLangs = Array.from(new Set(['orig', ...targetLangs.filter((l) => l !== 'orig')]));
+
+    return (
+      <div key={jobId || fileName}>
+        <RunningJobRow>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(260px, 1.6fr) minmax(260px, 1fr) auto',
+              gap: 16,
+              alignItems: 'center',
+            }}
+          >
+            <RunningJobMeta>
+              <Row style={{ gap: 10, alignItems: 'center' }}>
+                <JobThumb>{thumbSrc ? <img src={thumbSrc} alt={fileName || jobId || 'thumbnail'} /> : '🎞️'}</JobThumb>
+                <div style={{ minWidth: 0 }}>
+                  <RunningJobId>{jobId || 'Unknown job'}</RunningJobId>
+                  <RunningJobTitle>{fileName || 'Untitled file'}</RunningJobTitle>
+                  <div style={{ marginTop: 4, color: 'rgba(230, 232, 242, 0.65)', fontSize: 12 }}>
+                    Completed: {formatTimestamp(completedAt)}
+                  </div>
+                  <div style={{ marginTop: 2, color: 'rgba(230, 232, 242, 0.65)', fontSize: 12 }}>
+                    Total time: {durationLabel}
+                  </div>
+                </div>
+              </Row>
+            </RunningJobMeta>
+
+            <div style={{ display: 'grid', justifyItems: 'center' }}>
+              <CompletedDownloadTable>
+                <CompletedDownloadCell>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(230, 232, 242, 0.7)', marginBottom: 6 }}>
+                    Subtitle
+                  </div>
+                  <RunningJobSteps>
+                    {downloadLangs.map((lang) => (
+                      <StepChip key={`${jobId}-${lang}`} $status="completed" title={`Subtitles ${lang.toUpperCase()}`}>
+                        <LinkA
+                          href={subtitleDownloadUrl(jobId, lang, 'srt')}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {lang.toUpperCase()} SRT
+                        </LinkA>
+                      </StepChip>
+                    ))}
+                  </RunningJobSteps>
+                </CompletedDownloadCell>
+                <CompletedDownloadCell>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(230, 232, 242, 0.7)', marginBottom: 6 }}>
+                    Complete Metadata
+                  </div>
+                  <RunningJobSteps>
+                    {downloadLangs.map((lang) => (
+                      <StepChip key={`${jobId}-${lang}-json`} $status="completed" title={`Metadata ${lang.toUpperCase()}`}>
+                        <LinkA
+                          href={`${BACKEND_URL}/video/${jobId}/metadata-json?lang=${lang}&download=1`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {lang.toUpperCase()} JSON
+                        </LinkA>
+                      </StepChip>
+                    ))}
+                  </RunningJobSteps>
+                </CompletedDownloadCell>
+              </CompletedDownloadTable>
+            </div>
+
+            <CompletedJobActions>
+              <CompletedDetailButton
+                type="button"
+                onClick={() => {
+                  if (!jobId) return;
+                  if (isExpanded) {
+                    setExpandedCompletedJobId('');
+                    setSelectedVideoId(null);
+                    setSelectedVideoTitle(null);
+                    return;
+                  }
+                  setExpandedCompletedJobId(jobId);
+                  setSelectedVideoId(jobId);
+                  setSelectedVideoTitle(fileName || jobId);
+                  setTimeout(() => {
+                    document.getElementById('envid-metadata-details')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+                  }, 0);
+                }}
+                disabled={!jobId}
+                style={{ minWidth: 92, padding: '4px 8px', fontSize: 11 }}
+              >
+                {isExpanded ? 'Hide details' : 'Show details'}
+              </CompletedDetailButton>
+              <DeleteButton
+                type="button"
+                onClick={() => requestDeleteJob(jobId)}
+                disabled={!jobId}
+                style={{ minWidth: 92, padding: '4px 8px', fontSize: 11 }}
+              >
+                Delete
+              </DeleteButton>
+            </CompletedJobActions>
+          </div>
+        </RunningJobRow>
+      </div>
+    );
+  };
+
+  const failedJobRow = (job) => {
+    const jobId = String(job?.id || job?.job_id || '').trim();
+    const fileName = getJobFileName(job);
+    const thumbSrc = asJpegDataUri(job?.thumbnail || job?.video?.thumbnail || job?.metadata?.thumbnail);
+    const steps = Array.isArray(job?.steps) ? job.steps : [];
+    const failedStep = steps.find((s) => String(s?.status || '').toLowerCase() === 'failed') || null;
+    const failedStepId = String(failedStep?.id || '').toLowerCase();
+    const failedStepLabel =
+      DEFAULT_PIPELINE_STEPS.find((s) => String(s?.id || '').toLowerCase() === failedStepId)?.label ||
+      failedStep?.label ||
+      failedStepId ||
+      '';
+    const stepReason = String(failedStep?.message || failedStep?.error || '').trim();
+    const remarks =
+      String(
+        job?.failure_reason ||
+          job?.error_message ||
+          job?.error ||
+          job?.status_message ||
+          job?.message ||
+          job?.last_error ||
+          ''
+      ).trim() || 'Unknown failure';
+    const remarksText = stepReason ? `${failedStepLabel ? `${failedStepLabel}: ` : ''}${stepReason}` : remarks;
+    const failedAtText = failedStepLabel ? `Failed at ${failedStepLabel}` : 'Failed step unknown';
+
+    return (
+      <div key={jobId || fileName}>
+        <RunningJobRow>
+          <RunningJobMeta>
+            <Row style={{ gap: 10, alignItems: 'center' }}>
+              <JobThumb>{thumbSrc ? <img src={thumbSrc} alt={fileName || jobId || 'thumbnail'} /> : '⚠️'}</JobThumb>
+              <div style={{ minWidth: 0 }}>
+                <RunningJobId>{jobId || 'Unknown job'}</RunningJobId>
+                <RunningJobTitle>{fileName || 'Untitled file'}</RunningJobTitle>
+                <div style={{ marginTop: 6, fontSize: 12, color: 'rgba(255, 187, 187, 0.9)' }}>{failedAtText}</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(255, 187, 187, 0.9)' }}>
+                  Remarks: {remarksText}
+                </div>
+              </div>
+            </Row>
+          </RunningJobMeta>
+          <Row style={{ gap: 8, justifyContent: 'flex-end' }}>
+            <SecondaryButton type="button" onClick={() => restartJob(jobId)} disabled={!jobId}>
+              Restart
+            </SecondaryButton>
+            <DeleteButton type="button" onClick={() => requestDeleteJob(jobId)} disabled={!jobId}>
+              Delete
+            </DeleteButton>
+          </Row>
+        </RunningJobRow>
+      </div>
+    );
   };
 
   const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(value)));
@@ -1968,11 +3042,17 @@ export default function EnvidMetadataMinimal() {
 
   const deriveStepPercent = (step) => {
     if (!step || typeof step !== 'object') return null;
+    const stepId = String(step.id || '').toLowerCase();
     const status = String(step.status || '').toLowerCase();
     const raw = typeof step.percent === 'number' ? clampPercent(step.percent) : null;
     if (raw !== null && raw > 0) return raw;
     const msgPercent = extractPercentFromMessage(step.message);
     if (msgPercent !== null) return msgPercent;
+    if (stepId === 'upload_to_cloud_storage') {
+      const msg = String(step.message || '').toLowerCase();
+      if (msg.includes('uploaded') || msg.includes('downloaded')) return 100;
+      return raw !== null ? raw : 0;
+    }
     if (status === 'completed' || status === 'failed' || status === 'skipped') return 100;
     if (status !== 'running') return raw;
     const startedAt = step.started_at || step.startedAt;
@@ -1996,6 +3076,9 @@ export default function EnvidMetadataMinimal() {
     : '—';
   const gpuPercentLabel = Number.isFinite(systemStats?.gpu_percent)
     ? `${Math.round(systemStats.gpu_percent)}%`
+    : '—';
+  const memPercentLabel = Number.isFinite(systemStats?.memory_percent)
+    ? `${Math.round(systemStats.memory_percent)}%`
     : '—';
 
   const subtitleLanguageLabels = useMemo(() => {
@@ -2068,6 +3151,19 @@ export default function EnvidMetadataMinimal() {
     return { status: 'running', percent: 0 };
   })();
 
+  const taskSelectionAllEnabled = useMemo(
+    () => taskSelectionOptions.filter((t) => !t.disabled).every((t) => Boolean(taskSelection?.[t.enableKey])),
+    [taskSelectionOptions, taskSelection]
+  );
+
+  const pipelineStepLabelMap = useMemo(() => {
+    const map = {};
+    DEFAULT_PIPELINE_STEPS.forEach((step) => {
+      if (step?.id && step?.label) map[String(step.id).toLowerCase()] = String(step.label);
+    });
+    return map;
+  }, []);
+
   const statusPanel = showStatusPanel ? (
     <div style={{ marginTop: 12 }}>
       <StatusPanel>
@@ -2116,42 +3212,39 @@ export default function EnvidMetadataMinimal() {
 
         {pipelineSteps.length > 0 && (
           <StepList>
-            {pipelineSteps.map((step) => {
-              const id = String(step?.id || '');
-              const label = String(step?.label || id || 'Step');
-              const pct = deriveStepPercent(step);
-              const badge = statusBadgeFor(step?.status);
-              const hint = String(step?.message || '').trim();
-              const hintText = (() => {
-                if (pct !== null && pct > 0) return `${pct}%`;
-                if (hint) return hint;
-                if (pct !== null) return `${pct}%`;
-                return '';
-              })();
+            {pipelineSteps.length > 0 && (
+              <StatusTable>
+                <StatusTableHeader>
+                  <div>Task</div>
+                  <div>Status</div>
+                </StatusTableHeader>
+                {pipelineSteps.map((step) => {
+                  const id = String(step?.id || '');
+                  const label = String(step?.label || id || 'Step');
+                  const pct = deriveStepPercent(step);
+                  const hint = String(step?.message || '').trim();
+                  const hintText = (() => {
+                    if (pct !== null && pct > 0) return `${pct}%`;
+                    if (hint) return hint;
+                    if (pct !== null) return `${pct}%`;
+                    return '';
+                  })();
+                  const statusInfo = tableStatusFor(step?.status);
 
-              return (
-                <StepRow key={id || label}>
-                  <StepLeft>
-                    <StepLabelRow>
-                      <StepLabel>{label}</StepLabel>
-                      <StepHint>{hintText}</StepHint>
-                    </StepLabelRow>
-                    <ProgressBar>
-                      <ProgressFill
-                        $percent={
-                          pct !== null
-                            ? pct
-                            : String(step?.status || '').toLowerCase() === 'completed'
-                              ? 100
-                              : 0
-                        }
-                      />
-                    </ProgressBar>
-                  </StepLeft>
-                  <StepBadge $variant={badge.variant}>{badge.text}</StepBadge>
-                </StepRow>
-              );
-            })}
+                  return (
+                    <StatusTableRow key={id || label}>
+                      <StatusTableCell>
+                        <strong style={{ fontWeight: 700 }}>{label}</strong>
+                        {hintText ? <span style={{ color: 'rgba(180, 186, 220, 0.8)', fontSize: 12 }}>{hintText}</span> : null}
+                      </StatusTableCell>
+                      <StatusTableCell>
+                        <StatusPill $tone={statusInfo.tone}>{statusInfo.text}</StatusPill>
+                      </StatusTableCell>
+                    </StatusTableRow>
+                  );
+                })}
+              </StatusTable>
+            )}
           </StepList>
         )}
 
@@ -2185,77 +3278,6 @@ export default function EnvidMetadataMinimal() {
     </div>
   ) : null;
 
-  const handleDeleteVideo = async (videoId, videoTitle) => {
-    if (!videoId) return;
-    setDeletePending({ videoId, videoTitle });
-  };
-
-  const confirmDeleteVideo = async () => {
-    if (!deletePending) return;
-    const { videoId, videoTitle } = deletePending;
-    setDeletePending(null);
-    setMessage(null);
-    try {
-      const resp = await axios.delete(`${BACKEND_URL}/video/${videoId}`);
-      const baseMsg = resp.data?.message || `Deleted "${videoTitle}".`;
-      const warningsRaw =
-        resp.data?.storage_warnings ?? resp.data?.gcs_warnings ?? resp.data?.s3_warnings ?? resp.data?.warnings ?? [];
-      const warnings = Array.isArray(warningsRaw) ? warningsRaw.filter(Boolean) : [];
-      if (warnings.length) {
-        setMessage({
-          type: 'info',
-          text: `${baseMsg} (Storage warnings: ${warnings.slice(0, 4).join(' | ')}${warnings.length > 4 ? ' | …' : ''})`,
-        });
-      } else {
-        setMessage({ type: 'success', text: baseMsg });
-      }
-      await loadAllVideos();
-    } catch (e) {
-      setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to delete video' });
-    }
-  };
-
-  const handleReprocessVideo = async (videoId, videoTitle) => {
-    if (!videoId) return;
-    setReprocessPending({ videoId, videoTitle });
-  };
-
-  const confirmReprocessVideo = async () => {
-    if (!reprocessPending) return;
-    const { videoId, videoTitle } = reprocessPending;
-    setReprocessPending(null);
-    setMessage(null);
-    setUploading(true);
-    setUploadProgress(0);
-    setClientUploadProgress(0);
-    setUploadJob(null);
-    setMessage({ type: 'info', text: 'Reprocessing started…' });
-
-    let handedOffToPoller = false;
-    try {
-      const resp = await axios.post(`${BACKEND_URL}/video/${videoId}/reprocess`, { task_selection: taskSelectionPayload });
-      if (resp.status === 202 && resp.data?.job_id) {
-        setUploadProgress(5);
-        if (resp.data?.job) setUploadJob(resp.data.job);
-        setActiveJob({ kind: 'reprocess', videoId: String(videoId), jobId: resp.data.job_id });
-        handedOffToPoller = true;
-        await pollJob(resp.data.job_id);
-        return;
-      }
-      setMessage({ type: 'success', text: resp.data?.message || `Reprocess requested for "${videoTitle}".` });
-      await loadAllVideos();
-    } catch (e) {
-      setMessage({ type: 'error', text: e.response?.data?.error || `Failed to start reprocess for "${videoTitle}"` });
-    } finally {
-      if (!handedOffToPoller) {
-        setUploading(false);
-        setUploadProgress(0);
-        setUploadJob(null);
-        setActiveJob(null);
-      }
-    }
-  };
-
   const copyToClipboard = async (text) => {
     const value = String(text || '').trim();
     if (!value) return false;
@@ -2286,17 +3308,943 @@ export default function EnvidMetadataMinimal() {
     }
   };
 
+  const metadataDetailPanel =
+    activeTab === 'completed' && selectedVideoId ? (
+      <DetailPanel id="envid-metadata-details">
+        <DetailHeader>
+          <div style={{ minWidth: 0 }}>
+            <DetailTitle>
+              {selectedVideoTitle || 'Video'} · ID: {selectedVideoId}
+            </DetailTitle>
+            <div style={{ marginTop: 4, color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>
+              Click any timestamp/segment to seek.
+            </div>
+          </div>
+          <Row style={{ gap: 8 }}>
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('envid-script');
+                if (el && typeof el.scrollIntoView === 'function') {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              disabled={selectedMetaLoading}
+            >
+              Jump to Script
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={() =>
+                window.open(
+                  `${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=orig&download=1`,
+                  '_blank',
+                  'noopener,noreferrer'
+                )
+              }
+              disabled={selectedMetaLoading}
+            >
+              Download Full Metadata (Original)
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                setSelectedVideoId(null);
+                setSelectedVideoTitle(null);
+                setSelectedMeta(null);
+                setSelectedMetaError(null);
+                setExpandedCompletedJobId('');
+              }}
+            >
+              Close
+            </SecondaryButton>
+          </Row>
+        </DetailHeader>
+
+        <DetailBody>
+          {selectedMetaLoading ? (
+            <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontWeight: 900 }}>Loading metadata…</div>
+          ) : selectedMetaError ? (
+            <div style={{ color: '#ffd1d1', fontWeight: 900 }}>{selectedMetaError}</div>
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardHeaderTitle>Downloads</CardHeaderTitle>
+                </CardHeader>
+                <CardBody>
+                  <DownloadGrid>
+                    <DownloadGroup>
+                      <div>
+                        <DownloadGroupTitle>Subtitles</DownloadGroupTitle>
+                        <DownloadGroupHint>Download SRT or VTT for each available language.</DownloadGroupHint>
+                      </div>
+                      <DownloadList>
+                        {subtitleLanguages.map((lang) => {
+                          const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
+                          const isOrig = lang === 'orig';
+                          const srtLabel = isOrig ? '.srt' : `.${lang}.srt`;
+                          const vttLabel = isOrig ? '.vtt' : `.${lang}.vtt`;
+                          return (
+                            <DownloadRow key={lang}>
+                              <DownloadLabel>{label}</DownloadLabel>
+                              <LinkA
+                                href={subtitleDownloadUrl(selectedVideoId, lang, 'srt')}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Download {srtLabel}
+                              </LinkA>
+                              <LinkA
+                                href={subtitleDownloadUrl(selectedVideoId, lang, 'vtt')}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Download {vttLabel}
+                              </LinkA>
+                            </DownloadRow>
+                          );
+                        })}
+                      </DownloadList>
+                    </DownloadGroup>
+
+                    <DownloadGroup>
+                      <div>
+                        <DownloadGroupTitle>Complete Metadata</DownloadGroupTitle>
+                        <DownloadGroupHint>JSON files per language, including all pipeline outputs.</DownloadGroupHint>
+                      </div>
+                      <DownloadList>
+                        {metadataLanguages.map((lang) => {
+                          const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
+                          const suffix = lang === 'orig' ? '' : ` (${lang.toUpperCase()})`;
+                          return (
+                            <DownloadRow key={lang}>
+                              <DownloadLabel>{label}</DownloadLabel>
+                              <LinkA
+                                href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=${lang}&download=1`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Download Full Metadata JSON{suffix}
+                              </LinkA>
+                            </DownloadRow>
+                          );
+                        })}
+                      </DownloadList>
+                    </DownloadGroup>
+
+                    {isOutputTaskEnabled('enable_moderation') ? (
+                      <DownloadGroup>
+                        <div>
+                          <DownloadGroupTitle>Moderation Output</DownloadGroupTitle>
+                          <DownloadGroupHint>Full moderation JSON (all analyzed frames).</DownloadGroupHint>
+                        </div>
+                        <DownloadList>
+                          <DownloadRow>
+                            <DownloadLabel>Full report</DownloadLabel>
+                            <LinkA href={moderationDownloadUrl} target="_blank" rel="noreferrer">
+                              Download moderation JSON
+                            </LinkA>
+                          </DownloadRow>
+                        </DownloadList>
+                      </DownloadGroup>
+                    ) : null}
+                  </DownloadGrid>
+                </CardBody>
+              </Card>
+
+              <Grid2>
+                {isOutputTaskEnabled('enable_celebrity_detection') ? (
+                  <div>
+                    <Card>
+                      <CardHeader>
+                        <CardHeaderTitle>Celebrity Detection on Player</CardHeaderTitle>
+                        <div style={{ color: 'rgba(230, 232, 242, 0.65)', fontSize: 12 }}>
+                          {formatTimecode(playerTime, playerFps)}
+                        </div>
+                      </CardHeader>
+                      <CardBody>
+                        <VideoFrame ref={playerContainerRef}>
+                          <video
+                            ref={playerRef}
+                            src={`${BACKEND_URL}/video-file/${selectedVideoId}`}
+                            controls
+                            controlsList="nofullscreen"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', position: 'relative', zIndex: 1 }}
+                            onTimeUpdate={(e) => setPlayerTime(Number(e.currentTarget?.currentTime || 0))}
+                            onPlay={() => {
+                              setPlayerIsPaused(false);
+                            }}
+                            onPause={() => {
+                              setPlayerIsPaused(true);
+                            }}
+                            onEnded={() => {
+                              setPlayerIsPaused(true);
+                            }}
+                          />
+
+                          <PlayerFullscreenButton
+                            type="button"
+                            onClick={togglePlayerFullscreen}
+                            title={playerIsFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                            aria-label={playerIsFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                          >
+                            {playerIsFullscreen ? 'X' : 'FS'}
+                          </PlayerFullscreenButton>
+
+                          {showCelebOverlay ? (
+                            playerIsFullscreen ? (
+                              <>
+                                <VideoOverlaySidePanel>
+                                  <OverlaySideList $scrollable={fullscreenSideScrollable}>
+                                    {overlayCelebItems.map((c) => (
+                                      <OverlaySideItem key={c.name}>
+                                        <OverlayThumb>
+                                          {c.portrait_url ? (
+                                            <img src={c.portrait_url} alt={c.name} referrerPolicy="no-referrer" />
+                                          ) : (
+                                            <span>{String(c.name || '?').slice(0, 1).toUpperCase()}</span>
+                                          )}
+                                        </OverlayThumb>
+                                        <OverlayName title={c.name}>{c.name}</OverlayName>
+                                      </OverlaySideItem>
+                                    ))}
+                                  </OverlaySideList>
+                                </VideoOverlaySidePanel>
+                              </>
+                            ) : (
+                              <VideoOverlayBar>
+                                <OverlayScroller $scrollable={overlayIsScrollable}>
+                                  {overlayCelebItems.map((c) => (
+                                    <OverlayChip key={c.name}>
+                                      <OverlayChipThumb>
+                                        {c.portrait_url ? (
+                                          <img src={c.portrait_url} alt={c.name} referrerPolicy="no-referrer" />
+                                        ) : (
+                                          <span>{String(c.name || '?').slice(0, 1).toUpperCase()}</span>
+                                        )}
+                                      </OverlayChipThumb>
+                                      <OverlayChipName>{c.name}</OverlayChipName>
+                                    </OverlayChip>
+                                  ))}
+                                </OverlayScroller>
+                              </VideoOverlayBar>
+                            )
+                          ) : null}
+                        </VideoFrame>
+
+                        <div style={{ marginTop: 10, color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>
+                          Tip: use the Celebrity table segments below to jump.
+                        </div>
+                      </CardBody>
+                    </Card>
+                  </div>
+                ) : null}
+
+                <div>
+                  <Card>
+                    <CardHeader>
+                      <CardHeaderTitle>Technical</CardHeaderTitle>
+                    </CardHeader>
+                    <CardBody>
+                      <div style={{ display: 'grid', gap: 6, color: 'rgba(230, 232, 242, 0.85)', fontSize: 13 }}>
+                        <div>Title: {technical?.title || selectedVideoTitle || '—'}</div>
+                        <div>
+                          Container:{' '}
+                          {(() => {
+                            const c = formatContainerFormat(technical?.container_format);
+                            return (
+                              <span title={c.title || undefined} style={{ fontWeight: 900 }}>
+                                {c.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div>
+                          Size: {typeof technical?.file_size_bytes === 'number' ? formatBytes(technical.file_size_bytes) : '—'}
+                        </div>
+                        <div>Duration: {technical?.duration_seconds != null ? `${formatSeconds(technical.duration_seconds)} (${Number(technical.duration_seconds).toFixed(2)}s)` : '—'}</div>
+                        <div>
+                          Resolution:{' '}
+                          {technical?.resolution?.width && technical?.resolution?.height
+                            ? `${technical.resolution.width}×${technical.resolution.height}`
+                            : '—'}
+                        </div>
+                        <div>Video codec: {technical?.video_codec || '—'}</div>
+                        <div>Audio codec: {technical?.audio_codec || '—'}</div>
+                      </div>
+                    </CardBody>
+                  </Card>
+                </div>
+              </Grid2>
+
+              {isOutputTaskEnabled('enable_celebrity_detection') && isOutputTaskEnabled('enable_celebrity_bio_image') ? (
+                <Card>
+                  <CardHeader>
+                    <CardHeaderTitle>Celebrity Table (timestamp + short bio)</CardHeaderTitle>
+                  </CardHeader>
+                  <CardBody>
+                    {Array.isArray(celebs) && celebs.length ? (
+                      <div style={{ overflowX: 'auto' }}>
+                        <Table>
+                          <thead>
+                            <tr>
+                              <Th>Celebrity</Th>
+                              <Th>Occurrences</Th>
+                              <Th>Bio</Th>
+                              <Th>Src</Th>
+                              <Th>Portrait License</Th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {celebs.map((c) => {
+                              const name = String(c?.name || '').trim() || '—';
+                              const occ = Number(c?.occurrences);
+                              const occurrences = Number.isFinite(occ) ? Math.max(0, Math.floor(occ)) : null;
+                              const tsMs = Array.isArray(c?.timestamps_ms) ? c.timestamps_ms : [];
+                              const tsSeconds = Array.isArray(c?.timestamps_seconds) ? c.timestamps_seconds : [];
+                              const bio = (c?.bio_short || c?.bio || '').toString().trim();
+                              const portrait = (c?.portrait_url || '').toString().trim();
+                              const portraitLicense = (c?.portrait_license || '').toString().trim();
+                              const portraitLicenseUrl = (c?.portrait_license_url || '').toString().trim();
+                              const portraitSource = (c?.portrait_source || '').toString().trim();
+
+                              const occurrenceTimesSeconds = (() => {
+                                const raw = tsMs.length ? tsMs.map((ms) => Number(ms) / 1000) : tsSeconds.map((s) => Number(s));
+                                const seen = new Set();
+                                const out = [];
+                                for (const t of raw) {
+                                  if (!Number.isFinite(t) || t < 0) continue;
+                                  const k = Math.round(t * 1000);
+                                  if (seen.has(k)) continue;
+                                  seen.add(k);
+                                  out.push(t);
+                                }
+                                return out;
+                              })();
+                              return (
+                                <tr key={name}>
+                                  <Td>
+                                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                      {portrait ? (
+                                        <img
+                                          src={portrait}
+                                          alt={name}
+                                          style={{ width: 36, height: 36, borderRadius: 999, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.12)' }}
+                                        />
+                                      ) : (
+                                        <div
+                                          style={{
+                                            width: 36,
+                                            height: 36,
+                                            borderRadius: 999,
+                                            background: 'rgba(255,255,255,0.06)',
+                                            border: '1px solid rgba(255,255,255,0.12)',
+                                          }}
+                                        />
+                                      )}
+                                      <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{name}</div>
+                                        {c?.max_confidence != null ? (
+                                          <div style={{ marginTop: 2, color: 'rgba(230,232,242,0.7)', fontSize: 12 }}>
+                                            Max conf: {Number(c.max_confidence).toFixed(2)}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  </Td>
+                                  <Td>
+                                    <div style={{ display: 'grid', gap: 8 }}>
+                                      <div style={{ color: 'rgba(230, 232, 242, 0.85)', fontSize: 12, fontWeight: 900 }}>
+                                        Occurrences: {occurrences != null ? occurrences : '—'}
+                                      </div>
+                                      {occurrenceTimesSeconds.length ? (
+                                        <div style={{ display: 'grid', gap: 6 }}>
+                                          <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontSize: 12, fontWeight: 800 }}>
+                                            Exact times:
+                                          </div>
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                            {occurrenceTimesSeconds.slice(0, 20).map((t, idx) => (
+                                              <SegmentChip key={`${name}-occ-${idx}`} type="button" onClick={() => seekTo(t)}>
+                                                {formatTimecode(t, playerFps)}
+                                              </SegmentChip>
+                                            ))}
+                                            {occurrenceTimesSeconds.length > 20 ? (
+                                              <div style={{ color: 'rgba(230,232,242,0.6)', fontSize: 12, alignSelf: 'center' }}>
+                                                +{occurrenceTimesSeconds.length - 20} more
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </Td>
+                                  <Td>
+                                    <div style={{ color: 'rgba(230, 232, 242, 0.85)' }}>{bio || '—'}</div>
+                                  </Td>
+                                  <Td>
+                                    {portraitSource || portrait ? (
+                                      <div style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                                        {portraitSource ? (
+                                          <div>
+                                            <LinkA href={portraitSource} target="_blank" rel="noreferrer">
+                                              Source
+                                            </LinkA>
+                                          </div>
+                                        ) : null}
+                                        {portrait ? (
+                                          <div>
+                                            <LinkA href={portrait} target="_blank" rel="noreferrer">
+                                              Image
+                                            </LinkA>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    ) : (
+                                      '—'
+                                    )}
+                                  </Td>
+                                  <Td>
+                                    {portraitLicense || portraitLicenseUrl ? (
+                                      <div style={{ color: 'rgba(230,232,242,0.85)', fontWeight: 900, fontSize: 12 }}>
+                                        {portraitLicense ? (
+                                          portraitLicenseUrl ? (
+                                            <LinkA href={portraitLicenseUrl} target="_blank" rel="noreferrer">
+                                              {portraitLicense}
+                                            </LinkA>
+                                          ) : (
+                                            portraitLicense
+                                          )
+                                        ) : portraitLicenseUrl ? (
+                                          <LinkA href={portraitLicenseUrl} target="_blank" rel="noreferrer">
+                                            License
+                                          </LinkA>
+                                        ) : (
+                                          '—'
+                                        )}
+                                      </div>
+                                    ) : (
+                                      '—'
+                                    )}
+                                  </Td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>No celebrity detections.</div>
+                    )}
+                  </CardBody>
+                </Card>
+              ) : null}
+
+              <div style={{ display: 'grid', gap: 16 }}>
+                <div style={{ display: 'grid', gap: 16 }}>
+                  {isOutputTaskEnabled('enable_text_on_screen') ? (
+                    <Card>
+                      <CardHeader>
+                        <CardHeaderTitle>On-screen Text</CardHeaderTitle>
+                        <CountPill>{Array.isArray(detectedContent?.on_screen_text) ? detectedContent.on_screen_text.length : 0}</CountPill>
+                      </CardHeader>
+                      <CardBody>
+                        <div style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
+                          {Array.isArray(detectedContent?.on_screen_text) && detectedContent.on_screen_text.length ? (
+                            <MultiColumnList>
+                              {detectedContent.on_screen_text.slice(0, 50).map((t, idx) => {
+                                const text = typeof t === 'string' ? t : t?.text;
+                                const segs = Array.isArray(t?.segments) ? t.segments : [];
+                                return (
+                                  <MultiColumnItem key={`txt-${idx}`}>
+                                    <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{text || '—'}</div>
+                                    {t?.first_seen_seconds != null && t?.last_seen_seconds != null ? (
+                                      <div style={{ color: 'rgba(230,232,242,0.7)', fontSize: 12, marginTop: 2 }}>
+                                        {formatSeconds(t.first_seen_seconds)} → {formatSeconds(t.last_seen_seconds)}
+                                      </div>
+                                    ) : null}
+                                    {segs.length ? (
+                                      <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {segs.slice(0, 10).map((s, j) => (
+                                          <SegmentChip key={`txtseg-${idx}-${j}`} type="button" onClick={() => seekTo(s?.start_seconds)}>
+                                            {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
+                                          </SegmentChip>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </MultiColumnItem>
+                                );
+                              })}
+                            </MultiColumnList>
+                          ) : (
+                            '—'
+                          )}
+                        </div>
+                        {Array.isArray(detectedContent?.on_screen_text) && detectedContent.on_screen_text.length > 50 ? (
+                          <SubtleNote>Showing first 50 text items.</SubtleNote>
+                        ) : null}
+                      </CardBody>
+                    </Card>
+                  ) : null}
+
+                  {isOutputTaskEnabled('enable_label_detection') ? (
+                    <Card>
+                      <CardHeader>
+                        <CardHeaderTitle>Detected Content</CardHeaderTitle>
+                        <CountPill>{Array.isArray(detectedContent?.labels) ? detectedContent.labels.length : 0}</CountPill>
+                      </CardHeader>
+                      <CardBody>
+                        <div style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
+                          {Array.isArray(detectedContent?.labels) && detectedContent.labels.length ? (
+                            <MultiColumnList>
+                              {detectedContent.labels.map((l, idx) => {
+                                const name = typeof l === 'string' ? l : l?.name;
+                                const segs = Array.isArray(l?.segments) ? l.segments : [];
+                                return (
+                                  <MultiColumnItem key={`lbl-${idx}`}>
+                                    <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{name || '—'}</div>
+                                    {l?.first_seen_seconds != null && l?.last_seen_seconds != null ? (
+                                      <div style={{ color: 'rgba(230,232,242,0.7)', fontSize: 12, marginTop: 2 }}>
+                                        {formatSeconds(l.first_seen_seconds)} → {formatSeconds(l.last_seen_seconds)}
+                                      </div>
+                                    ) : null}
+                                    {segs.length ? (
+                                      <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {segs.slice(0, 10).map((s, j) => (
+                                          <SegmentChip key={`lblseg-${idx}-${j}`} type="button" onClick={() => seekTo(s?.start_seconds)}>
+                                            {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
+                                          </SegmentChip>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </MultiColumnItem>
+                                );
+                              })}
+                            </MultiColumnList>
+                          ) : (
+                            '—'
+                          )}
+                        </div>
+                        {Array.isArray(detectedContent?.labels) && detectedContent.labels.length > 60 ? (
+                          <SubtleNote>Showing first 60 label items.</SubtleNote>
+                        ) : null}
+                      </CardBody>
+                    </Card>
+                  ) : null}
+
+                  {isOutputTaskEnabled('enable_moderation') ? (
+                    <Card>
+                      <CardHeader>
+                        <CardHeaderTitle>Moderation</CardHeaderTitle>
+                        <CountPill>{Array.isArray(detectedContent?.moderation) ? detectedContent.moderation.length : 0}</CountPill>
+                      </CardHeader>
+                      <CardBody>
+                        <div style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
+                          {Array.isArray(detectedContent?.moderation) && detectedContent.moderation.length ? (
+                            <MultiColumnList>
+                              {detectedContent.moderation.slice(0, 60).map((m, idx) => {
+                                const name = typeof m === 'string' ? m : m?.name;
+                                const segs = Array.isArray(m?.segments) ? m.segments : [];
+                                return (
+                                  <MultiColumnItem key={`mod-${idx}`}>
+                                    <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{name || '—'}</div>
+                                    {m?.first_seen_seconds != null && m?.last_seen_seconds != null ? (
+                                      <div style={{ color: 'rgba(230,232,242,0.7)', fontSize: 12, marginTop: 2 }}>
+                                        {formatSeconds(m.first_seen_seconds)} → {formatSeconds(m.last_seen_seconds)}
+                                      </div>
+                                    ) : null}
+                                    {segs.length ? (
+                                      <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {segs.slice(0, 10).map((s, j) => (
+                                          <SegmentChip key={`modseg-${idx}-${j}`} type="button" onClick={() => seekTo(s?.start_seconds)}>
+                                            {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
+                                          </SegmentChip>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </MultiColumnItem>
+                                );
+                              })}
+                            </MultiColumnList>
+                          ) : (
+                            '—'
+                          )}
+                        </div>
+                        {Array.isArray(detectedContent?.moderation) && detectedContent.moderation.length > 60 ? (
+                          <SubtleNote>Showing first 60 moderation items.</SubtleNote>
+                        ) : null}
+                        {moderationDownloadUrl ? (
+                          <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(203, 213, 255, 0.85)' }}>
+                            Full results: <LinkA href={moderationDownloadUrl} target="_blank" rel="noreferrer">Download moderation JSON</LinkA>
+                          </div>
+                        ) : null}
+                      </CardBody>
+                    </Card>
+                  ) : null}
+                </div>
+
+                {isOutputTaskEnabled('enable_synopsis_generation') ? (
+                  <Card>
+                    <CardHeader>
+                      <CardHeaderTitle>Synopsis</CardHeaderTitle>
+                    </CardHeader>
+                    <CardBody>
+                      {synopsisPayload ? (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <div
+                            style={{
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              borderRadius: 12,
+                              padding: 12,
+                            }}
+                          >
+                            <div style={{ marginTop: 6, color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
+                              <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.75)', marginBottom: 4 }}>Short</div>
+                              <div>{(synopsisPayload?.short || '').toString().trim() || '—'}</div>
+                              <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.75)', margin: '10px 0 4px' }}>Long</div>
+                              <div>{(synopsisPayload?.long || '').toString().trim() || '—'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>
+                          {synopsisStep?.status ? (
+                            <>
+                              {`Status: ${statusBadgeFor(synopsisStep.status).text}`}
+                              {synopsisStep?.message ? ` • ${String(synopsisStep.message).trim()}` : ''}
+                            </>
+                          ) : (
+                            '—'
+                          )}
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                ) : null}
+
+                {isOutputTaskEnabled('enable_scene_by_scene') ? (
+                  <Card>
+                    <CardHeader>
+                      <CardHeaderTitle>Scene by Scene Metadata</CardHeaderTitle>
+                      <CountPill>{Array.isArray(sceneByScene?.scenes) ? sceneByScene.scenes.length : 0}</CountPill>
+                    </CardHeader>
+                    <CardBody>
+                      {Array.isArray(sceneByScene?.scenes) && sceneByScene.scenes.length ? (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {sceneByScene.scenes.slice(0, 120).map((sc, idx) => {
+                            const st = sc?.start_seconds ?? sc?.start;
+                            const en = sc?.end_seconds ?? sc?.end;
+                            const summary = sc?.summary_text || sc?.summary_text_llm || sc?.summary_text_transcript || sc?.summary_text_combined;
+                            return (
+                              <div key={`scene-${idx}`} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                                <Row style={{ justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                                  <div style={{ fontWeight: 900, color: '#e6e8f2' }}>
+                                    Scene {sc?.scene_index ?? sc?.index ?? idx + 1}
+                                  </div>
+                                  <SegmentChip type="button" onClick={() => seekTo(st)}>
+                                    {formatSeconds(st)}–{formatSeconds(en)}
+                                  </SegmentChip>
+                                </Row>
+                                {summary ? (
+                                  <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
+                                    {String(summary).trim()}
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                          {sceneByScene.scenes.length > 120 ? <SubtleNote>Showing first 120 scenes.</SubtleNote> : null}
+                        </div>
+                      ) : (
+                        <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>—</div>
+                      )}
+                    </CardBody>
+                  </Card>
+                ) : null}
+
+                {isOutputTaskEnabled('enable_key_scene') ? (
+                  <Card>
+                    <CardHeader>
+                      <CardHeaderTitle>Key Scenes</CardHeaderTitle>
+                      <CountPill>{Array.isArray(keyScenes) ? keyScenes.length : 0}</CountPill>
+                    </CardHeader>
+                    <CardBody>
+                      {Array.isArray(keyScenes) && keyScenes.length ? (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {keyScenes.slice(0, 50).map((ks, idx) => {
+                            const st = ks?.start_seconds ?? ks?.start;
+                            const en = ks?.end_seconds ?? ks?.end;
+                            const summary = ks?.summary || ks?.summary_text;
+                            return (
+                              <div key={`keyscene-${idx}`} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                                <Row style={{ justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                                  <div style={{ fontWeight: 900, color: '#e6e8f2' }}>Key scene {idx + 1}</div>
+                                  <SegmentChip type="button" onClick={() => seekTo(st)}>
+                                    {formatSeconds(st)}–{formatSeconds(en)}
+                                  </SegmentChip>
+                                </Row>
+                                {summary ? (
+                                  <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
+                                    {String(summary).trim()}
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>—</div>
+                      )}
+                    </CardBody>
+                  </Card>
+                ) : null}
+
+                {isOutputTaskEnabled('enable_high_point') ? (
+                  <Card>
+                    <CardHeader>
+                      <CardHeaderTitle>High Points</CardHeaderTitle>
+                      <CountPill>{Array.isArray(highPoints) ? highPoints.length : 0}</CountPill>
+                    </CardHeader>
+                    <CardBody>
+                      {Array.isArray(highPoints) && highPoints.length ? (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {highPoints.slice(0, 50).map((hp, idx) => {
+                            const st = hp?.start_seconds ?? hp?.start;
+                            const en = hp?.end_seconds ?? hp?.end;
+                            const summary = hp?.summary || hp?.summary_text;
+                            return (
+                              <div key={`highpoint-${idx}`} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                                <Row style={{ justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                                  <div style={{ fontWeight: 900, color: '#e6e8f2' }}>High point {idx + 1}</div>
+                                  <SegmentChip type="button" onClick={() => seekTo(st)}>
+                                    {formatSeconds(st)}–{formatSeconds(en)}
+                                  </SegmentChip>
+                                </Row>
+                                {summary ? (
+                                  <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
+                                    {String(summary).trim()}
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>—</div>
+                      )}
+                    </CardBody>
+                  </Card>
+                ) : null}
+
+                <Card>
+                  <CardHeader>
+                    <CardHeaderTitle>Transcript</CardHeaderTitle>
+                  </CardHeader>
+                  <CardBody id="envid-script">
+                    <div style={{ display: 'grid', gap: 18 }}>
+                      <div>
+                        <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
+                          Time-banded audio script
+                        </div>
+                        {Array.isArray(transcriptSegments) && transcriptSegments.length ? (
+                          <div style={{ display: 'grid', gap: 8 }}>
+                            {transcriptSegments.slice(0, 2000).map((seg, idx) => (
+                              <div key={`ts-${idx}`} style={{ color: 'rgba(230,232,242,0.88)', fontSize: 13, lineHeight: 1.45 }}>
+                                <SegmentChip type="button" onClick={() => seekTo(seg?.start)}>
+                                  {formatTimecode(seg?.start, playerFps)}–{formatTimecode(seg?.end, playerFps)}
+                                </SegmentChip>{' '}
+                                {(seg?.text || '').toString().trim() || '—'}
+                              </div>
+                            ))}
+                            {transcriptSegments.length > 2000 ? (
+                              <SubtleNote>Showing first 2000 transcript segments.</SubtleNote>
+                            ) : null}
+                          </div>
+                        ) : transcriptText.trim() ? (
+                          <div style={{ color: 'rgba(230,232,242,0.75)', fontSize: 13 }}>{transcriptText}</div>
+                        ) : (
+                          <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
+                            <div>No transcript found for this video.</div>
+                            <SubtleNote>
+                              If this was processed before Audio Transcription existed (or transcription was disabled), click Reprocess and enable Audio Transcription.
+                            </SubtleNote>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
+                          Paragraph-wise script
+                        </div>
+                        {transcriptParagraphs.length ? (
+                          <div style={{ display: 'grid', gap: 10 }}>
+                            {transcriptParagraphs.slice(0, 400).map((p, idx) => (
+                              <div
+                                key={`tp-${idx}`}
+                                style={{
+                                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                                  background: 'rgba(255, 255, 255, 0.03)',
+                                  borderRadius: 12,
+                                  padding: 12,
+                                }}
+                              >
+                                <Row style={{ justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                                  <div style={{ color: 'rgba(230,232,242,0.65)', fontSize: 12, fontWeight: 900 }}>
+                                    {formatTimecode(p.start, playerFps)}–{formatTimecode(p.end, playerFps)}
+                                  </div>
+                                  <SecondaryButton type="button" onClick={() => seekTo(p.start)}>
+                                    Seek
+                                  </SecondaryButton>
+                                </Row>
+                                <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.5 }}>
+                                  {p.text}
+                                </div>
+                              </div>
+                            ))}
+                            {transcriptParagraphs.length > 400 ? <SubtleNote>Showing first 400 paragraphs.</SubtleNote> : null}
+                          </div>
+                        ) : transcriptText.trim() ? (
+                          <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.5 }}>
+                            {transcriptText}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
+                            <div>No transcript found for this video.</div>
+                            <SubtleNote>
+                              If this was processed before Audio Transcription existed (or transcription was disabled), click Reprocess and enable Audio Transcription.
+                            </SubtleNote>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
+                          Raw transcript (no timestamps)
+                        </div>
+                        {rawTranscriptText.trim() ? (
+                          <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.55 }}>
+                            {rawTranscriptText}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
+                            <div>No transcript found for this video.</div>
+                            <SubtleNote>Click Reprocess and enable Audio Transcription to generate a transcript.</SubtleNote>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              </div>
+            </>
+          )}
+        </DetailBody>
+      </DetailPanel>
+    ) : null;
+
   return (
     <PageWrapper>
       <Container>
         <Header>
           <Title>Envid Metadata (Multimodal)</Title>
           <Subtitle>Upload videos or analyze a GCS object (any folder)</Subtitle>
+          {systemStats ? (
+            <TopStatsBar>
+              <TopStatsItem>CPU {cpuPercentLabel}</TopStatsItem>
+              <TopStatsItem>RAM {memPercentLabel}</TopStatsItem>
+              <TopStatsItem>GPU {gpuPercentLabel}</TopStatsItem>
+            </TopStatsBar>
+          ) : null}
+          <TabsRow>
+            <TabButton
+              type="button"
+              $active={activeTab === 'workflow'}
+              onClick={() => setActiveTab('workflow')}
+              disabled={uploading}
+            >
+              Workflow
+            </TabButton>
+            <TabButton
+              type="button"
+              $active={activeTab === 'running'}
+              onClick={() => setActiveTab('running')}
+              disabled={uploading}
+            >
+              Running Jobs
+            </TabButton>
+            <TabButton
+              type="button"
+              $active={activeTab === 'completed'}
+              onClick={() => setActiveTab('completed')}
+              disabled={uploading}
+            >
+              Completed Jobs
+            </TabButton>
+            <TabButton
+              type="button"
+              $active={activeTab === 'failed'}
+              onClick={() => setActiveTab('failed')}
+              disabled={uploading}
+            >
+              Failed Jobs
+            </TabButton>
+          </TabsRow>
         </Header>
 
         {message && <Message type={message.type}>{message.text}</Message>}
 
+        {jobSubmitModal?.jobId ? (
+          <ModalOverlay>
+            <ModalCard>
+              <ModalTitle>Job Submitted</ModalTitle>
+              <ModalBody>
+                Specific job id <strong>{jobSubmitModal.jobId}</strong> has been submitted.
+              </ModalBody>
+              <ModalActions>
+                <SecondaryButton type="button" onClick={() => setJobSubmitModal(null)}>
+                  Close
+                </SecondaryButton>
+              </ModalActions>
+            </ModalCard>
+          </ModalOverlay>
+        ) : null}
+
+        {deleteConfirm?.jobId ? (
+          <ModalOverlay
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setDeleteConfirm(null);
+            }}
+          >
+            <ModalCard>
+              <ModalHeader>
+                <div>
+                  <ModalTitle>Delete job</ModalTitle>
+                  <ModalSubtitle>Confirm removal</ModalSubtitle>
+                </div>
+                <SecondaryButton type="button" onClick={() => setDeleteConfirm(null)}>
+                  Close
+                </SecondaryButton>
+              </ModalHeader>
+              <ModalBody>
+                <ConfirmText>
+                  Are you sure you want to delete job <strong>{deleteConfirm.jobId}</strong>?
+                </ConfirmText>
+              </ModalBody>
+              <ConfirmActions>
+                <SecondaryButton type="button" onClick={() => setDeleteConfirm(null)}>
+                  Cancel
+                </SecondaryButton>
+                <DeleteButton type="button" onClick={() => confirmDeleteJob(deleteConfirm.jobId)}>
+                  Delete
+                </DeleteButton>
+              </ConfirmActions>
+            </ModalCard>
+          </ModalOverlay>
+        ) : null}
+
         <div style={{ display: 'grid', gap: 18 }}>
+          {activeTab === 'workflow' && (
           <Section>
             <SectionTitle>
               <Icon>📤</Icon>
@@ -2455,154 +4403,39 @@ export default function EnvidMetadataMinimal() {
                 padding: 14,
               }}
             >
-              <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Target Translation</div>
-              <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-                <details
-                  style={{
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: 10,
-                    padding: 10,
-                    background: 'rgba(255, 255, 255, 0.04)',
-                  }}
-                >
-                  <summary
-                    style={{
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      color: '#e6e8f2',
-                      listStyle: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      borderRadius: 10,
-                      fontSize: 14,
-                      width: '100%',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                    }}
-                  >
-                    <span>Select target languages ({targetTranslateLanguages.length} selected)</span>
-                    <span style={{ opacity: 0.7 }}>▾</span>
-                  </summary>
-                  <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-                    <Row style={{ gap: 8 }}>
-                      <SecondaryButton
-                        type="button"
-                        onClick={() => {
-                          const all = translateLanguageOptions.map((lang) => String(lang.code).toLowerCase());
-                          setTargetTranslateLanguages(all);
-                        }}
-                        disabled={uploading || translateLanguagesLoading}
-                      >
-                        Select All
-                      </SecondaryButton>
-                      <SecondaryButton
-                        type="button"
-                        onClick={() => setTargetTranslateLanguages([])}
-                        disabled={uploading || translateLanguagesLoading}
-                      >
-                        Clear
-                      </SecondaryButton>
-                    </Row>
-                    <div style={{ display: 'grid', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
-                      {translateLanguageOptions.map((lang) => {
-                        const code = String(lang.code || '').toLowerCase();
-                        const checked = targetTranslateLanguages.includes(code);
-                        return (
-                          <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              disabled={uploading || translateLanguagesLoading}
-                              onChange={() => {
-                                setTargetTranslateLanguages((prev) => {
-                                  const current = Array.isArray(prev) ? prev : [];
-                                  if (current.includes(code)) return current.filter((c) => c !== code);
-                                  return [...current, code];
-                                });
-                              }}
-                            />
-                            <span>
-                              {lang.name} ({code})
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </details>
-                <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>
-                  Original and English are included by default. Choose one or more target languages for translation.
-                </div>
-                {translateLanguagesError ? (
-                  <div style={{ fontSize: 12, color: '#ff6b6b' }}>{translateLanguagesError}</div>
-                ) : null}
-              </div>
-            </div>
-
-            <div
-              style={{
-                marginTop: 14,
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                background: 'rgba(255, 255, 255, 0.03)',
-                borderRadius: 14,
-                padding: 14,
-              }}
-            >
               <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Task Selection</div>
 
               <div style={{ display: 'grid', gap: 10 }}>
-                {[
-                  {
-                    enableKey: 'enable_famous_location_detection',
-                    label: 'Famous location detection',
-                    modelKey: 'famous_location_detection_model',
-                    models: [
-                      { value: 'auto', label: 'Auto (backend default)' },
-                      { value: 'gcp_language', label: 'Google Cloud Natural Language' },
-                    ],
-                  },
-                  {
-                    enableKey: 'enable_opening_closing_credit_detection',
-                    label: 'Opening and closing credit',
-                    modelKey: 'opening_closing_credit_detection_model',
-                    models: [
-                      { value: 'auto', label: 'Auto (backend default)' },
-                      { value: 'ffmpeg_blackdetect', label: 'FFmpeg blackdetect' },
-                      { value: 'pyscenedetect', label: 'PySceneDetect' },
-                    ],
-                  },
-                  {
-                    enableKey: 'enable_celebrity_detection',
-                    label: 'Celebrity detection',
-                    modelKey: 'celebrity_detection_model',
-                    models: [{ value: 'auto', label: 'Auto (backend default)' }],
-                  },
-                  {
-                    enableKey: 'enable_celebrity_bio_image',
-                    label: 'Celebrity bio & image',
-                    modelKey: 'celebrity_bio_image_model',
-                    models: [{ value: 'auto', label: 'Auto (backend default)' }],
-                  },
-                ].map((t) => {
-                  const defaultModelsByKey = {
-                    famous_location_detection_model: 'auto',
-                    opening_closing_credit_detection_model: 'auto',
-                    celebrity_detection_model: 'auto',
-                    celebrity_bio_image_model: 'auto',
-                  };
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 800, color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>Select tasks to run</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 900, color: '#e6e8f2' }}>
+                    <input
+                      type="checkbox"
+                      checked={taskSelectionAllEnabled}
+                      onChange={(e) => {
+                        const isChecked = Boolean(e.target.checked);
+                        setTaskSelection((prev) => {
+                          const next = { ...(prev || {}) };
+                          taskSelectionOptions.forEach((t) => {
+                            if (!t.disabled) next[t.enableKey] = isChecked;
+                          });
+                          return next;
+                        });
+                      }}
+                    />
+                    Select all
+                  </label>
+                </div>
 
+                {taskSelectionOptions.map((t) => {
                   const checked = Boolean(taskSelection?.[t.enableKey]);
-                  const showModel = Boolean(t.modelKey) && Array.isArray(t.models);
-                  const modelValue = showModel ? String(taskSelection?.[t.modelKey] || '') : '';
 
                   return (
                     <div
                       key={t.enableKey}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: showModel ? 'minmax(220px, 1.2fr) minmax(220px, 1fr)' : '1fr',
+                        gridTemplateColumns: '1fr',
                         gap: 10,
                         alignItems: 'center',
                       }}
@@ -2612,6 +4445,7 @@ export default function EnvidMetadataMinimal() {
                           <input
                             type="checkbox"
                             checked={checked}
+                            disabled={Boolean(t.disabled)}
                             onChange={(e) => {
                               const isChecked = Boolean(e.target.checked);
                               setTaskSelection((prev) => {
@@ -2625,37 +4459,144 @@ export default function EnvidMetadataMinimal() {
                         {t.hint ? <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>{t.hint}</div> : null}
                       </div>
 
-                      {showModel ? (
-                        <select
-                          value={modelValue}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setTaskSelection((prev) => ({ ...(prev || {}), [t.modelKey]: v }));
-                          }}
-                          disabled={!checked}
-                          style={{
-                            padding: '10px 12px',
-                            border: '1px solid rgba(255, 255, 255, 0.12)',
-                            borderRadius: 10,
-                            fontSize: 14,
-                            width: '100%',
-                            background: 'rgba(255, 255, 255, 0.04)',
-                            color: '#e6e8f2',
-                          }}
-                        >
-                          {t.models.map((m) => (
-                            <option key={m.value} value={m.value}>
-                              {String(m.label)}
-                              {t.modelKey && t.modelKey !== 'transcribe_model' && defaultModelsByKey[t.modelKey] === m.value
-                                ? ' (Default)'
-                                : ''}
-                            </option>
-                          ))}
-                        </select>
-                      ) : null}
+                      {null}
                     </div>
                   );
                 })}
+
+                {Boolean(taskSelection?.enable_transcribe) && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      padding: 10,
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 10,
+                      background: 'rgba(255, 255, 255, 0.04)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 800, color: 'rgba(230, 232, 242, 0.9)', marginBottom: 6 }}>
+                      Source Language
+                    </div>
+                    <select
+                      value={transcribeLanguage}
+                      onChange={(e) => setTranscribeLanguage(String(e.target.value || 'auto'))}
+                      disabled={uploading}
+                      style={{
+                        padding: '10px 12px',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: 8,
+                        fontSize: '0.95rem',
+                        width: '100%',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        color: '#e6e8f2',
+                      }}
+                    >
+                      {WHISPER_LANGUAGE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)', marginTop: 6 }}>
+                      Choose auto-detect or a specific source language for transcription accuracy.
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    marginTop: 14,
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: 14,
+                    padding: 14,
+                  }}
+                >
+                  <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Target Language</div>
+                  <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+                    <details
+                      style={{
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: 10,
+                        padding: 10,
+                        background: 'rgba(255, 255, 255, 0.04)',
+                      }}
+                    >
+                      <summary
+                        style={{
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          color: '#e6e8f2',
+                          listStyle: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: 10,
+                          fontSize: 14,
+                          width: '100%',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                        }}
+                      >
+                        <span>Select target languages ({targetTranslateLanguages.length} selected)</span>
+                        <span style={{ opacity: 0.7 }}>▾</span>
+                      </summary>
+                      <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                        <Row style={{ gap: 8 }}>
+                          <SecondaryButton
+                            type="button"
+                            onClick={() => {
+                              const all = translateLanguageOptions.map((lang) => String(lang.code).toLowerCase());
+                              setTargetTranslateLanguages(all);
+                            }}
+                            disabled={uploading || translateLanguagesLoading}
+                          >
+                            Select All
+                          </SecondaryButton>
+                          <SecondaryButton
+                            type="button"
+                            onClick={() => setTargetTranslateLanguages([])}
+                            disabled={uploading || translateLanguagesLoading}
+                          >
+                            Clear
+                          </SecondaryButton>
+                        </Row>
+                        <div style={{ display: 'grid', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+                          {translateLanguageOptions.map((lang) => {
+                            const code = String(lang.code || '').toLowerCase();
+                            const checked = targetTranslateLanguages.includes(code);
+                            return (
+                              <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={uploading || translateLanguagesLoading}
+                                  onChange={() => {
+                                    setTargetTranslateLanguages((prev) => {
+                                      const current = Array.isArray(prev) ? prev : [];
+                                      if (current.includes(code)) return current.filter((c) => c !== code);
+                                      return [...current, code];
+                                    });
+                                  }}
+                                />
+                                <span>
+                                  {lang.name} ({code})
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </details>
+                    <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>
+                      Original and English are included by default. Choose one or more target languages for translation.
+                    </div>
+                    {translateLanguagesError ? (
+                      <div style={{ fontSize: 12, color: '#ff6b6b' }}>{translateLanguagesError}</div>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2664,7 +4605,7 @@ export default function EnvidMetadataMinimal() {
                 {uploadPhaseLabel}
               </Button>
 
-              {uploading && (
+              {(uploading || (activeJob?.kind === 'reprocess' && activeJob?.jobId)) && (
                 <>
                   <ProgressBar>
                     <ProgressFill $percent={uploadProgress} />
@@ -2675,1076 +4616,102 @@ export default function EnvidMetadataMinimal() {
               )}
             </div>
           </Section>
+          )}
 
+          {activeTab === 'running' && (
           <Section>
             <SectionTitle>
-              <Icon>🕘</Icon>
-              History
+              <Icon>⏳</Icon>
+              <span>Running Jobs</span>
+              <div style={{ flex: 1 }} />
+              <IconButton
+                type="button"
+                title="Refresh running jobs"
+                onClick={manualRefreshRunningJobs}
+                disabled={runningJobsLoading}
+              >
+                🔄
+              </IconButton>
             </SectionTitle>
 
-            {activeJob?.jobId && activeJob?.kind === 'reprocess' && statusPanel}
+            {runningJobsLoading ? (
+              <Message type="info">Loading running jobs…</Message>
+            ) : null}
 
-            <Row style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>
-                {allVideos.length ? `${allVideos.length} video(s)` : 'No videos yet'}
-              </div>
-              <Row style={{ gap: 8 }}>
-                <IconButton
-                  type="button"
-                  aria-label="Scroll history left"
-                  onClick={() => {
-                    const width = historyCarouselRef.current?.clientWidth || 520;
-                    historyCarouselRef.current?.scrollBy?.({ left: -width, behavior: 'smooth' });
-                  }}
-                  disabled={!allVideos.length}
-                >
-                  ‹
-                </IconButton>
-                <IconButton
-                  type="button"
-                  aria-label="Scroll history right"
-                  onClick={() => {
-                    const width = historyCarouselRef.current?.clientWidth || 520;
-                    historyCarouselRef.current?.scrollBy?.({ left: width, behavior: 'smooth' });
-                  }}
-                  disabled={!allVideos.length}
-                >
-                  ›
-                </IconButton>
-                <SecondaryButton type="button" onClick={loadAllVideos} disabled={uploading}>
-                  Refresh
-                </SecondaryButton>
-              </Row>
-            </Row>
+            {runningJobsError ? (
+              <Message type="error">{runningJobsError}</Message>
+            ) : null}
 
-            {allVideos.length > 0 ? (
-              <Carousel ref={historyCarouselRef}>
-                {allVideos
-                  .slice()
-                  .sort((a, b) => new Date(b?.uploaded_at || 0).getTime() - new Date(a?.uploaded_at || 0).getTime())
-                  .map((video) => {
-                    const videoId = video?.video_id || video?.id;
-                    const title = video?.title || videoId || 'Untitled';
-                    const status = video?.status || video?.processing_status || video?.state;
-                    const thumbSrc = asJpegDataUri(video?.thumbnail);
-                    const frameCount = Number(video?.frame_count ?? video?.frameCount ?? 0) || 0;
-                    const taskSummary = formatTaskDurationSummary(video?.task_durations);
-
-                    return (
-                      <CarouselItem
-                        key={videoId || title}
-                        $active={Boolean(videoId && selectedVideoId && String(videoId) === String(selectedVideoId))}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={Boolean(videoId && selectedVideoId && String(videoId) === String(selectedVideoId))}
-                        onClick={() => {
-                          if (!videoId) return;
-                          setSelectedVideoId(String(videoId));
-                          setSelectedVideoTitle(title);
-                          // bring detail panel into view
-                          setTimeout(() => {
-                            document.getElementById('envid-metadata-details')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-                          }, 0);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            if (!videoId) return;
-                            setSelectedVideoId(String(videoId));
-                            setSelectedVideoTitle(title);
-                            setTimeout(() => {
-                              document.getElementById('envid-metadata-details')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-                            }, 0);
-                          }
-                        }}
-                      >
-                        <CarouselThumb>
-                          {thumbSrc ? (
-                            <CarouselThumbImg src={thumbSrc} alt={title} />
-                          ) : (
-                            <div style={{ color: 'rgba(230, 232, 242, 0.65)', fontWeight: 800 }}>No thumbnail</div>
-                          )}
-                        </CarouselThumb>
-                        <CarouselBody>
-                          <CarouselTitle title={title}>{title}</CarouselTitle>
-                          <CarouselMeta>
-                            <Row style={{ gap: 8, alignItems: 'center' }}>
-                              <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>{videoId ? `ID: ${videoId}` : 'ID: —'}</div>
-                              {videoId ? (
-                                <TinyButton
-                                  type="button"
-                                  aria-label="Copy video id"
-                                  disabled={uploading}
-                                  onClick={async () => {
-                                    const ok = await copyToClipboard(videoId);
-                                    setMessage({
-                                      type: ok ? 'success' : 'error',
-                                      text: ok ? 'Copied video ID to clipboard.' : 'Failed to copy video ID.',
-                                    });
-                                  }}
-                                >
-                                  Copy
-                                </TinyButton>
-                              ) : null}
-                            </Row>
-                            {taskSummary ? (
-                              <>
-                                <br />
-                                <span style={{ color: 'rgba(230, 232, 242, 0.7)' }}>{taskSummary}</span>
-                              </>
-                            ) : null}
-                            <br />
-                            {status ? `Status: ${status}` : 'Status: —'}
-                            {activeJob?.kind === 'reprocess' && String(activeJob?.videoId) === String(videoId) ? (
-                              <>
-                                <br />
-                                <span style={{ color: 'rgba(230, 232, 242, 0.75)', fontWeight: 900 }}>
-                                  Reprocessing: {typeof uploadJob?.progress === 'number' ? `${Math.round(uploadJob.progress)}%` : '…'}
-                                  {uploadJob?.message ? ` · ${uploadJob.message}` : ''}
-                                </span>
-                              </>
-                            ) : null}
-                            <br />
-                            Uploaded: {formatTimestamp(video?.uploaded_at)}
-                            {frameCount ? ` · Frames: ${frameCount}` : ''}
-                          </CarouselMeta>
-                        </CarouselBody>
-
-                        {videoId ? (
-                          <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <ReprocessButton
-                                type="button"
-                                disabled={uploading}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleReprocessVideo(videoId, title);
-                                }}
-                              >
-                                Reprocess
-                              </ReprocessButton>
-                              <DeleteButton
-                                type="button"
-                                disabled={uploading}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleDeleteVideo(videoId, title);
-                                }}
-                              >
-                                Delete
-                              </DeleteButton>
-                            </div>
-                          </div>
-                        ) : null}
-                      </CarouselItem>
-                    );
-                  })}
-              </Carousel>
-            ) : (
+            {!runningJobsLoading && !runningJobsError && runningJobs.length === 0 ? (
               <EmptyState>
-                <EmptyIcon>🎬</EmptyIcon>
-                <div style={{ fontWeight: 800, color: '#e6e8f2' }}>No videos indexed yet</div>
-                <div style={{ marginTop: 6 }}>Upload a video to start extracting metadata.</div>
+                <EmptyIcon>✅</EmptyIcon>
+                No running jobs right now.
               </EmptyState>
+            ) : (
+              <RunningJobsList>
+                {runningJobs.map((job) => runningJobRow(job))}
+              </RunningJobsList>
+            )}
+          </Section>
+          )}
+
+          {activeTab === 'completed' && (
+          <Section>
+            <SectionTitle>
+              <Icon>✅</Icon>
+              Completed Jobs
+            </SectionTitle>
+
+            {completedJobsLoading ? (
+              <Message type="info">Loading completed jobs…</Message>
+            ) : null}
+
+            {completedJobsError ? (
+              <Message type="error">{completedJobsError}</Message>
+            ) : null}
+
+            {!completedJobsLoading && !completedJobsError && completedJobs.length === 0 ? (
+              <EmptyState>
+                <EmptyIcon>✅</EmptyIcon>
+                No completed jobs yet.
+              </EmptyState>
+            ) : (
+              <RunningJobsList>
+                {completedJobs.map((job) => completedJobRow(job))}
+              </RunningJobsList>
             )}
 
-            {selectedVideoId ? (
-              <DetailPanel id="envid-metadata-details">
-                <DetailHeader>
-                  <div style={{ minWidth: 0 }}>
-                    <DetailTitle>
-                      {selectedVideoTitle || 'Video'} · ID: {selectedVideoId}
-                    </DetailTitle>
-                    <div style={{ marginTop: 4, color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>
-                      Click any timestamp/segment to seek.
-                    </div>
-                  </div>
-                  <Row style={{ gap: 8 }}>
-                    <SecondaryButton
-                      type="button"
-                      onClick={() => {
-                        const el = document.getElementById('envid-script');
-                        if (el && typeof el.scrollIntoView === 'function') {
-                          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
-                      }}
-                      disabled={selectedMetaLoading}
-                    >
-                      Jump to Script
-                    </SecondaryButton>
-                    <SecondaryButton
-                      type="button"
-                      onClick={() =>
-                        window.open(
-                          `${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=orig&download=1`,
-                          '_blank',
-                          'noopener,noreferrer'
-                        )
-                      }
-                      disabled={selectedMetaLoading}
-                    >
-                      Download Full Metadata (Original)
-                    </SecondaryButton>
-                    <SecondaryButton
-                      type="button"
-                      onClick={() => {
-                        setSelectedVideoId(null);
-                        setSelectedVideoTitle(null);
-                        setSelectedMeta(null);
-                        setSelectedMetaError(null);
-                      }}
-                    >
-                      Close
-                    </SecondaryButton>
-                  </Row>
-                </DetailHeader>
-
-                <DetailBody>
-                  {selectedMetaLoading ? (
-                    <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontWeight: 900 }}>Loading metadata…</div>
-                  ) : selectedMetaError ? (
-                    <div style={{ color: '#ffd1d1', fontWeight: 900 }}>{selectedMetaError}</div>
-                  ) : (
-                    <>
-                      <Card>
-                        <CardHeader>
-                          <CardHeaderTitle>Downloads</CardHeaderTitle>
-                        </CardHeader>
-                        <CardBody>
-                          <DownloadGrid>
-                            <DownloadGroup>
-                              <div>
-                                <DownloadGroupTitle>Subtitles</DownloadGroupTitle>
-                                <DownloadGroupHint>Download SRT or VTT for each available language.</DownloadGroupHint>
-                              </div>
-                              <DownloadList>
-                                {subtitleLanguages.map((lang) => {
-                                  const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
-                                  const isOrig = lang === 'orig';
-                                  const srtLabel = isOrig ? '.srt' : `.${lang}.srt`;
-                                  const vttLabel = isOrig ? '.vtt' : `.${lang}.vtt`;
-                                  return (
-                                    <DownloadRow key={lang}>
-                                      <DownloadLabel>{label}</DownloadLabel>
-                                      <LinkA
-                                        href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.srt`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        Download {srtLabel}
-                                      </LinkA>
-                                      <LinkA
-                                        href={`${BACKEND_URL}/video/${selectedVideoId}/subtitles/${lang}.vtt`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        Download {vttLabel}
-                                      </LinkA>
-                                    </DownloadRow>
-                                  );
-                                })}
-                              </DownloadList>
-                            </DownloadGroup>
-
-                            <DownloadGroup>
-                              <div>
-                                <DownloadGroupTitle>Complete Metadata</DownloadGroupTitle>
-                                <DownloadGroupHint>JSON files per language, including all pipeline outputs.</DownloadGroupHint>
-                              </div>
-                              <DownloadList>
-                                {metadataLanguages.map((lang) => {
-                                  const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
-                                  const suffix = lang === 'orig' ? '' : ` (${lang.toUpperCase()})`;
-                                  return (
-                                    <DownloadRow key={lang}>
-                                      <DownloadLabel>{label}</DownloadLabel>
-                                      <LinkA
-                                        href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=${lang}&download=1`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        Download Full Metadata JSON{suffix}
-                                      </LinkA>
-                                    </DownloadRow>
-                                  );
-                                })}
-                              </DownloadList>
-                            </DownloadGroup>
-                          </DownloadGrid>
-                        </CardBody>
-                      </Card>
-
-                      <Grid2>
-                        <div>
-                          <Card>
-                            <CardHeader>
-                              <CardHeaderTitle>Celebrity Detection on Player</CardHeaderTitle>
-                              <div style={{ color: 'rgba(230, 232, 242, 0.65)', fontSize: 12 }}>
-                                {formatTimecode(playerTime, playerFps)}
-                              </div>
-                            </CardHeader>
-                            <CardBody>
-                              <VideoFrame ref={playerContainerRef}>
-                                <video
-                                  ref={playerRef}
-                                  src={`${BACKEND_URL}/video-file/${selectedVideoId}`}
-                                  controls
-                                  controlsList="nofullscreen"
-                                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', position: 'relative', zIndex: 1 }}
-                                  onTimeUpdate={(e) => setPlayerTime(Number(e.currentTarget?.currentTime || 0))}
-                                  onPlay={() => {
-                                    setPlayerIsPaused(false);
-                                  }}
-                                  onPause={() => {
-                                    setPlayerIsPaused(true);
-                                  }}
-                                  onEnded={() => {
-                                    setPlayerIsPaused(true);
-                                  }}
-                                />
-
-                                <PlayerFullscreenButton
-                                  type="button"
-                                  onClick={togglePlayerFullscreen}
-                                  title={playerIsFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-                                  aria-label={playerIsFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-                                >
-                                  {playerIsFullscreen ? 'X' : 'FS'}
-                                </PlayerFullscreenButton>
-
-                                {showCelebOverlay ? (
-                                  playerIsFullscreen ? (
-                                    <>
-                                      <VideoOverlaySidePanel>
-                                        <OverlaySideList $scrollable={fullscreenSideScrollable}>
-                                          {overlayCelebItems.map((c) => (
-                                            <OverlaySideItem key={c.name}>
-                                              <OverlayThumb>
-                                                {c.portrait_url ? (
-                                                  <img src={c.portrait_url} alt={c.name} referrerPolicy="no-referrer" />
-                                                ) : (
-                                                  <span>{String(c.name || '?').slice(0, 1).toUpperCase()}</span>
-                                                )}
-                                              </OverlayThumb>
-                                              <OverlayName title={c.name}>{c.name}</OverlayName>
-                                            </OverlaySideItem>
-                                          ))}
-                                        </OverlaySideList>
-                                      </VideoOverlaySidePanel>
-                                    </>
-                                  ) : (
-                                    <VideoOverlayBar>
-                                      <OverlayScroller $scrollable={overlayIsScrollable}>
-                                        {overlayCelebItems.map((c) => (
-                                          <OverlayChip key={c.name}>
-                                            <OverlayChipThumb>
-                                              {c.portrait_url ? (
-                                                <img src={c.portrait_url} alt={c.name} referrerPolicy="no-referrer" />
-                                              ) : (
-                                                <span>{String(c.name || '?').slice(0, 1).toUpperCase()}</span>
-                                              )}
-                                            </OverlayChipThumb>
-                                            <OverlayChipName>{c.name}</OverlayChipName>
-                                          </OverlayChip>
-                                        ))}
-                                      </OverlayScroller>
-                                    </VideoOverlayBar>
-                                  )
-                                ) : null}
-                              </VideoFrame>
-
-                              <div style={{ marginTop: 10, color: 'rgba(230, 232, 242, 0.7)', fontSize: 12 }}>
-                                Tip: use the Celebrity table segments below to jump.
-                              </div>
-                            </CardBody>
-                          </Card>
-                        </div>
-
-                        <div>
-                          <Card>
-                            <CardHeader>
-                              <CardHeaderTitle>Technical</CardHeaderTitle>
-                            </CardHeader>
-                            <CardBody>
-                              <div style={{ display: 'grid', gap: 6, color: 'rgba(230, 232, 242, 0.85)', fontSize: 13 }}>
-                                <div>Title: {technical?.title || selectedVideoTitle || '—'}</div>
-                                <div>
-                                  Container:{' '}
-                                  {(() => {
-                                    const c = formatContainerFormat(technical?.container_format);
-                                    return (
-                                      <span title={c.title || undefined} style={{ fontWeight: 900 }}>
-                                        {c.label}
-                                      </span>
-                                    );
-                                  })()}
-                                </div>
-                                <div>
-                                  Size: {typeof technical?.file_size_bytes === 'number' ? formatBytes(technical.file_size_bytes) : '—'}
-                                </div>
-                                <div>Duration: {technical?.duration_seconds != null ? `${formatSeconds(technical.duration_seconds)} (${Number(technical.duration_seconds).toFixed(2)}s)` : '—'}</div>
-                                <div>
-                                  Resolution:{' '}
-                                  {technical?.resolution?.width && technical?.resolution?.height
-                                    ? `${technical.resolution.width}×${technical.resolution.height}`
-                                    : '—'}
-                                </div>
-                                <div>Video codec: {technical?.video_codec || '—'}</div>
-                                <div>Audio codec: {technical?.audio_codec || '—'}</div>
-                              </div>
-                            </CardBody>
-                          </Card>
-                        </div>
-                      </Grid2>
-
-                      <Card>
-                        <CardHeader>
-                          <CardHeaderTitle>Celebrity Table (timestamp + short bio)</CardHeaderTitle>
-                        </CardHeader>
-                        <CardBody>
-                          {Array.isArray(celebs) && celebs.length ? (
-                            <div style={{ overflowX: 'auto' }}>
-                              <Table>
-                                <thead>
-                                  <tr>
-                                    <Th>Celebrity</Th>
-                                    <Th>Occurrences</Th>
-                                    <Th>Bio</Th>
-                                    <Th>Src</Th>
-                                    <Th>Portrait License</Th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {celebs.map((c) => {
-                                    const name = String(c?.name || '').trim() || '—';
-                                    const occ = Number(c?.occurrences);
-                                    const occurrences = Number.isFinite(occ) ? Math.max(0, Math.floor(occ)) : null;
-                                    const tsMs = Array.isArray(c?.timestamps_ms) ? c.timestamps_ms : [];
-                                    const tsSeconds = Array.isArray(c?.timestamps_seconds) ? c.timestamps_seconds : [];
-                                    const bio = (c?.bio_short || c?.bio || '').toString().trim();
-                                    const portrait = (c?.portrait_url || '').toString().trim();
-                                    const portraitLicense = (c?.portrait_license || '').toString().trim();
-                                    const portraitLicenseUrl = (c?.portrait_license_url || '').toString().trim();
-                                    const portraitSource = (c?.portrait_source || '').toString().trim();
-
-                                    const occurrenceTimesSeconds = (() => {
-                                      const raw = tsMs.length ? tsMs.map((ms) => Number(ms) / 1000) : tsSeconds.map((s) => Number(s));
-                                      const seen = new Set();
-                                      const out = [];
-                                      for (const t of raw) {
-                                        if (!Number.isFinite(t) || t < 0) continue;
-                                        const k = Math.round(t * 1000);
-                                        if (seen.has(k)) continue;
-                                        seen.add(k);
-                                        out.push(t);
-                                      }
-                                      return out;
-                                    })();
-                                    return (
-                                      <tr key={name}>
-                                        <Td>
-                                          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                                            {portrait ? (
-                                              <img
-                                                src={portrait}
-                                                alt={name}
-                                                style={{ width: 36, height: 36, borderRadius: 999, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.12)' }}
-                                              />
-                                            ) : (
-                                              <div
-                                                style={{
-                                                  width: 36,
-                                                  height: 36,
-                                                  borderRadius: 999,
-                                                  background: 'rgba(255,255,255,0.06)',
-                                                  border: '1px solid rgba(255,255,255,0.12)',
-                                                }}
-                                              />
-                                            )}
-                                            <div style={{ minWidth: 0 }}>
-                                              <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{name}</div>
-                                              {c?.max_confidence != null ? (
-                                                <div style={{ marginTop: 2, color: 'rgba(230,232,242,0.7)', fontSize: 12 }}>
-                                                  Max conf: {Number(c.max_confidence).toFixed(2)}
-                                                </div>
-                                              ) : null}
-                                            </div>
-                                          </div>
-                                        </Td>
-                                        <Td>
-                                          <div style={{ display: 'grid', gap: 8 }}>
-                                            <div style={{ color: 'rgba(230, 232, 242, 0.85)', fontSize: 12, fontWeight: 900 }}>
-                                              Occurrences: {occurrences != null ? occurrences : '—'}
-                                            </div>
-                                            {occurrenceTimesSeconds.length ? (
-                                              <div style={{ display: 'grid', gap: 6 }}>
-                                                <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontSize: 12, fontWeight: 800 }}>
-                                                  Exact times:
-                                                </div>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                                  {occurrenceTimesSeconds.slice(0, 20).map((t, idx) => (
-                                                    <SegmentChip key={`${name}-occ-${idx}`} type="button" onClick={() => seekTo(t)}>
-                                                      {formatTimecode(t, playerFps)}
-                                                    </SegmentChip>
-                                                  ))}
-                                                  {occurrenceTimesSeconds.length > 20 ? (
-                                                    <div style={{ color: 'rgba(230,232,242,0.6)', fontSize: 12, alignSelf: 'center' }}>
-                                                      +{occurrenceTimesSeconds.length - 20} more
-                                                    </div>
-                                                  ) : null}
-                                                </div>
-                                              </div>
-                                            ) : null}
-                                          </div>
-                                        </Td>
-                                        <Td>
-                                          <div style={{ color: 'rgba(230, 232, 242, 0.85)' }}>{bio || '—'}</div>
-                                        </Td>
-                                        <Td>
-                                          {portraitSource || portrait ? (
-                                            <div style={{ display: 'grid', gap: 6, fontSize: 12 }}>
-                                              {portraitSource ? (
-                                                <div>
-                                                  <LinkA href={portraitSource} target="_blank" rel="noreferrer">
-                                                    Source
-                                                  </LinkA>
-                                                </div>
-                                              ) : null}
-                                              {portrait ? (
-                                                <div>
-                                                  <LinkA href={portrait} target="_blank" rel="noreferrer">
-                                                    Image
-                                                  </LinkA>
-                                                </div>
-                                              ) : null}
-                                            </div>
-                                          ) : (
-                                            '—'
-                                          )}
-                                        </Td>
-                                        <Td>
-                                          {portraitLicense || portraitLicenseUrl ? (
-                                            <div style={{ color: 'rgba(230,232,242,0.85)', fontWeight: 900, fontSize: 12 }}>
-                                              {portraitLicense ? (
-                                                portraitLicenseUrl ? (
-                                                  <LinkA href={portraitLicenseUrl} target="_blank" rel="noreferrer">
-                                                    {portraitLicense}
-                                                  </LinkA>
-                                                ) : (
-                                                  portraitLicense
-                                                )
-                                              ) : portraitLicenseUrl ? (
-                                                <LinkA href={portraitLicenseUrl} target="_blank" rel="noreferrer">
-                                                  License
-                                                </LinkA>
-                                              ) : (
-                                                '—'
-                                              )}
-                                            </div>
-                                          ) : (
-                                            '—'
-                                          )}
-                                        </Td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </Table>
-                            </div>
-                          ) : (
-                            <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>No celebrity detections.</div>
-                          )}
-                        </CardBody>
-                      </Card>
-
-                      <div style={{ display: 'grid', gap: 16 }}>
-                        <div style={{ display: 'grid', gap: 16 }}>
-                          <Card>
-                            <CardHeader>
-                              <CardHeaderTitle>On-screen Text</CardHeaderTitle>
-                              <CountPill>{Array.isArray(detectedContent?.on_screen_text) ? detectedContent.on_screen_text.length : 0}</CountPill>
-                            </CardHeader>
-                            <CardBody>
-                              <div style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
-                                {Array.isArray(detectedContent?.on_screen_text) && detectedContent.on_screen_text.length ? (
-                                  <MultiColumnList>
-                                    {detectedContent.on_screen_text.slice(0, 50).map((t, idx) => {
-                                      const text = typeof t === 'string' ? t : t?.text;
-                                      const segs = Array.isArray(t?.segments) ? t.segments : [];
-                                      return (
-                                        <MultiColumnItem key={`txt-${idx}`}>
-                                          <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{text || '—'}</div>
-                                          {t?.first_seen_seconds != null && t?.last_seen_seconds != null ? (
-                                            <div style={{ color: 'rgba(230,232,242,0.7)', fontSize: 12, marginTop: 2 }}>
-                                              {formatSeconds(t.first_seen_seconds)} → {formatSeconds(t.last_seen_seconds)}
-                                            </div>
-                                          ) : null}
-                                          {segs.length ? (
-                                            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                              {segs.slice(0, 10).map((s, j) => (
-                                                <SegmentChip key={`txtseg-${idx}-${j}`} type="button" onClick={() => seekTo(s?.start_seconds)}>
-                                                  {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
-                                                </SegmentChip>
-                                              ))}
-                                            </div>
-                                          ) : null}
-                                        </MultiColumnItem>
-                                      );
-                                    })}
-                                  </MultiColumnList>
-                                ) : (
-                                  '—'
-                                )}
-                              </div>
-                              {Array.isArray(detectedContent?.on_screen_text) && detectedContent.on_screen_text.length > 50 ? (
-                                <SubtleNote>Showing first 50 text items.</SubtleNote>
-                              ) : null}
-                            </CardBody>
-                          </Card>
-
-                          <Card>
-                            <CardHeader>
-                              <CardHeaderTitle>Detected Content</CardHeaderTitle>
-                              <CountPill>{Array.isArray(detectedContent?.labels) ? detectedContent.labels.length : 0}</CountPill>
-                            </CardHeader>
-                            <CardBody>
-                              <div style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
-                                {Array.isArray(detectedContent?.labels) && detectedContent.labels.length ? (
-                                  <MultiColumnList>
-                                    {detectedContent.labels.slice(0, 60).map((l, idx) => {
-                                      const name = typeof l === 'string' ? l : l?.name;
-                                      const segs = Array.isArray(l?.segments) ? l.segments : [];
-                                      return (
-                                        <MultiColumnItem key={`lbl-${idx}`}>
-                                          <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{name || '—'}</div>
-                                          {l?.first_seen_seconds != null && l?.last_seen_seconds != null ? (
-                                            <div style={{ color: 'rgba(230,232,242,0.7)', fontSize: 12, marginTop: 2 }}>
-                                              {formatSeconds(l.first_seen_seconds)} → {formatSeconds(l.last_seen_seconds)}
-                                            </div>
-                                          ) : null}
-                                          {segs.length ? (
-                                            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                              {segs.slice(0, 10).map((s, j) => (
-                                                <SegmentChip key={`lblseg-${idx}-${j}`} type="button" onClick={() => seekTo(s?.start_seconds)}>
-                                                  {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
-                                                </SegmentChip>
-                                              ))}
-                                            </div>
-                                          ) : null}
-                                        </MultiColumnItem>
-                                      );
-                                    })}
-                                  </MultiColumnList>
-                                ) : (
-                                  '—'
-                                )}
-                              </div>
-                              {Array.isArray(detectedContent?.labels) && detectedContent.labels.length > 60 ? (
-                                <SubtleNote>Showing first 60 labels.</SubtleNote>
-                              ) : null}
-                            </CardBody>
-                          </Card>
-
-                          <Card>
-                            <CardHeader>
-                              <CardHeaderTitle>Moderation</CardHeaderTitle>
-                              <CountPill>{Array.isArray(detectedContent?.moderation) ? detectedContent.moderation.length : 0}</CountPill>
-                            </CardHeader>
-                            <CardBody>
-                              <div style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
-                                {Array.isArray(detectedContent?.moderation) && detectedContent.moderation.length ? (
-                                  <MultiColumnList>
-                                    {detectedContent.moderation.slice(0, 60).map((m, idx) => {
-                                      const name = typeof m === 'string' ? m : m?.name;
-                                      const segs = Array.isArray(m?.segments) ? m.segments : [];
-                                      return (
-                                        <MultiColumnItem key={`mod-${idx}`}>
-                                          <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{name || '—'}</div>
-                                          {m?.first_seen_seconds != null && m?.last_seen_seconds != null ? (
-                                            <div style={{ color: 'rgba(230,232,242,0.7)', fontSize: 12, marginTop: 2 }}>
-                                              {formatSeconds(m.first_seen_seconds)} → {formatSeconds(m.last_seen_seconds)}
-                                            </div>
-                                          ) : null}
-                                          {segs.length ? (
-                                            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                              {segs.slice(0, 10).map((s, j) => (
-                                                <SegmentChip key={`modseg-${idx}-${j}`} type="button" onClick={() => seekTo(s?.start_seconds)}>
-                                                  {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
-                                                </SegmentChip>
-                                              ))}
-                                            </div>
-                                          ) : null}
-                                        </MultiColumnItem>
-                                      );
-                                    })}
-                                  </MultiColumnList>
-                                ) : (
-                                  '—'
-                                )}
-                              </div>
-                              {Array.isArray(detectedContent?.moderation) && detectedContent.moderation.length > 60 ? (
-                                <SubtleNote>Showing first 60 moderation items.</SubtleNote>
-                              ) : null}
-                            </CardBody>
-                          </Card>
-                        </div>
-                      </div>
-
-                      <Card>
-                        <CardHeader>
-                          <CardHeaderTitle>Synopses (by age group)</CardHeaderTitle>
-                        </CardHeader>
-                        <CardBody>
-                          {synopsesByAge && typeof synopsesByAge === 'object' && Object.keys(synopsesByAge).length ? (
-                            <div style={{ display: 'grid', gap: 10 }}>
-                              {Object.entries(synopsesByAge).map(([group, s]) => (
-                                <div
-                                  key={group}
-                                  style={{
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    background: 'rgba(255, 255, 255, 0.03)',
-                                    borderRadius: 12,
-                                    padding: 12,
-                                  }}
-                                >
-                                  <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{group}</div>
-                                  <div style={{ marginTop: 6, color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
-                                    <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.75)', marginBottom: 4 }}>Short</div>
-                                    <div>{(s?.short || '').toString().trim() || '—'}</div>
-                                    <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.75)', margin: '10px 0 4px' }}>Long</div>
-                                    <div>{(s?.long || '').toString().trim() || '—'}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>
-                              {synopsisStep?.status ? (
-                                <>
-                                  {`Status: ${statusBadgeFor(synopsisStep.status).text}`}
-                                  {synopsisStep?.message ? ` • ${String(synopsisStep.message).trim()}` : ''}
-                                </>
-                              ) : (
-                                '—'
-                              )}
-                            </div>
-                          )}
-                        </CardBody>
-                      </Card>
-
-                      <Grid2>
-                        <Card>
-                          <CardHeader>
-                            <CardHeaderTitle>High Points</CardHeaderTitle>
-                          </CardHeader>
-                          <CardBody>
-                            {Array.isArray(highPoints) && highPoints.length ? (
-                              <div style={{ display: 'grid', gap: 8 }}>
-                                {highPoints.slice(0, 100).map((hp, idx) => (
-                                  <div key={`hp-${idx}`} style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
-                                    {hp?.start_seconds != null || hp?.end_seconds != null ? (
-                                      <SegmentChip type="button" onClick={() => seekTo(hp?.start_seconds)}>
-                                        {formatSeconds(hp?.start_seconds)}–{formatSeconds(hp?.end_seconds)}
-                                      </SegmentChip>
-                                    ) : null}{' '}
-                                    {hp?.text || hp?.summary || hp?.reason || (typeof hp === 'string' ? hp : '')}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>—</div>
-                            )}
-                          </CardBody>
-                        </Card>
-
-                        <Card>
-                          <CardHeader>
-                            <CardHeaderTitle>Key Scenes</CardHeaderTitle>
-                          </CardHeader>
-                          <CardBody>
-                            {Array.isArray(keyScenes) && keyScenes.length ? (
-                              <div style={{ display: 'grid', gap: 8 }}>
-                                {keyScenes.slice(0, 100).map((ks, idx) => (
-                                  <div key={`ks-${idx}`} style={{ color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>
-                                    {ks?.start_seconds != null || ks?.end_seconds != null ? (
-                                      <SegmentChip type="button" onClick={() => seekTo(ks?.start_seconds)}>
-                                        {formatSeconds(ks?.start_seconds)}–{formatSeconds(ks?.end_seconds)}
-                                      </SegmentChip>
-                                    ) : ks?.scene_index != null ? (
-                                      <SegmentChip type="button" onClick={() => {
-                                        const match = Array.isArray(sceneByScene)
-                                          ? sceneByScene.find((s) => String(s?.scene_index) === String(ks?.scene_index))
-                                          : null;
-                                        if (match?.start_seconds != null) seekTo(match.start_seconds);
-                                      }}>
-                                        Scene {ks.scene_index}
-                                      </SegmentChip>
-                                    ) : null}{' '}
-                                    {ks?.key_reason || ks?.reason || ks?.text || (typeof ks === 'string' ? ks : '')}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>—</div>
-                            )}
-                          </CardBody>
-                        </Card>
-                      </Grid2>
-
-                      <Card>
-                        <CardHeader>
-                          <CardHeaderTitle>Scene-by-scene metadata (timestamp mapped)</CardHeaderTitle>
-                        </CardHeader>
-                        <CardBody>
-                          {Array.isArray(sceneByScene) && sceneByScene.length ? (
-                            <div style={{ display: 'grid', gap: 10 }}>
-                              {sceneByScene.slice(0, 200).map((s, idx) => (
-                                <div
-                                  key={`sc-${idx}`}
-                                  style={{
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    background: 'rgba(255, 255, 255, 0.03)',
-                                    borderRadius: 12,
-                                    padding: 12,
-                                  }}
-                                >
-                                  <Row style={{ justifyContent: 'space-between', gap: 10 }}>
-                                    <div style={{ fontWeight: 900, color: '#e6e8f2' }}>Scene {s?.scene_index ?? idx + 1}</div>
-                                    <SegmentChip type="button" onClick={() => seekTo(s?.start_seconds)}>
-                                      {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
-                                    </SegmentChip>
-                                  </Row>
-                                  {s?.summary_text ? (
-                                    <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.85)', fontSize: 13 }}>{s.summary_text}</div>
-                                  ) : null}
-                                  {Array.isArray(s?.celebrities) && s.celebrities.length ? (
-                                    <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.7)', fontSize: 12 }}>
-                                      Celebrities: {s.celebrities.map((c) => (typeof c === 'string' ? c : c?.name || '')).filter(Boolean).join(', ')}
-                                    </div>
-                                  ) : null}
-                                  {Array.isArray(s?.labels) && s.labels.length ? (
-                                    <div style={{ marginTop: 6, color: 'rgba(230,232,242,0.7)', fontSize: 12 }}>
-                                      Content: {s.labels.map((l) => (typeof l === 'string' ? l : l?.name || '')).filter(Boolean).slice(0, 15).join(', ')}
-                                    </div>
-                                  ) : null}
-                                  {Array.isArray(s?.transcript_segments) && s.transcript_segments.length ? (
-                                    <div style={{ marginTop: 6, color: 'rgba(230,232,242,0.7)', fontSize: 12 }}>
-                                      Transcript: {(s.transcript_segments[0]?.text || '').toString().slice(0, 180)}
-                                      {s.transcript_segments.length > 1 ? '…' : ''}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>—</div>
-                          )}
-                        </CardBody>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardHeaderTitle>Famous Locations</CardHeaderTitle>
-                        </CardHeader>
-                        <CardBody>
-                          <Row style={{ gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                            <SegmentChip type="button" onClick={() => setLocationSourceFilter('all')} style={{ opacity: locationSourceFilter === 'all' ? 1 : 0.65 }}>
-                              All
-                            </SegmentChip>
-                            <SegmentChip
-                              type="button"
-                              onClick={() => setLocationSourceFilter('transcript')}
-                              style={{ opacity: locationSourceFilter === 'transcript' ? 1 : 0.65 }}
-                            >
-                              Transcript
-                            </SegmentChip>
-                            <SegmentChip
-                              type="button"
-                              onClick={() => setLocationSourceFilter('landmarks')}
-                              style={{ opacity: locationSourceFilter === 'landmarks' ? 1 : 0.65 }}
-                            >
-                              Landmarks
-                            </SegmentChip>
-                          </Row>
-                          <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.85)', fontSize: 13 }}>
-                            {Array.isArray(locations?.time_mapped) && locations.time_mapped.length
-                              ? locations.time_mapped
-                                  .filter((loc) => {
-                                    if (!loc || typeof loc !== 'object') return false;
-                                    const srcs = Array.isArray(loc.sources) ? loc.sources : [];
-                                    const hasTranscript = srcs.some((s) => /transcript|speech|asr|whisper/i.test(String(s || '')));
-                                    const hasLandmarks = srcs.some((s) => /landmark/i.test(String(s || '')));
-                                    if (locationSourceFilter === 'transcript') return hasTranscript;
-                                    if (locationSourceFilter === 'landmarks') return hasLandmarks;
-                                    return true;
-                                  })
-                                  .slice(0, 60)
-                                  .map((loc, idx) => {
-                                  const name = String(loc?.name || loc?.location || loc?.label || '').trim() || 'Location';
-                                  const segs = Array.isArray(loc?.segments) ? loc.segments : [];
-                                  const geocode = loc?.geocode && typeof loc.geocode === 'object' ? loc.geocode : null;
-                                  const lat = geocode ? Number(geocode.lat) : null;
-                                  const lng = geocode ? Number(geocode.lng) : null;
-                                  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
-                                  const mapsHref = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
-                                  const sources = Array.isArray(loc?.sources) ? loc.sources.filter(Boolean).slice(0, 3) : [];
-
-                                  return (
-                                    <div key={`loc-${idx}`}>
-                                      <Row style={{ justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                                        <div style={{ fontWeight: 900, color: '#e6e8f2' }}>{name}</div>
-                                        {mapsHref ? (
-                                          <LinkA href={mapsHref} target="_blank" rel="noreferrer">
-                                            Map
-                                          </LinkA>
-                                        ) : null}
-                                      </Row>
-
-                                      {sources.length ? (
-                                        <div style={{ color: 'rgba(230,232,242,0.6)', marginTop: 2, fontSize: 12 }}>
-                                          Source: {sources.join(', ')}
-                                        </div>
-                                      ) : null}
-
-                                      {segs.length ? (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                                          {segs.slice(0, 10).map((s, j) => (
-                                            <SegmentChip key={`locseg-${idx}-${j}`} type="button" onClick={() => seekTo(s?.start_seconds)}>
-                                              {formatSeconds(s?.start_seconds)}–{formatSeconds(s?.end_seconds)}
-                                            </SegmentChip>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  );
-                                })
-                              : Array.isArray(locations?.locations) && locations.locations.length
-                                ? locations.locations.slice(0, 60).map((loc, idx) => (
-                                    <div key={`loc2-${idx}`}>{typeof loc === 'string' ? loc : loc?.name || JSON.stringify(loc)}</div>
-                                  ))
-                                : '—'}
-                          </div>
-                        </CardBody>
-                      </Card>
-
-                      <Card id="envid-script">
-                        <CardHeader>
-                          <CardHeaderTitle>Script</CardHeaderTitle>
-                          <CountPill>
-                            {Array.isArray(transcriptSegments) && transcriptSegments.length
-                              ? `${transcriptSegments.length} segment(s)`
-                              : transcriptText.trim()
-                                ? '1 transcript'
-                                : '0'}
-                          </CountPill>
-                        </CardHeader>
-                        <CardBody>
-                          <div style={{ display: 'grid', gap: 14 }}>
-                            <div>
-                              <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
-                                Time-banded audio script
-                              </div>
-                              {Array.isArray(transcriptSegments) && transcriptSegments.length ? (
-                                <div style={{ display: 'grid', gap: 8 }}>
-                                  {transcriptSegments.slice(0, 2000).map((seg, idx) => (
-                                    <div key={`ts-${idx}`} style={{ color: 'rgba(230,232,242,0.88)', fontSize: 13, lineHeight: 1.45 }}>
-                                      <SegmentChip type="button" onClick={() => seekTo(seg?.start)}>
-                                        {formatTimecode(seg?.start, playerFps)}–{formatTimecode(seg?.end, playerFps)}
-                                      </SegmentChip>{' '}
-                                      {(seg?.text || '').toString().trim() || '—'}
-                                    </div>
-                                  ))}
-                                  {transcriptSegments.length > 2000 ? (
-                                    <SubtleNote>Showing first 2000 transcript segments.</SubtleNote>
-                                  ) : null}
-                                </div>
-                              ) : transcriptText.trim() ? (
-                                <div style={{ color: 'rgba(230,232,242,0.75)', fontSize: 13 }}>
-                                  {transcriptText}
-                                </div>
-                              ) : (
-                                <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
-                                  <div>No transcript found for this video.</div>
-                                  <SubtleNote>
-                                    If this was processed before Audio Transcription existed (or transcription was disabled), click Reprocess and enable Audio Transcription.
-                                  </SubtleNote>
-                                </div>
-                              )}
-                            </div>
-
-                            <div>
-                              <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
-                                Paragraph-wise script
-                              </div>
-                              {transcriptParagraphs.length ? (
-                                <div style={{ display: 'grid', gap: 10 }}>
-                                  {transcriptParagraphs.slice(0, 400).map((p, idx) => (
-                                    <div
-                                      key={`tp-${idx}`}
-                                      style={{
-                                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                                        background: 'rgba(255, 255, 255, 0.03)',
-                                        borderRadius: 12,
-                                        padding: 12,
-                                      }}
-                                    >
-                                      <Row style={{ justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                                        <div style={{ color: 'rgba(230,232,242,0.65)', fontSize: 12, fontWeight: 900 }}>
-                                          {formatTimecode(p.start, playerFps)}–{formatTimecode(p.end, playerFps)}
-                                        </div>
-                                        <SecondaryButton type="button" onClick={() => seekTo(p.start)}>
-                                          Seek
-                                        </SecondaryButton>
-                                      </Row>
-                                      <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.5 }}>
-                                        {p.text}
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {transcriptParagraphs.length > 400 ? (
-                                    <SubtleNote>Showing first 400 paragraphs.</SubtleNote>
-                                  ) : null}
-                                </div>
-                              ) : transcriptText.trim() ? (
-                                <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.5 }}>
-                                  {transcriptText}
-                                </div>
-                              ) : (
-                                <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
-                                  <div>No transcript found for this video.</div>
-                                  <SubtleNote>
-                                    If this was processed before Audio Transcription existed (or transcription was disabled), click Reprocess and enable Audio Transcription.
-                                  </SubtleNote>
-                                </div>
-                              )}
-                            </div>
-
-                            <div>
-                              <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
-                                Raw transcript (no timestamps)
-                              </div>
-                              {rawTranscriptText.trim() ? (
-                                <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.55 }}>
-                                  {rawTranscriptText}
-                                </div>
-                              ) : (
-                                <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
-                                  <div>No transcript found for this video.</div>
-                                  <SubtleNote>Click Reprocess and enable Audio Transcription to generate a transcript.</SubtleNote>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardBody>
-                      </Card>
-                    </>
-                  )}
-                </DetailBody>
-              </DetailPanel>
-            ) : null}
+            {metadataDetailPanel}
           </Section>
+          )}
+
+          {activeTab === 'failed' && (
+          <Section>
+            <SectionTitle>
+              <Icon>⚠️</Icon>
+              Failed Jobs
+            </SectionTitle>
+
+            {failedJobsLoading ? (
+              <Message type="info">Loading failed jobs…</Message>
+            ) : null}
+
+            {failedJobsError ? (
+              <Message type="error">{failedJobsError}</Message>
+            ) : null}
+
+            {!failedJobsLoading && !failedJobsError && failedJobs.length === 0 ? (
+              <EmptyState>
+                <EmptyIcon>✅</EmptyIcon>
+                No failed jobs.
+              </EmptyState>
+            ) : (
+              <RunningJobsList>
+                {failedJobs.map((job) => failedJobRow(job))}
+              </RunningJobsList>
+            )}
+          </Section>
+          )}
         </div>
 
         {gcsBrowserOpen && (
@@ -3861,65 +4828,6 @@ export default function EnvidMetadataMinimal() {
           </ModalOverlay>
         )}
 
-        {deletePending && (
-          <ModalOverlay
-            onClick={(event) => {
-              if (event.target === event.currentTarget) setDeletePending(null);
-            }}
-          >
-            <ModalCard>
-              <ModalHeader>
-                <div>
-                  <ModalTitle>Delete video</ModalTitle>
-                  <ModalSubtitle>{deletePending.videoTitle || 'Selected video'}</ModalSubtitle>
-                </div>
-              </ModalHeader>
-              <ModalBody>
-                <ConfirmText>
-                  Are you sure you want to delete this video? This action cannot be undone.
-                </ConfirmText>
-                <ConfirmActions>
-                  <SecondaryButton type="button" onClick={() => setDeletePending(null)}>
-                    Cancel
-                  </SecondaryButton>
-                  <DeleteButton type="button" onClick={confirmDeleteVideo}>
-                    Delete
-                  </DeleteButton>
-                </ConfirmActions>
-              </ModalBody>
-            </ModalCard>
-          </ModalOverlay>
-        )}
-
-        {reprocessPending && (
-          <ModalOverlay
-            onClick={(event) => {
-              if (event.target === event.currentTarget) setReprocessPending(null);
-            }}
-          >
-            <ModalCard>
-              <ModalHeader>
-                <div>
-                  <ModalTitle>Reprocess video</ModalTitle>
-                  <ModalSubtitle>{reprocessPending.videoTitle || 'Selected video'}</ModalSubtitle>
-                </div>
-              </ModalHeader>
-              <ModalBody>
-                <ConfirmText>
-                  Reprocessing will rerun the selected pipeline steps for this video. Proceed?
-                </ConfirmText>
-                <ConfirmActions>
-                  <SecondaryButton type="button" onClick={() => setReprocessPending(null)}>
-                    Cancel
-                  </SecondaryButton>
-                  <ReprocessButton type="button" onClick={confirmReprocessVideo}>
-                    Reprocess
-                  </ReprocessButton>
-                </ConfirmActions>
-              </ModalBody>
-            </ModalCard>
-          </ModalOverlay>
-        )}
       </Container>
     </PageWrapper>
   );

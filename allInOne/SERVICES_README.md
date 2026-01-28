@@ -78,7 +78,7 @@ npm start
 - **Movie Script Creation Service**: http://localhost:5005
 - **Content Moderation Service**: http://localhost:5006
 - **Personalized Trailer Service**: http://localhost:5007
-- **WhisperX Service**: http://localhost:5088
+- **OpenAI Whisper Service**: http://localhost:5088
 
 ## 📊 Port Configuration
 
@@ -93,7 +93,7 @@ npm start
 | Movie Script Creation Service | 5005 | Feature-length screenplay generation with audience and region targeting |
 | Content Moderation Service | 5006 | Video upload with automated moderation timelines |
 | Personalized Trailer Service | 5007 | AI-generated trailer planning and packaging workflows |
-| WhisperX Service | 5088 | GPU-first transcription with streaming subtitles |
+| OpenAI Whisper Service | 5088 | GPU-first transcription |
 ## 🔧 Configuration
 
 ### Environment Variables

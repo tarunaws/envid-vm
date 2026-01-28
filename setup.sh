@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${SCRIPT_DIR}"
 MICROSERVICES_DIR="${ROOT_DIR}/microservices"
-DOCKERHUB_REPO="${DOCKERHUB_REPO:-tarunaws/envid-metadata}"
 
 if ! command -v docker >/dev/null 2>&1; then
 	echo "❌ docker not found. Install Docker before continuing."
@@ -25,9 +24,45 @@ else
 	exit 1
 fi
 
+PUSH_SCRIPT="${ROOT_DIR}/push-images.sh"
+did_build=false
+
+# text-normalizer is now hosted inside translate. Remove legacy container if present.
+if docker ps -a --format '{{.Names}}' | grep -q '^text-normalizer$'; then
+	echo "🧹 Removing legacy text-normalizer container"
+	docker rm -f text-normalizer >/dev/null 2>&1 || true
+fi
+
+# document-extractor service removed. Remove legacy container if present.
+if docker ps -a --format '{{.Names}}' | grep -q '^document-extractor$'; then
+	echo "🧹 Removing legacy document-extractor container"
+	docker rm -f document-extractor >/dev/null 2>&1 || true
+fi
+
+# Mongo service is now named db. Remove legacy mongo container if present.
+if docker ps -a --format '{{.Names}}' | grep -q '^mongo$'; then
+	echo "🧹 Removing legacy mongo container"
+	docker rm -f mongo >/dev/null 2>&1 || true
+fi
+
+
 if [ ! -f "${MICROSERVICES_DIR}/.env" ] && [ -f "${MICROSERVICES_DIR}/.env.sample" ]; then
 	cp "${MICROSERVICES_DIR}/.env.sample" "${MICROSERVICES_DIR}/.env"
 	echo "✅ Created microservices/.env from microservices/.env.sample"
+fi
+
+if [ -f "${MICROSERVICES_DIR}/.env" ]; then
+	cp "${MICROSERVICES_DIR}/.env" "${ROOT_DIR}/.env"
+	echo "✅ Synced .env from microservices/.env to repo root"
+fi
+
+if [ -f "${MICROSERVICES_DIR}/.env" ]; then
+	echo "🔁 Syncing .env to service folders..."
+	for svc_dir in "${MICROSERVICES_DIR}"/*; do
+		if [ -d "${svc_dir}" ] && [ -f "${svc_dir}/Dockerfile" ]; then
+			cp "${MICROSERVICES_DIR}/.env" "${svc_dir}/.env"
+		fi
+	done
 fi
 
 if [ ! -d "/mnt/gcs" ]; then
@@ -35,7 +70,7 @@ if [ ! -d "/mnt/gcs" ]; then
 	exit 1
 fi
 
-mkdir -p /mnt/gcs/envid-metadata /mnt/gcs/translate/models /mnt/gcs/translate/cache /mnt/gcs/db
+mkdir -p /mnt/gcs/envid-metadata /mnt/gcs/translate/models /mnt/gcs/translate/cache /mnt/gcs/db /mnt/processing/mongo
 
 MICROSERVICES_DIR="${MICROSERVICES_DIR}" python3 - <<'PY'
 from pathlib import Path
@@ -116,59 +151,25 @@ PY
 
 compose_file="${MICROSERVICES_DIR}/docker-compose.app.yml"
 
-get_latest_tag() {
-	python3 - "$DOCKERHUB_REPO" "$1" <<'PY'
-import json
-import sys
-import urllib.request
-from urllib.parse import quote
-
-repo = sys.argv[1]
-image = sys.argv[2]
-
-tags = []
-url = f"https://hub.docker.com/v2/repositories/{repo}/tags?page_size=100&name={quote(image + '-v')}"
-while url:
-	try:
-		with urllib.request.urlopen(url, timeout=15) as resp:
-			data = json.load(resp)
-	except Exception:
-		break
-	for item in data.get("results", []) or []:
-		name = str(item.get("name") or "")
-		if name.startswith(f"{image}-v"):
-			tags.append(name)
-	url = data.get("next")
-
-def ver(tag: str) -> int:
-	try:
-		return int(tag.rsplit("-v", 1)[1])
-	except Exception:
-		return -1
-
-tags = sorted(tags, key=ver, reverse=True)
-print(tags[0] if tags else "")
-PY
-}
-
 ensure_image() {
-	local image_name="$1"
-	if docker images --format '{{.Repository}}' | grep -q "^${image_name}$"; then
-		echo "✅ Image ${image_name} exists locally."
+	local image_ref="$1"
+	local image_full="${image_ref}"
+	if [[ "${image_full}" != *:* ]]; then
+		image_full="${image_full}:latest"
+	fi
+
+	if docker image inspect "${image_full}" >/dev/null 2>&1; then
+		echo "✅ Image ${image_full} exists locally."
 		return 0
 	fi
 
-	latest_tag="$(get_latest_tag "${image_name}")"
-	if [ -n "${latest_tag}" ]; then
-		echo "⬇️  Pulling ${DOCKERHUB_REPO}:${latest_tag}"
-		if docker pull "${DOCKERHUB_REPO}:${latest_tag}"; then
-			docker tag "${DOCKERHUB_REPO}:${latest_tag}" "${image_name}:latest"
-			echo "✅ Tagged ${image_name}:latest from Docker Hub"
-			return 0
-		fi
+	echo "⬇️  Pulling ${image_full}"
+	if docker pull "${image_full}"; then
+		echo "✅ Pulled ${image_full}"
+		return 0
 	fi
 
-	echo "🛠️  Building ${image_name} from Dockerfile"
+	echo "🛠️  Building ${image_ref} from Dockerfile"
 	return 1
 }
 
@@ -200,6 +201,7 @@ while IFS=$'\t' read -r service container_name image_name; do
 	else
 		if ! ensure_image "${image_name}"; then
 			"${COMPOSE_CMD[@]}" -f "${compose_file}" build "${service}"
+			did_build=true
 		fi
 		echo "▶️  Starting ${service} (${container_name})..."
 		"${COMPOSE_CMD[@]}" -f "${compose_file}" up -d "${service}"
@@ -244,7 +246,7 @@ for line in lines:
 			container_name = cname_match.group(1).strip()
 		img_match = re.match(r"^    image:\s*\"?([^\"#]+)\"?\s*$", line)
 		if img_match:
-			image_name = img_match.group(1).strip().split(":")[0]
+			image_name = img_match.group(1).strip()
 
 emit(current_service, container_name, image_name)
 PY
@@ -264,10 +266,20 @@ else
 	else
 		if ! ensure_image "${dns_image}"; then
 			"${COMPOSE_CMD[@]}" -f "${compose_file}" build "${dns_service}"
+			did_build=true
 		fi
 		echo "▶️  Starting ${dns_service} (${dns_container})..."
 		"${COMPOSE_CMD[@]}" -f "${compose_file}" up -d "${dns_service}"
 	fi
 fi
+
+	if [[ "${did_build}" == "true" ]]; then
+		if [[ -x "${PUSH_SCRIPT}" ]]; then
+			echo "⬆️  Pushing updated images to Docker Hub"
+			"${PUSH_SCRIPT}"
+		else
+			echo "⚠️  ${PUSH_SCRIPT} not found or not executable; skipping push"
+		fi
+	fi
 
 echo "✅ Setup complete. Review microservices/.env and microservices/*/.env before starting the stack."

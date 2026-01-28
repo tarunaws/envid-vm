@@ -2,7 +2,7 @@
 
 ## Big picture (where to start)
 - Two parallel stacks: the **all-in-one monolith** in [code/envidMetadataGCP](code/envidMetadataGCP) and the **microservices migration** in [microservices](microservices).
-- The monolith remains the active orchestrator; it performs GCS I/O, ffmpeg preprocessing, WhisperX transcription, LLM summarization, and optional sidecar calls (see [code/envidMetadataGCP/README.md](code/envidMetadataGCP/README.md)).
+- The monolith remains the active orchestrator; it performs GCS I/O, ffmpeg preprocessing, OpenAI Whisper transcription, LLM summarization, and optional sidecar calls (see [code/envidMetadataGCP/README.md](code/envidMetadataGCP/README.md)).
 - Microservices are defined in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml) and are gradually replacing monolith steps (see [microservices/README.md](microservices/README.md)).
 - Legacy AWS service under [code/envidMetadata](code/envidMetadata) is deprecated and not part of the default stack.
 

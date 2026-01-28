@@ -13,7 +13,7 @@ Split the pipeline into discrete services aligned with existing steps in [CODEBA
 - moderation (NudeNet)
 - OCR (Tesseract)
 - key-scene detection (TransNetV2 + CLIP)
-- transcription (WhisperX)
+- transcription (OpenAI Whisper)
 - summarization (LLM synopsis + scene-by-scene)
 - export (JSON/zip/subtitles)
 
@@ -26,9 +26,9 @@ Split the pipeline into discrete services aligned with existing steps in [CODEBA
 - Label detection is handled inside the backend via Google Video Intelligence.
 - Text-on-screen OCR can be offloaded to the OCR service via `ENVID_OCR_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
 - Moderation uses the NudeNet service via `ENVID_MODERATION_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
-- Transcription can be offloaded to WhisperX via `ENVID_WHISPERX_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
+- Transcription can be offloaded via `ENVID_TRANSCRIBE_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
 - Scene detection can be offloaded to the scene service via `ENVID_SCENE_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
-- LLM synopsis + scene-by-scene summarization can be offloaded via `ENVID_SYNOPSYS_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
+- LLM synopsis + scene-by-scene summarization can be offloaded via `ENVID_SUMMARIZER_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
 - Export (artifact upload/zip/subtitles) can be offloaded via `ENVID_METADATA_EXPORT_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
 
 ## Phase 2 (extraction)

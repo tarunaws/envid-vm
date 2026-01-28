@@ -21,25 +21,89 @@ else:
     _NUDENET_IMPORT_ERROR = None
 
 try:
-    from PIL import Image  # type: ignore
+    from PIL import Image, ImageEnhance, ImageOps  # type: ignore
 except Exception as exc:  # pragma: no cover
     Image = None  # type: ignore
     _PIL_IMPORT_ERROR = str(exc)
 else:
     _PIL_IMPORT_ERROR = None
 
+try:
+    import onnxruntime as ort  # type: ignore
+except Exception as exc:  # pragma: no cover
+    ort = None  # type: ignore
+    _ORT_IMPORT_ERROR = str(exc)
+else:
+    _ORT_IMPORT_ERROR = None
+
 app = Flask(__name__)
 CORS(app)
 
 _CLASSIFIER: Any = None
+_CLASSIFIER_PROVIDERS: list[str] | None = None
+
+
+def _preprocess_image(img: Image.Image) -> Image.Image:
+    upscale = 1.2
+    contrast = 1.3
+    sharpen = 1.1
+    try:
+        upscale = float(os.getenv("ENVID_METADATA_MODERATION_UPSCALE") or upscale)
+    except Exception:
+        upscale = 1.2
+    try:
+        contrast = float(os.getenv("ENVID_METADATA_MODERATION_CONTRAST") or contrast)
+    except Exception:
+        contrast = 1.3
+    try:
+        sharpen = float(os.getenv("ENVID_METADATA_MODERATION_SHARPEN") or sharpen)
+    except Exception:
+        sharpen = 1.1
+
+    if upscale < 1.0:
+        upscale = 1.0
+    if contrast < 0.5:
+        contrast = 0.5
+    if sharpen < 0.5:
+        sharpen = 0.5
+
+    img = ImageOps.exif_transpose(img)
+    if upscale > 1.0:
+        w, h = img.size
+        img = img.resize((int(w * upscale), int(h * upscale)), resample=Image.LANCZOS)
+    if contrast != 1.0:
+        img = ImageEnhance.Contrast(img).enhance(contrast)
+    if sharpen != 1.0:
+        img = ImageEnhance.Sharpness(img).enhance(sharpen)
+    return img
 
 
 def _get_detector() -> Any:
     global _CLASSIFIER
+    global _CLASSIFIER_PROVIDERS
     if NudeDetector is None:
         raise RuntimeError(f"nudenet import failed: {_NUDENET_IMPORT_ERROR}")
     if _CLASSIFIER is None:
-        _CLASSIFIER = NudeDetector()
+        providers: list[str] = []
+        if ort is not None:
+            available = [p for p in ort.get_available_providers() if isinstance(p, str)]
+        else:
+            available = []
+
+        env_providers = (os.getenv("ENVID_METADATA_MODERATION_PROVIDERS") or "").strip()
+        if env_providers:
+            providers = [p.strip() for p in env_providers.split(",") if p.strip()]
+        elif "CUDAExecutionProvider" in available:
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        else:
+            providers = ["CPUExecutionProvider"]
+
+        try:
+            _CLASSIFIER = NudeDetector(providers=providers)
+            _CLASSIFIER_PROVIDERS = providers
+        except TypeError:
+            _CLASSIFIER = NudeDetector()
+            _CLASSIFIER_PROVIDERS = None
     return _CLASSIFIER
 
 
@@ -79,6 +143,13 @@ def health() -> Any:
                 "nudenet_import_error": _NUDENET_IMPORT_ERROR,
                 "has_pillow": Image is not None,
                 "pillow_import_error": _PIL_IMPORT_ERROR,
+                "onnxruntime_import_error": _ORT_IMPORT_ERROR,
+                "onnxruntime_available_providers": (
+                    [p for p in ort.get_available_providers() if isinstance(p, str)]
+                    if ort is not None
+                    else []
+                ),
+                "onnxruntime_selected_providers": _CLASSIFIER_PROVIDERS,
             }
         ),
         200,
@@ -115,7 +186,8 @@ def moderate_frames() -> Any:
         image_paths: list[Path] = []
         times: list[float] = []
 
-        for idx, fr in enumerate(frames[:2000]):
+        max_input_frames = 200000
+        for idx, fr in enumerate(frames[:max_input_frames]):
             if not isinstance(fr, dict):
                 continue
             try:
@@ -134,6 +206,7 @@ def moderate_frames() -> Any:
                 raw = base64.b64decode(b64)
                 img = Image.open(io.BytesIO(raw))
                 img = img.convert("RGB")
+                img = _preprocess_image(img)
             except Exception:
                 continue
 
@@ -157,6 +230,11 @@ def moderate_frames() -> Any:
             "ANUS_EXPOSED",
             "BUTTOCKS_EXPOSED",
         }
+        reason_min_score = 0.25
+        try:
+            reason_min_score = float(os.getenv("ENVID_METADATA_MODERATION_REASON_MIN_SCORE") or 0.25)
+        except Exception:
+            reason_min_score = 0.25
 
         detections_by_frame: list[list[dict[str, Any]]] = []
         try:
@@ -172,6 +250,7 @@ def moderate_frames() -> Any:
 
         for dets, t in zip(detections_by_frame, times):
             unsafe = 0.0
+            reasons: list[dict[str, Any]] = []
             if isinstance(dets, list):
                 for d in dets:
                     if not isinstance(d, dict):
@@ -180,16 +259,23 @@ def moderate_frames() -> Any:
                     score = d.get("score")
                     if label in explicit_labels:
                         try:
-                            unsafe = max(unsafe, float(score or 0.0))
+                            score_val = float(score or 0.0)
                         except Exception:
-                            pass
+                            score_val = 0.0
+                        unsafe = max(unsafe, score_val)
+                        if score_val >= reason_min_score:
+                            reasons.append({"label": str(label), "score": score_val})
             safe = max(0.0, 1.0 - unsafe)
+            reasons.sort(key=lambda item: float(item.get("score") or 0.0), reverse=True)
+            top_reason = reasons[0] if reasons else None
             explicit_frames.append(
                 {
                     "time": float(t),
                     "severity": _severity_from_score(unsafe),
                     "unsafe": unsafe,
                     "safe": safe,
+                    **({"reasons": reasons} if reasons else {}),
+                    **({"top_label": top_reason.get("label"), "top_score": top_reason.get("score")} if top_reason else {}),
                 }
             )
 

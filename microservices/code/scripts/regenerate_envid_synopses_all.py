@@ -46,7 +46,7 @@ def _http_get_json(url: str, timeout_seconds: float) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Force-regenerate synopses for every Envid Metadata video in the local index by calling the running backend."
+            "Force-regenerate synopsis for every Envid Metadata video in the local index by calling the running backend."
         )
     )
     parser.add_argument(
@@ -99,19 +99,19 @@ def main() -> int:
     failed = 0
 
     for i, vid in enumerate(ids, start=1):
-        qs = urllib.parse.urlencode({"category": "combined", "force_synopses_regen": "1"})
+        qs = urllib.parse.urlencode({"category": "combined", "force_synopsis_regen": "1"})
         url = f"{args.base_url.rstrip('/')}/video/{vid}/metadata-json?{qs}"
 
         try:
             data = _http_get_json(url, timeout_seconds=float(args.timeout_seconds))
-            syn = ((data.get("categories") or {}).get("synopses_by_age_group") or {})
-            groups = sorted(list(syn.keys()))
-            if groups:
+            synopsis = ((data.get("categories") or {}).get("synopsis") or {})
+            keys = sorted(list(synopsis.keys()))
+            if keys:
                 ok += 1
-                print(f"[{i}/{total}] OK {vid} groups={groups}")
+                print(f"[{i}/{total}] OK {vid} keys={keys}")
             else:
                 failed += 1
-                print(f"[{i}/{total}] FAIL {vid} (no synopses returned)")
+                print(f"[{i}/{total}] FAIL {vid} (no synopsis returned)")
         except Exception as exc:
             failed += 1
             print(f"[{i}/{total}] FAIL {vid} ({exc})")

@@ -196,9 +196,7 @@ def _normalize_transcript_basic(text: str) -> str:
 
 
 def _languagetool_remote_check(*, text: str, language: str) -> dict[str, Any] | None:
-    url = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip()
-    if not url:
-        return None
+    url = "http://translate:8010"
     if url.endswith("/"):
         url = url[:-1]
     if not url.endswith("/v2/check") and not url.endswith("/check"):

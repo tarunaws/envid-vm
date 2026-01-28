@@ -32,6 +32,32 @@ def _run_ffprobe(video_path: Path) -> dict[str, Any]:
     return json.loads(res.stdout or "{}")
 
 
+def _primary_video_codec(probe: dict[str, Any]) -> str:
+    streams = probe.get("streams") if isinstance(probe, dict) else None
+    if not isinstance(streams, list):
+        return ""
+    for st in streams:
+        if not isinstance(st, dict):
+            continue
+        if str(st.get("codec_type") or "").lower() == "video":
+            return str(st.get("codec_name") or "").lower().strip()
+    return ""
+
+
+def _gpu_codec_supported(codec: str) -> bool:
+    if not codec:
+        return True
+    supported = {
+        "h264",
+        "hevc",
+        "h265",
+        "av1",
+        "vp9",
+        "mpeg2video",
+    }
+    return codec in supported
+
+
 def _extract_audio(
     *,
     video_path: Path,
@@ -137,14 +163,28 @@ def _ffmpeg_supports_nvenc() -> bool:
 
 
 def _use_gpu_transcode() -> bool:
-    raw = (os.getenv("ENVID_FFMPEG_USE_GPU") or "true").strip().lower()
-    if raw in {"0", "false", "no", "off"}:
-        return False
     if not _ffmpeg_supports_nvenc():
         return False
-    if not Path("/dev/nvidia0").exists():
+    if not _gpu_device_available():
         return False
     return True
+
+
+def _gpu_device_available() -> bool:
+    if Path("/proc/driver/nvidia/gpus").exists():
+        try:
+            if any(Path("/proc/driver/nvidia/gpus").iterdir()):
+                return True
+        except Exception:
+            pass
+    if Path("/dev/nvidia0").exists():
+        try:
+            res = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True, timeout=2)
+            if res.returncode == 0 and (res.stdout or "").strip():
+                return True
+        except Exception:
+            pass
+    return False
 
 
 @app.route("/health", methods=["GET"])
@@ -174,9 +214,24 @@ def normalize() -> Any:
 
         output_path = Path(tempfile.mkstemp(suffix=suffix)[1])
 
+        probe = _run_ffprobe(input_path)
+        input_codec = _primary_video_codec(probe)
+
         use_gpu = _use_gpu_transcode()
+        gpu_codec_ok = _gpu_codec_supported(input_codec)
+        app.logger.info(
+            "normalize: codec=%s gpu_available=%s nvenc=%s gpu_codec_ok=%s",
+            input_codec or "unknown",
+            _gpu_device_available(),
+            _ffmpeg_supports_nvenc(),
+            gpu_codec_ok,
+        )
         if use_gpu and not _ffmpeg_supports_nvenc():
             raise RuntimeError("NVENC not available; GPU transcoding required")
+        if use_gpu and not gpu_codec_ok:
+            app.logger.warning("GPU decode unsupported for codec %s; using CPU", input_codec or "unknown")
+            use_gpu = False
+        app.logger.info("normalize: selected %s", "GPU (NVENC)" if use_gpu else "CPU")
 
         def _build_cmd(gpu: bool) -> list[str]:
             video_codec = "h264_nvenc" if gpu else "libx264"
@@ -185,8 +240,6 @@ def normalize() -> Any:
             if gpu:
                 cmd += ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
             cmd += ["-i", str(input_path)]
-            if gpu:
-                cmd += ["-vf", "scale_cuda=iw:ih"]
             cmd += [
                 "-c:v",
                 video_codec,
@@ -213,12 +266,26 @@ def normalize() -> Any:
             return cmd
 
         try:
-            _run_ffmpeg(_build_cmd(use_gpu))
-        except Exception as exc:
             if use_gpu:
-                _run_ffmpeg(_build_cmd(False))
+                app.logger.info("normalize: using GPU transcode (NVENC)")
+                last_exc: Exception | None = None
+                for attempt in range(1, 4):
+                    try:
+                        app.logger.info("normalize: attempting GPU transcode (attempt %s)", attempt)
+                        _run_ffmpeg(_build_cmd(True))
+                        last_exc = None
+                        break
+                    except Exception as exc:
+                        last_exc = exc
+                        app.logger.warning("GPU transcode attempt %s failed: %s", attempt, exc)
+                if last_exc is not None:
+                    app.logger.warning("GPU transcode failed after retries; falling back to CPU")
+                    _run_ffmpeg(_build_cmd(False))
             else:
-                raise exc
+                app.logger.info("normalize: using CPU transcode")
+                _run_ffmpeg(_build_cmd(False))
+        except Exception as exc:
+            raise exc
         if not output_path.exists() or output_path.stat().st_size == 0:
             raise RuntimeError("ffmpeg produced empty output")
 

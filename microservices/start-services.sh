@@ -45,4 +45,12 @@ if [ ${#to_start[@]} -eq 0 ]; then
   exit 0
 fi
 
-exec "${COMPOSE_CMD[@]}" -f "${compose_file}" up -d --build "${to_start[@]}"
+"${COMPOSE_CMD[@]}" -f "${compose_file}" up -d --build "${to_start[@]}"
+
+PUSH_SCRIPT="${ROOT_DIR}/push-images.sh"
+if [[ -x "${PUSH_SCRIPT}" ]]; then
+  echo "⬆️  Checking for changed services and pushing updated images"
+  "${PUSH_SCRIPT}"
+else
+  echo "⚠️  ${PUSH_SCRIPT} not found or not executable; skipping push"
+fi

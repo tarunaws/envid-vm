@@ -92,8 +92,8 @@ def main() -> int:
             "moderation": len(detected.get("moderation") or []),
         },
     )
-    synopses = categories.get("synopses_by_age_group") or {}
-    print("synopses_groups", sorted(synopses.keys()))
+    synopsis = categories.get("synopsis") or {}
+    print("synopsis_keys", sorted(synopsis.keys()))
 
     try:
         try:

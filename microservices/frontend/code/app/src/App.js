@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 
-import About from './About';
 import AISubtitling from './AISubtitling';
 import AskMe from './AskMe';
 import DynamicAdInsertion from './DynamicAdInsertion';
@@ -183,19 +182,18 @@ function App() {
               <NavLinks>
                 <NeonLink to="/">Home</NeonLink>
                 <NeonLink to="/use-cases">Live Demo</NeonLink>
-                <NeonLink to="/about">About</NeonLink>
               </NavLinks>
-              <NavCenter>
-                <StatsGroup>
-                  <StatsPill>CPU: {cpuLabel}</StatsPill>
-                  <StatsPill>RAM: {memPercent}</StatsPill>
-                  <StatsPill>GPU: {gpuLabel}</StatsPill>
-                </StatsGroup>
-              </NavCenter>
               <Spacer />
-              <LogoutButton type="button" onClick={handleLogout}>
-                Logout
-              </LogoutButton>
+              <NavRight>
+                <StatsGroup>
+                  <StatsPill $variant="cpu">CPU: {cpuLabel}</StatsPill>
+                  <StatsPill $variant="ram">RAM: {memPercent}</StatsPill>
+                  <StatsPill $variant="gpu">GPU: {gpuLabel}</StatsPill>
+                </StatsGroup>
+                <LogoutButton type="button" onClick={handleLogout}>
+                  Logout
+                </LogoutButton>
+              </NavRight>
             </NavInner>
           </NeonNav>
 
@@ -218,7 +216,7 @@ function App() {
               <Route path="/scene-summarization" element={<SceneSummarization />} />
               <Route path="/ai-subtitling" element={<AISubtitling />} />
               <Route path="/media-supply-chain" element={<Navigate to="/envid-metadata" replace />} />
-              <Route path="/about" element={<About />} />
+              <Route path="/about" element={<EnvidMetadataMinimal initialTab="history" />} />
                 <Route path="/interactive-video" element={<InteractiveShoppable />} />
               <Route path="/tech-stack" element={<Navigate to="/" replace />} />
               {/* Admin use-case toggles disabled (GCS-only frontend). */}
@@ -357,27 +355,33 @@ const NavLinks = styled.div`
   gap: clamp(0.5rem, 1.6vw, 1.5rem);
 `;
 
-const NavCenter = styled.div`
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-`;
-
 const StatsGroup = styled.div`
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-end;
 `;
 
 const StatsPill = styled.div`
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
+  background: ${(props) => {
+    const v = String(props.$variant || 'neutral');
+    if (v === 'cpu') return 'rgba(239, 68, 68, 0.22)';
+    if (v === 'ram') return 'rgba(59, 130, 246, 0.22)';
+    if (v === 'gpu') return 'rgba(245, 158, 11, 0.22)';
+    return 'rgba(255, 255, 255, 0.08)';
+  }};
+  border-color: ${(props) => {
+    const v = String(props.$variant || 'neutral');
+    if (v === 'cpu') return 'rgba(239, 68, 68, 0.5)';
+    if (v === 'ram') return 'rgba(59, 130, 246, 0.5)';
+    if (v === 'gpu') return 'rgba(245, 158, 11, 0.5)';
+    return 'rgba(255, 255, 255, 0.2)';
+  }};
+  color: #e6e8f2;
   font-size: 0.8rem;
   font-weight: 700;
   white-space: nowrap;
@@ -404,6 +408,14 @@ const NeonLink = styled(NavLink)`
 
 const Spacer = styled.div`
   flex: 1;
+`;
+
+const NavRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 `;
 
 const LogoutButton = styled.button`

@@ -39,12 +39,10 @@ ENV ENVID_GRAMMAR_CORRECTION_URL=http://translate:8010 \
     ENVID_WHISPER_FP16=true \
     ENVID_WHISPER_DEVICE=cuda
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        git \
-        docker.io \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true update \
+    && apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 WORKDIR /app
 

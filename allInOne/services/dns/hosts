@@ -3,7 +3,7 @@
 172.28.0.3   gateway backend
 172.28.0.4   backend
 172.28.0.5   frontend
-172.28.0.6   audio-translation
+172.28.0.6   audio-transcription
 172.28.0.7   local-moderation-nudenet
 172.28.0.8   local-keyscene-best
 172.28.0.9   ffmpeg

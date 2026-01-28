@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import io
 import os
-import subprocess
 import tempfile
 from dataclasses import dataclass
 from math import exp
@@ -12,6 +11,7 @@ from typing import Any
 
 import numpy as np
 from flask import Flask, jsonify, request
+import requests
 
 app = Flask(__name__)
 
@@ -82,26 +82,22 @@ def _extract_keyframe_jpg(*, video_path: Path, at_seconds: float, out_path: Path
     except Exception:
         pass
 
-    cmd = [
-        "ffmpeg",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-ss",
-        f"{max(0.0, float(at_seconds or 0.0)):.3f}",
-        "-i",
-        str(video_path),
-        "-frames:v",
-        "1",
-        "-vf",
-        "scale=224:-1",
-        "-q:v",
-        "3",
-        "-y",
-        str(out_path),
-    ]
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=max_seconds)
-    return res.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0
+    service_url = "http://transcoder:5091"
+    try:
+        with video_path.open("rb") as handle:
+            files = {"video": (video_path.name, handle, "application/octet-stream")}
+            data = {
+                "timestamp": f"{max(0.0, float(at_seconds or 0.0)):.3f}",
+                "scale": "224",
+                "quality": "3",
+            }
+            resp = requests.post(f"{service_url}/extract-frame", files=files, data=data, timeout=max_seconds)
+        if resp.status_code >= 400:
+            return False
+        out_path.write_bytes(resp.content)
+        return out_path.exists() and out_path.stat().st_size > 0
+    except Exception:
+        return False
 
 
 def _ahash64_from_jpg(jpg_path: Path) -> str | None:
@@ -444,7 +440,8 @@ def health():
 
     # TransNetV2 weights presence is optional; endpoint will error if missing.
     model_dir = (os.getenv("TRANSNETV2_MODEL_DIR") or "").strip()
-    details["transnetv2"] = {"model_dir": model_dir or None}
+    backend = (os.getenv("TRANSNETV2_BACKEND") or "pytorch").strip().lower()
+    details["transnetv2"] = {"model_dir": model_dir or None, "backend": backend}
 
     return jsonify({"status": "ok" if ok else "degraded", "details": details}), 200
 
@@ -579,12 +576,31 @@ def transnet_scenes():
         return jsonify({"error": "provide multipart field 'video' or raw request body"}), 400
 
     model_dir = (os.getenv("TRANSNETV2_MODEL_DIR") or "").strip() or None
+    backend = (os.getenv("TRANSNETV2_BACKEND") or "pytorch").strip().lower()
+    torch_weights_path = (os.getenv("TRANSNETV2_PYTORCH_WEIGHTS") or "").strip() or None
 
     # Heavy import only when needed
-    try:
-        from transnetv2 import TransNetV2  # type: ignore
-    except Exception as exc:
-        return jsonify({"error": f"transnetv2 import failed: {str(exc)[:200]}"}), 500
+    use_pytorch = backend in {"pytorch", "torch"}
+    if use_pytorch:
+        try:
+            from transnetv2_pytorch_local import (
+                TransNetV2 as TorchTransNet,
+                load_or_convert_weights,
+                predictions_to_scenes as torch_predictions_to_scenes,
+            )  # type: ignore
+            import torch  # type: ignore
+        except Exception as exc:
+            use_pytorch = False
+            app.logger.warning("PyTorch TransNetV2 unavailable: %s", exc)
+
+    if not use_pytorch:
+        try:
+            from transnetv2 import TransNetV2  # type: ignore
+        except Exception:
+            try:
+                from transnetv2_local import TransNetV2  # type: ignore
+            except Exception as exc:
+                return jsonify({"error": f"transnetv2 import failed: {str(exc)[:200]}"}), 500
 
     suffix = os.path.splitext(filename)[1] or ".mp4"
 
@@ -594,9 +610,55 @@ def transnet_scenes():
 
     try:
         fps, duration = _ffprobe_fps_and_duration(tmp_path)
-        model = TransNetV2(model_dir)
-        video_frames, single_pred, all_pred = model.predict_video(tmp_path)
-        scenes = model.predictions_to_scenes(single_pred)
+        if use_pytorch:
+            # PyTorch inference on GPU if available
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            weights_dir = model_dir or str(Path(__file__).parent / "transnetv2-weights")
+            weights_out = torch_weights_path or str(Path(weights_dir) / "transnetv2-pytorch-weights.pth")
+            model = load_or_convert_weights(weights_dir, weights_out)
+            model.eval().to(device)
+
+            import ffmpeg  # type: ignore
+            video_stream, _ = (
+                ffmpeg.input(tmp_path).output("pipe:", format="rawvideo", pix_fmt="rgb24", s="48x27").run(
+                    capture_stdout=True, capture_stderr=True
+                )
+            )
+            video_frames = np.frombuffer(video_stream, np.uint8).reshape([-1, 27, 48, 3])
+
+            # windowed inference (100-frame windows, 50 overlap)
+            def _iter_windows(frames: np.ndarray):
+                no_padded_frames_start = 25
+                no_padded_frames_end = 25 + 50 - (len(frames) % 50 if len(frames) % 50 != 0 else 50)
+                start_frame = np.expand_dims(frames[0], 0)
+                end_frame = np.expand_dims(frames[-1], 0)
+                padded_inputs = np.concatenate(
+                    [start_frame] * no_padded_frames_start + [frames] + [end_frame] * no_padded_frames_end, 0
+                )
+                ptr = 0
+                while ptr + 100 <= len(padded_inputs):
+                    out = padded_inputs[ptr : ptr + 100]
+                    ptr += 50
+                    yield out
+
+            single_parts = []
+            all_parts = []
+            with torch.no_grad():
+                for window in _iter_windows(video_frames):
+                    inp = torch.from_numpy(window).unsqueeze(0).to(device)
+                    single_logits, many_logits = model(inp)
+                    single_pred = torch.sigmoid(single_logits).squeeze(-1).cpu().numpy()[0, 25:75]
+                    all_pred = torch.sigmoid(many_logits["many_hot"]).squeeze(-1).cpu().numpy()[0, 25:75]
+                    single_parts.append(single_pred)
+                    all_parts.append(all_pred)
+
+            single_pred = np.concatenate(single_parts)[: len(video_frames)]
+            all_pred = np.concatenate(all_parts)[: len(video_frames)]
+            scenes = torch_predictions_to_scenes(single_pred)
+        else:
+            model = TransNetV2(model_dir)
+            video_frames, single_pred, all_pred = model.predict_video(tmp_path)
+            scenes = model.predictions_to_scenes(single_pred)
 
         # scenes are [start_frame, end_frame] inclusive indices
         fps_eff = float(fps) if fps and fps > 0 else None

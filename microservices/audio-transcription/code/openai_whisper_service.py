@@ -26,6 +26,11 @@ _PUNCTUATION_MODEL = None
 _PUNCTUATION_MODEL_NAME = None
 
 
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 def _bool_param(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default

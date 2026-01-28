@@ -37,8 +37,8 @@ def main() -> int:
     celeb_table = cat.get("celebrity_table") or {}
     print("celebrity_table.celebrities", _len(celeb_table.get("celebrities")))
 
-    syn = (cat.get("synopses_by_age_group") or {})
-    print("synopses_by_age_group.keys", sorted(syn.keys()))
+    synopsis = (cat.get("synopsis") or {})
+    print("synopsis.keys", sorted(synopsis.keys()))
 
     print("high_points", _len(cat.get("high_points")))
     print("key_scenes", _len(cat.get("key_scenes")))

@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Iterable
 
-from whisperx_adapter import transcribe
+from openai_whisper_adapter import transcribe
 from writers import write_json, write_srt, write_txt, write_vtt
 
 
@@ -29,14 +29,14 @@ def _output_base(output_dir: Path, input_item: str, index: int) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="WhisperX transcription CLI")
+    parser = argparse.ArgumentParser(description="OpenAI Whisper transcription CLI")
     parser.add_argument("--input", action="append", required=True, help="Input file/URL (repeatable)")
     parser.add_argument("--output-dir", default="outputs", help="Directory to write outputs")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size")
     parser.add_argument("--language", default=None, help="Language code (auto-detect if omitted)")
     parser.add_argument("--diarize", action="store_true", help="Enable diarization")
     parser.add_argument("--hf-token", default=None, help="Hugging Face token (or HUGGINGFACE_TOKEN env var)")
-    parser.add_argument("--model-size", default="large-v2", help="Whisper model size")
+    parser.add_argument("--model-size", default="large-v3", help="Whisper model size")
     parser.add_argument("--compute-type", default=None, help="Compute type (float16/float32/int8)")
     parser.add_argument("--min-speech-dur", type=float, default=None, help="Min speech duration (seconds) for VAD")
     parser.add_argument("--vad", action="store_true", help="Enable VAD filtering")

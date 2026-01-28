@@ -40,7 +40,7 @@ def main():
 
     urls = [
         f"{BASE}/video/{vid}/metadata-json?category=combined&download=true",
-        f"{BASE}/video/{vid}/metadata-json?category=synopses_by_age_group&download=true",
+        f"{BASE}/video/{vid}/metadata-json?category=synopsis&download=true",
         f"{BASE}/video/{vid}/metadata-json.zip",
     ]
     for url in urls:

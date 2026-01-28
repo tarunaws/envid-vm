@@ -6,9 +6,9 @@ import os
 import sys
 from typing import Any
 
-from whisperx_adapter import transcribe
+from openai_whisper_adapter import transcribe
 
-LOGGER = logging.getLogger("whisperx-acceptance")
+LOGGER = logging.getLogger("openai-whisper-acceptance")
 
 
 def _get_env(name: str) -> str | None:
@@ -88,56 +88,23 @@ def _run_transcribe_case(
     return result
 
 
-def _expect_diarization_error(audio: str, model_size: str, device: str, compute_type: str) -> None:
-    try:
-        transcribe(
-            audio,
-            diarize=True,
-            model_size=model_size,
-            device=device,
-            compute_type=compute_type,
-        )
-    except Exception as exc:  # noqa: BLE001
-        if "HF token" not in str(exc) and "HUGGINGFACE" not in str(exc):
-            raise AssertionError(f"Unexpected diarization error: {exc}") from exc
-        LOGGER.info("Diarization error check passed: %s", exc)
-    else:
-        raise AssertionError("Diarization should have failed without HF token.")
-
-
-def _expect_diarization_success(audio: str, model_size: str, device: str, compute_type: str, hf_token: str) -> None:
-    result = transcribe(
-        audio,
-        diarize=True,
-        hf_token=hf_token,
-        model_size=model_size,
-        device=device,
-        compute_type=compute_type,
-    )
-    if not isinstance(result, dict):
-        raise AssertionError("Expected diarization result dictionary.")
-    if not result.get("diarization"):
-        raise AssertionError("Diarization flag not present in result.")
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="WhisperX acceptance tests")
-    parser.add_argument("--audio", default=_get_env("ENVID_WHISPERX_TEST_AUDIO"))
-    parser.add_argument("--audio-long", default=_get_env("ENVID_WHISPERX_TEST_AUDIO_LONG"))
-    parser.add_argument("--model", default=_get_env("ENVID_WHISPERX_MODEL") or "large-v2")
-    parser.add_argument("--language", default=_get_env("ENVID_WHISPERX_TEST_LANGUAGE"))
+    parser = argparse.ArgumentParser(description="OpenAI Whisper acceptance tests")
+    parser.add_argument("--audio", default=_get_env("ENVID_OPENAI_WHISPER_TEST_AUDIO"))
+    parser.add_argument("--audio-long", default=_get_env("ENVID_OPENAI_WHISPER_TEST_AUDIO_LONG"))
+    parser.add_argument("--model", default=_get_env("ENVID_OPENAI_WHISPER_MODEL") or "large-v3")
+    parser.add_argument("--language", default=_get_env("ENVID_OPENAI_WHISPER_TEST_LANGUAGE"))
     parser.add_argument("--run-cpu", action="store_true")
     parser.add_argument("--run-cuda", action="store_true")
     parser.add_argument("--vad", action="store_true", default=True)
     parser.add_argument("--min-speech-dur", type=float, default=0.1)
     parser.add_argument("--chunk-seconds", type=int, default=15)
-    parser.add_argument("--diarization", action="store_true")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     if not args.audio:
-        LOGGER.error("Provide --audio or set ENVID_WHISPERX_TEST_AUDIO.")
+        LOGGER.error("Provide --audio or set ENVID_OPENAI_WHISPER_TEST_AUDIO.")
         return 2
 
     run_cpu = args.run_cpu or not args.run_cuda

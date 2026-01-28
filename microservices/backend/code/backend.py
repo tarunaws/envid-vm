@@ -4422,6 +4422,7 @@ def _moderation_extractor_explicit_frames_from_video(
         "max_frames": int(max_frames),
         "job_id": job_id,
         "output_kind": "processed_local",
+        "force_interval": True,
     }
     if timestamps:
         payload_req["timestamps"] = [float(t) for t in timestamps]
@@ -5033,8 +5034,8 @@ def _process_gcs_video_job_cloud_only(
             nonlocal local_text, effective_models
             try:
                 _job_update(job_id, progress=26, message="Text on Screen (OCR)")
-                interval = 0.0
-                max_frames = 200000
+                interval = 1.0
+                max_frames = 20000
                 _job_step_update(job_id, "text_on_screen", status="running", percent=0, message=f"Running ({requested_text_model})")
                 text_on_video_url = _text_on_video_service_url()
                 if not text_on_video_url:
@@ -6124,7 +6125,7 @@ def _process_gcs_video_job_cloud_only(
 
             # Optional fallback: if scene detection yields a single segment on longer videos,
             # generate uniform segments (controlled via env).
-            allow_scene_fallback = _env_truthy(os.getenv("ENVID_SCENE_FALLBACK_ENABLED"), default=True)
+            allow_scene_fallback = True
             if allow_scene_fallback and (not scenes or len(scenes) <= 1):
                 fallback_duration = float(duration_seconds) if duration_seconds and float(duration_seconds) > 0 else None
                 if fallback_duration is None and scenes:
@@ -6137,6 +6138,16 @@ def _process_gcs_video_job_cloud_only(
                     if fallback:
                         scenes = fallback
                         scenes_source = "fallback_uniform"
+
+            # Force uniform segmentation over full duration when requested.
+            force_uniform = True
+            if force_uniform:
+                fallback_duration = float(duration_seconds) if duration_seconds and float(duration_seconds) > 0 else None
+                if fallback_duration and fallback_duration > 0:
+                    fallback = _fallback_scene_segments(duration_seconds=float(fallback_duration))
+                    if fallback:
+                        scenes = fallback
+                        scenes_source = "fallback_uniform_forced"
 
             # Optional: OpenRouter (Meta Llama) scene-by-scene summaries.
             scene_llm_mode = (requested_models.get("scene_by_scene_metadata_model") or "").strip().lower()

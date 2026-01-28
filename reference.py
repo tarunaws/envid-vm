@@ -304,49 +304,57 @@ def _libretranslate_translate(*, text: str, source_lang: str | None, target_lang
     return str(translated or "").strip()
 
 
-def _whisper_docker_transcribe(
+def _openai_whisper_service_url() -> str:
+    return (os.getenv("ENVID_TRANSCRIBE_SERVICE_URL") or "http://audio-transcription:5088").strip()
+
+
+def _openai_whisper_available() -> bool:
+    base = _openai_whisper_service_url().rstrip("/")
+    if not base:
+        return False
+    try:
+        resp = requests.get(f"{base}/health", timeout=5)
+        if resp.status_code >= 400:
+            return False
+        data: Any = {}
+        try:
+            data = resp.json()
+        except Exception:
+            data = {}
+        if isinstance(data, dict):
+            status = str(data.get("status") or "").lower()
+            return status == "healthy" or bool(data.get("ok"))
+        return True
+    except Exception:
+        return False
+
+
+def _openai_whisper_transcribe(
     *,
     audio_path: Path,
-    model_size: str,
-    decode_kwargs: Dict[str, Any],
-    prompt: str | None,
+    language: str | None,
+    model_size: str | None,
+    chunk_seconds: int | None,
 ) -> dict[str, Any]:
-    raise RuntimeError("Whisper docker is disabled; WhisperX only")
-
-
-def _whisperx_command() -> list[str] | None:
-    bin_path = (os.getenv("ENVID_WHISPERX_BIN") or "").strip()
-    if bin_path:
-        return [bin_path]
-    py_path = (os.getenv("ENVID_WHISPERX_PYTHON") or "").strip()
-    if py_path:
-        return [py_path, "-m", "whisperx"]
-    docker_bin = shutil.which("docker")
-    if docker_bin:
-        try:
-            res = subprocess.run(
-                [docker_bin, "ps", "--filter", "name=whisperx-service", "--format", "{{.ID}}"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if (res.stdout or "").strip():
-                return [docker_bin, "exec", "-i", "whisperx-service", "python3", "-m", "whisperx"]
-        except Exception:
-            pass
-    for candidate in (
-        "/home/tarun-envid/whisperx-venv/bin/python",
-        "/home/tarun-envid/whisperx-venv/bin/python3",
-    ):
-        if Path(candidate).exists():
-            return [candidate, "-m", "whisperx"]
-    if shutil.which("whisperx"):
-        return ["whisperx"]
-    return None
-
-
-def _whisperx_available() -> bool:
-    return _whisperx_command() is not None
+    base = _openai_whisper_service_url().rstrip("/")
+    if not base:
+        raise RuntimeError("OpenAI Whisper service URL is not configured (ENVID_TRANSCRIBE_SERVICE_URL)")
+    payload: Dict[str, Any] = {}
+    if language:
+        payload["language"] = language
+    if model_size:
+        payload["model"] = model_size
+    if chunk_seconds:
+        payload["chunk_seconds"] = str(chunk_seconds)
+    with open(audio_path, "rb") as fh:
+        files = {"file": (audio_path.name, fh, "application/octet-stream")}
+        resp = requests.post(f"{base}/transcribe", files=files, data=payload, timeout=3600)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"OpenAI Whisper service failed ({resp.status_code}): {resp.text[:240]}")
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise RuntimeError("OpenAI Whisper service returned invalid response")
+    return data
 
 
 def _translate_targets() -> list[str]:
@@ -1934,12 +1942,12 @@ def _precheck_models(
     _require(bool(shutil.which(FFMPEG_PATH)), "ffmpeg", f"ffmpeg not found (FFMPEG_PATH={FFMPEG_PATH})")
     _require(bool(shutil.which(FFPROBE_PATH)), "ffprobe", f"ffprobe not found (FFPROBE_PATH={FFPROBE_PATH})")
 
-    # WhisperX availability
+    # OpenAI Whisper service availability
     if enable_transcribe:
         _require(
-            _whisperx_available(),
-            "whisperx",
-            "WhisperX is not available (set ENVID_WHISPERX_BIN/ENVID_WHISPERX_PYTHON or run whisperx-service docker)",
+            _openai_whisper_available(),
+            "openai_whisper",
+            "OpenAI Whisper service is not available (set ENVID_TRANSCRIBE_SERVICE_URL or run audio-transcription)",
         )
         nlp_mode = "openrouter_llama"
         if nlp_mode in {"openrouter_llama", "openrouter", "llama"}:
@@ -4334,131 +4342,36 @@ def _process_gcs_video_job_cloud_only(
 
         def _run_whisper_transcription() -> None:
             nonlocal transcript, transcript_language_code, languages_detected, transcript_words, transcript_segments, transcript_meta, effective_models
-            whisperx_cmd = _whisperx_command()
-            if not whisperx_cmd:
-                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="WhisperX not available")
+            if not _openai_whisper_available():
+                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="OpenAI Whisper service unavailable")
                 return
             try:
-                app.logger.info("WhisperX transcription started")
-                _job_update(job_id, progress=32, message="WhisperX")
-                whisperx_model = "large-v2"
-                _job_step_update(job_id, "transcribe", status="running", percent=5, message=f"Running (WhisperX/{whisperx_model})")
+                model_name = (os.getenv("ENVID_OPENAI_WHISPER_MODEL") or "large-v3").strip()
+                app.logger.info("OpenAI Whisper transcription started")
+                _job_update(job_id, progress=32, message="OpenAI Whisper")
+                _job_step_update(job_id, "transcribe", status="running", percent=5, message=f"Running (OpenAI Whisper/{model_name})")
 
-                whisper_device = "cuda" if shutil.which("nvidia-smi") else "cpu"
+                selection_language_hint = ""
+                if isinstance(sel, dict):
+                    selection_language_hint = str(
+                        sel.get("transcribe_language")
+                        or sel.get("transcribe_source_language")
+                        or sel.get("source_language")
+                        or ""
+                    ).strip().lower()
+                raw_language_hint = selection_language_hint or (os.getenv("ENVID_OPENAI_WHISPER_LANGUAGE") or "").strip().lower()
+                whisper_language = None if raw_language_hint in {"", "auto", "detect", "none"} else raw_language_hint
 
-                # Audio preprocessing (best-effort): extract clean mono 16kHz WAV and optionally slow down tempo.
-                # This improves stability for noisy inputs and some fast-speaking clips.
-                preprocess_enabled = False
-                tempo = 1.0
-                filters = ""
-
-                audio_for_whisper: Path = local_path
-                audio_preprocess_fallback_used = False
-                if preprocess_enabled:
-                    audio_path = temp_dir / "whisper_audio.wav"
-                    cmd_base = [
-                        FFMPEG_PATH,
-                        "-i",
-                        str(local_path),
-                        "-vn",
-                        "-ac",
-                        "1",
-                        "-ar",
-                        "16000",
-                        "-acodec",
-                        "pcm_s16le",
-                    ]
-                    cmd = list(cmd_base)
-                    if filters:
-                        cmd += ["-af", filters]
-                    cmd += [str(audio_path), "-y"]
-                    res = subprocess.run(cmd, capture_output=True)
-                    if res.returncode != 0:
-                        err = (res.stderr or b"").decode("utf-8", errors="ignore")
-                        raise RuntimeError(f"FFmpeg denoise failed (filters required): {err[:240]}")
-                    audio_for_whisper = audio_path
-
-                transcript_meta["whisperx"] = {
-                    "model": whisperx_model,
-                    "device": whisper_device or "auto",
-                    "audio_preprocess": {
-                        "enabled": bool(preprocess_enabled),
-                        "filters": filters,
-                        "atempo": float(tempo) if tempo else 1.0,
-                        "format": "wav_s16le_mono_16khz" if preprocess_enabled else "source_video",
-                        "fallback_used": bool(audio_preprocess_fallback_used),
-                    },
-                }
-                whisper_language = None
-
-                output_dir = temp_dir / "whisperx"
-                output_dir.mkdir(parents=True, exist_ok=True)
-
-                cmd = [*whisperx_cmd, str(audio_for_whisper), "--model", whisperx_model, "--output_dir", str(output_dir), "--output_format", "json"]
-                if whisper_device:
-                    cmd += ["--device", whisper_device]
-                if whisper_language:
-                    cmd += ["--language", whisper_language]
-                compute_type = "float16" if whisper_device == "cuda" else "float32"
-                cmd += ["--compute_type", compute_type]
-                cmd += ["--batch_size", "32"]
-                cmd += ["--vad_method", "silero"]
-
-                env = os.environ.copy()
-                env.setdefault("PYTHONWARNINGS", "ignore")
-                if whisper_device == "cuda":
-                    env.setdefault("CT2_USE_CUDA", "1")
-                    env.setdefault("CT2_CUDA_ALLOW_TF32", "1")
-                    env.setdefault("CUDA_VISIBLE_DEVICES", "0")
-                app.logger.info("WhisperX cmd: %s", " ".join(cmd))
-                timeout_s = 5400.0
-                start_ts = time.monotonic()
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    env=env,
+                response = _openai_whisper_transcribe(
+                    audio_path=local_path,
+                    language=whisper_language,
+                    model_size=model_name,
+                    chunk_seconds=None,
                 )
-                last_emit = 0.0
-                while True:
-                    try:
-                        res_code = proc.wait(timeout=15)
-                        break
-                    except subprocess.TimeoutExpired:
-                        elapsed = time.monotonic() - start_ts
-                        if elapsed - last_emit >= 15:
-                            last_emit = elapsed
-                            pct = min(95, 5 + int(elapsed / 30))
-                            _job_step_update(
-                                job_id,
-                                "transcribe",
-                                status="running",
-                                percent=pct,
-                                message=f"Running (WhisperX/{whisperx_model}) {int(elapsed)}s",
-                            )
-                stdout_text, stderr_text = proc.communicate()
-                stdout_text = (stdout_text or "").strip()
-                stderr_text = (stderr_text or "").strip()
-                log_path = output_dir / "whisperx_cli.log"
-                if stderr_text or stdout_text:
-                    log_path.write_text(
-                        ("STDOUT:\n" + stdout_text + "\n\nSTDERR:\n" + stderr_text).strip() + "\n",
-                        encoding="utf-8",
-                        errors="ignore",
-                    )
-
-                json_files = sorted(output_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-                if res_code != 0 and not json_files:
-                    err = (stderr_text or stdout_text or "").strip()
-                    raise RuntimeError(f"WhisperX failed: {err[:240]}")
-                if not json_files:
-                    raise RuntimeError("WhisperX output JSON not found")
-                data = json.loads(json_files[0].read_text(encoding="utf-8", errors="ignore") or "{}")
-
-                segments = data.get("segments") if isinstance(data, dict) else None
-                if not isinstance(segments, list):
-                    segments = []
+                result = response.get("result") if isinstance(response, dict) else {}
+                if not isinstance(result, dict):
+                    result = {}
+                segments = result.get("segments") if isinstance(result.get("segments"), list) else []
 
                 transcript_words = []
                 transcript_segments = []
@@ -4474,24 +4387,19 @@ def _process_gcs_video_job_cloud_only(
                         continue
                     if not txt:
                         continue
-                    words = seg.get("words") if isinstance(seg.get("words"), list) else []
-                    for w in words:
-                        if not isinstance(w, dict):
-                            continue
-                        transcript_words.append(
-                            {
-                                "word": str(w.get("word") or "").strip(),
-                                "start": _safe_float(w.get("start"), 0.0),
-                                "end": _safe_float(w.get("end"), 0.0),
-                            }
-                        )
                     transcript_segments.append({"start": st, "end": en, "text": txt})
 
                 transcript = " ".join(
                     [str(s.get("text") or "").strip() for s in transcript_segments if (s.get("text") or "").strip()]
                 ).strip()
-                transcript_language_code = str((data.get("language") if isinstance(data, dict) else None) or whisper_language or "").strip()
+                transcript_language_code = str(result.get("language") or "").strip()
                 languages_detected = [transcript_language_code] if transcript_language_code else []
+
+                transcript_meta["openai_whisper"] = {
+                    "model": model_name,
+                    "service_url": _openai_whisper_service_url(),
+                    "language_hint": whisper_language or "auto",
+                }
 
                 # Preserve raw transcript/segments for diagnostics before any corrections.
                 raw_transcript = transcript
@@ -4654,15 +4562,15 @@ def _process_gcs_video_job_cloud_only(
                 if raw_transcript_segments:
                     transcript_meta.setdefault("raw_segments", raw_transcript_segments)
 
-                effective_models["transcribe"] = f"whisperx/{whisperx_model}"
-                _job_step_update(job_id, "transcribe", status="completed", percent=100, message=f"Completed (WhisperX/{whisperx_model})")
-                app.logger.info("WhisperX transcription completed")
+                effective_models["transcribe"] = f"openai-whisper/{model_name}"
+                _job_step_update(job_id, "transcribe", status="completed", percent=100, message=f"Completed (OpenAI Whisper/{model_name})")
+                app.logger.info("OpenAI Whisper transcription completed")
             except TranscriptVerificationError as exc:
                 app.logger.warning("Transcript verification failed: %s", exc)
                 _job_step_update(job_id, "transcribe", status="failed", message=str(exc)[:240])
                 raise
             except Exception as exc:
-                app.logger.warning("WhisperX failed: %s", exc)
+                app.logger.warning("OpenAI Whisper failed: %s", exc)
                 _job_step_update(job_id, "transcribe", status="failed", percent=100, message=str(exc)[:240])
                 # Fall through to the GCP path below.
                 transcript = ""
@@ -4725,9 +4633,9 @@ def _process_gcs_video_job_cloud_only(
                 else:
                     parallel_futures["scene_detect"] = _ensure_parallel_executor().submit(_run_scene_detect_task)
 
-            if enable_transcribe and (transcribe_effective_mode == "whisperx") and not _whisperx_available():
-                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="WhisperX not available")
-            elif enable_transcribe and (transcribe_effective_mode == "whisperx") and _whisperx_available():
+            if enable_transcribe and (transcribe_effective_mode == "openai-whisper") and not _openai_whisper_available():
+                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="OpenAI Whisper service unavailable")
+            elif enable_transcribe and (transcribe_effective_mode == "openai-whisper") and _openai_whisper_available():
                 whisper_started = True
                 if sequential_scene_then_whisper:
                     _run_whisper_transcription()
@@ -5114,9 +5022,9 @@ def _process_gcs_video_job_cloud_only(
                 scenes_started = True
                 _run_scene_detect_task()
 
-            if enable_transcribe and (transcribe_effective_mode == "whisperx") and not _whisperx_available():
-                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="WhisperX not available")
-            elif enable_transcribe and (transcribe_effective_mode == "whisperx") and _whisperx_available():
+            if enable_transcribe and (transcribe_effective_mode == "openai-whisper") and not _openai_whisper_available():
+                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="OpenAI Whisper service unavailable")
+            elif enable_transcribe and (transcribe_effective_mode == "openai-whisper") and _openai_whisper_available():
                 whisper_started = True
                 _run_whisper_transcription()
 
@@ -5135,7 +5043,7 @@ def _process_gcs_video_job_cloud_only(
                 except FutureTimeoutError:
                     app.logger.warning("Parallel task %s timed out", name)
                     if name == "whisper":
-                        _job_step_update(job_id, "transcribe", status="failed", percent=100, message="WhisperX timed out")
+                        _job_step_update(job_id, "transcribe", status="failed", percent=100, message="OpenAI Whisper timed out")
                     elif name == "scene_detect":
                         _job_step_update(job_id, "key_scene_detection", status="failed", percent=100, message="Scene detect timed out")
                     elif name == "local_ocr":
@@ -5281,8 +5189,8 @@ def _process_gcs_video_job_cloud_only(
                 if not enable_transcribe:
                     _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Disabled")
                 else:
-                    if transcribe_effective_mode == "whisperx":
-                        msg = "WhisperX not installed" if not _whisperx_available() else "Disabled"
+                    if transcribe_effective_mode == "openai-whisper":
+                        msg = "OpenAI Whisper service unavailable" if not _openai_whisper_available() else "Disabled"
                     else:
                         msg = "Disabled" if not enable_speech else "Library not installed"
                     _job_step_update(job_id, "transcribe", status="skipped", percent=100, message=msg)

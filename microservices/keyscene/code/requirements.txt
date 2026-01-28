@@ -4,13 +4,12 @@ requests==2.32.3
 numpy==1.26.4
 pillow==10.4.0
 scikit-learn==1.5.2
+ffmpeg-python==0.2.0
 
 # CLIP
 open_clip_torch==2.29.0
 
 # Torch (CPU) - installed via extra index in Dockerfile
 
-# TransNetV2 (TensorFlow-based)
-transnetv2 @ git+https://github.com/soCzech/TransNetV2.git
+# TransNetV2 (TensorFlow-based) - vendored locally
 tensorflow==2.15.1
-ffmpeg-python==0.2.0
