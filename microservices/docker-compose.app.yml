@@ -286,6 +286,8 @@ services:
     image: tarunaws/ai:text-on-video
     restart: always
     runtime: nvidia
+    env_file:
+      - ./.env
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility

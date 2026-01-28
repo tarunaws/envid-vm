@@ -230,8 +230,8 @@ def ocr() -> Any:
     payload = request.get_json(silent=True) or {}
     video_path_raw = str(payload.get("video_path") or "").strip()
 
-    interval = 0.0
-    max_frames = 200000
+    interval = _parse_float(os.getenv("ENVID_METADATA_OCR_INTERVAL_SECONDS"), 2.0)
+    max_frames = _parse_int(os.getenv("ENVID_METADATA_OCR_MAX_FRAMES"), 3000, min_value=1, max_value=50000)
     job_id = str(payload.get("job_id") or "").strip()
     output_kind = str(payload.get("output_kind") or "processed_local").strip() or "processed_local"
 
@@ -260,7 +260,7 @@ def ocr() -> Any:
         resp = requests.post(
             f"{extractor_url}/extract",
             json=payload,
-            timeout=120,
+            timeout=900,
         )
         if resp.status_code >= 400:
             return jsonify({"error": f"frame extractor failed ({resp.status_code}): {resp.text}"}), 502
