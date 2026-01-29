@@ -326,6 +326,162 @@ def _openrouter_llama_normalize_transcript(text: str, language_code: str | None)
         return None, False
 
 
+def _gemini_api_key() -> str | None:
+    api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+    return api_key or None
+
+
+def _gemini_base_url() -> str:
+    return (os.getenv("GEMINI_BASE_URL") or "https://generativelanguage.googleapis.com/v1beta").strip().rstrip("/")
+
+
+def _gemini_model() -> str:
+    model = (
+        os.getenv("GEMINI_MODEL")
+        or os.getenv("GEMINI_DEFAULT_MODEL")
+        or "gemini-2.5-pro"
+    ).strip()
+    if model.startswith("models/"):
+        return model
+    return f"models/{model}"
+
+
+def _gemini_generate_text(*, prompt: str, system: str | None, timeout_s: float, max_tokens: int) -> str | None:
+    api_key = _gemini_api_key()
+    if not api_key:
+        return None
+    base_url = _gemini_base_url()
+    model = _gemini_model()
+    url = f"{base_url}/{model}:generateContent?key={api_key}"
+    payload: dict[str, Any] = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": int(max_tokens)},
+    }
+    if system:
+        payload["systemInstruction"] = {"parts": [{"text": system}]}
+    try:
+        resp = requests.post(url, json=payload, timeout=timeout_s)
+        if resp.status_code >= 400:
+            return None
+        data = resp.json()
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return None
+        parts = ((candidates[0].get("content") or {}).get("parts") or [])
+        texts = [str(p.get("text") or "").strip() for p in parts if isinstance(p, dict)]
+        content = "\n".join([t for t in texts if t]).strip()
+        return content or None
+    except Exception:
+        return None
+
+
+def _gemini_normalize_transcript(text: str, language_code: str | None) -> tuple[str | None, bool]:
+    if not _gemini_api_key():
+        return None, False
+
+    raw = _normalize_transcript_basic(text)
+    if not raw:
+        return None, False
+
+    timeout_s = float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("OPENROUTER_TIMEOUT_SECONDS") or 15.0)
+    lang = (language_code or "").strip() or "unknown"
+    prompt = (
+        "You are a transcript normalizer.\n"
+        "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
+        "Hard rules:\n"
+        "- Do NOT add new words or remove words.\n"
+        "- Do NOT guess missing words.\n"
+        "- Do NOT rewrite, paraphrase, or summarize.\n"
+        "- Keep the language as-is.\n"
+        "- For Hindi, prefer the danda (।) for sentence endings.\n"
+        "- Output plain text only (no markdown, no quotes).\n\n"
+        f"Language hint: {lang}\n\n"
+        f"Transcript:\n{raw[:12000]}\n"
+    )
+
+    content = _gemini_generate_text(
+        prompt=prompt,
+        system="Fix punctuation/casing/spacing only. Output plain text.",
+        timeout_s=timeout_s,
+        max_tokens=1200,
+    )
+    return (content if content else None), bool(content)
+
+
+def _local_llm_base_url() -> str:
+    return (os.getenv("ENVID_LLM_BASE_URL") or "http://localhost:8000/v1").strip().rstrip("/")
+
+
+def _local_llm_headers() -> dict[str, str]:
+    api_key = (os.getenv("ENVID_LLM_API_KEY") or "").strip()
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+
+def _local_llm_model() -> str:
+    return (
+        os.getenv("ENVID_LLM_TRANSCRIPT_MODEL")
+        or os.getenv("ENVID_TEXT_NORMALIZE_MODEL")
+        or os.getenv("ENVID_LLM_MODEL")
+        or "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    ).strip()
+
+
+def _local_llm_normalize_transcript(text: str, language_code: str | None) -> tuple[str | None, bool]:
+    raw = _normalize_transcript_basic(text)
+    if not raw:
+        return None, False
+
+    base_url = _local_llm_base_url()
+    if not base_url:
+        return None, False
+
+    model = _local_llm_model()
+    timeout_s = float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or os.getenv("OPENROUTER_TIMEOUT_SECONDS") or 15.0)
+
+    lang = (language_code or "").strip() or "unknown"
+    prompt = (
+        "You are a transcript normalizer.\n"
+        "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
+        "Hard rules:\n"
+        "- Do NOT add new words or remove words.\n"
+        "- Do NOT guess missing words.\n"
+        "- Do NOT rewrite, paraphrase, or summarize.\n"
+        "- Keep the language as-is.\n"
+        "- For Hindi, prefer the danda (।) for sentence endings.\n"
+        "- Output plain text only (no markdown, no quotes).\n\n"
+        f"Language hint: {lang}\n\n"
+        f"Transcript:\n{raw[:12000]}\n"
+    )
+
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "Fix punctuation/casing/spacing only. Output plain text."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+        "max_tokens": 1200,
+    }
+
+    try:
+        resp = requests.post(
+            f"{base_url}/chat/completions",
+            headers=_local_llm_headers(),
+            json=payload,
+            timeout=timeout_s,
+        )
+        if resp.status_code >= 400:
+            return None, False
+        data = resp.json()
+        content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+        return (content if content else None), bool(content)
+    except Exception:
+        return None, False
+
+
 @app.get("/health")
 def health() -> Any:
     return jsonify({"ok": True}), 200
@@ -350,11 +506,24 @@ def normalize_segment() -> Any:
         "punctuation_applied": False,
     }
 
-    if nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
-        normalized, applied = _openrouter_llama_normalize_transcript(out, language_code)
+    if nlp_mode in {"gemini", "gemini_primary", "openrouter_llama", "llama", "openrouter", "local_llama", "local"}:
+        normalized, applied = _gemini_normalize_transcript(out, language_code)
         if normalized and applied:
             out = normalized
             meta["nlp_applied"] = True
+            meta["nlp_provider"] = "gemini"
+        else:
+            normalized, applied = _local_llm_normalize_transcript(out, language_code)
+            if normalized and applied:
+                out = normalized
+                meta["nlp_applied"] = True
+                meta["nlp_provider"] = "local"
+            elif nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
+                normalized, applied = _openrouter_llama_normalize_transcript(out, language_code)
+                if normalized and applied:
+                    out = normalized
+                    meta["nlp_applied"] = True
+                    meta["nlp_provider"] = "openrouter"
 
     if grammar_enabled:
         corrected, applied = _grammar_correct_text(text=out, language=language_code)
