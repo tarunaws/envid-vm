@@ -121,6 +121,8 @@ function App() {
   const cpuLabel = formatPercent(systemStats?.cpu_percent);
   const gpuLabel = formatPercent(systemStats?.gpu_percent);
   const memPercent = formatPercent(systemStats?.memory_percent);
+  const ramLabel = memPercent;
+  const vramLabel = formatPercent(systemStats?.gpu_memory_percent);
 
   if (!isAuthenticated) {
     return (
@@ -187,8 +189,9 @@ function App() {
               <NavRight>
                 <StatsGroup>
                   <StatsPill $variant="cpu">CPU: {cpuLabel}</StatsPill>
-                  <StatsPill $variant="ram">RAM: {memPercent}</StatsPill>
+                  <StatsPill $variant="ram">RAM: {ramLabel}</StatsPill>
                   <StatsPill $variant="gpu">GPU: {gpuLabel}</StatsPill>
+                  <StatsPill $variant="gpu">VRAM: {vramLabel}</StatsPill>
                 </StatsGroup>
                 <LogoutButton type="button" onClick={handleLogout}>
                   Logout

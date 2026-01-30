@@ -1,0 +1,15 @@
+.git
+**/.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.cache
+**/dist
+**/build
+envid-local
+nltk_data
+TransNetV2
+snap
+envid-metadata

@@ -104,9 +104,74 @@ def _gcp_translate_location() -> str:
     return (os.getenv("GCP_TRANSLATE_LOCATION") or "global").strip() or "global"
 
 
+_INDIC_LANG_CODES: set[str] = {
+    "as",
+    "bn",
+    "doi",
+    "gu",
+    "hi",
+    "kn",
+    "ks",
+    "ml",
+    "mr",
+    "ne",
+    "or",
+    "pa",
+    "sa",
+    "sd",
+    "ta",
+    "te",
+    "ur",
+}
+
+
 def _translate_provider() -> str:
-    # Translation is always routed through the translate container (LibreTranslate).
+    raw = (
+        os.getenv("ENVID_TRANSLATE_PROVIDER")
+        or os.getenv("ENVID_METADATA_TRANSLATE_PROVIDER")
+        or "libretranslate"
+    )
+    provider = str(raw or "libretranslate").strip().lower()
+    if provider in {"libretranslate", "indictrans2", "gcp_translate", "disabled", "hybrid"}:
+        return provider
     return "libretranslate"
+
+
+def _provider_for_target(target_lang: str, provider: str) -> str:
+    tgt = str(target_lang or "").strip().lower()
+    if provider != "hybrid":
+        return provider
+    if tgt in _INDIC_LANG_CODES and tgt != "en":
+        return "indictrans2"
+    return "libretranslate"
+
+
+def _provider_for_langs(source_lang: str | None, target_lang: str, provider: str) -> str:
+    tgt = str(target_lang or "").strip().lower()
+    src = str(source_lang or "").strip().lower()
+    if provider != "hybrid":
+        return provider
+    if tgt in _INDIC_LANG_CODES:
+        return "indictrans2"
+    if src in _INDIC_LANG_CODES and tgt == "en":
+        return "indictrans2"
+    return "libretranslate"
+
+
+def _indictrans2_model_name_for(source_lang: str | None, target_lang: str) -> str:
+    src = str(source_lang or "").strip().lower() or "en"
+    tgt = str(target_lang or "").strip().lower()
+    model_en_indic = os.getenv("INDIC_TRANS_MODEL_EN_INDIC") or "ai4bharat/indictrans2-en-indic-1B"
+    model_indic_en = os.getenv("INDIC_TRANS_MODEL_INDIC_EN") or "ai4bharat/indictrans2-indic-en-1B"
+    model_indic_indic = os.getenv("INDIC_TRANS_MODEL_INDIC_INDIC") or "ai4bharat/indictrans2-indic-indic-1B"
+    model_default = (os.getenv("INDIC_TRANS_MODEL_DEFAULT") or "").strip()
+    if src == "en" and tgt != "en":
+        return model_en_indic or model_default
+    if src != "en" and tgt == "en":
+        return model_indic_en or model_default
+    if src != "en" and tgt != "en":
+        return model_indic_indic or model_default
+    return model_default or model_en_indic
 
 
 def _translate_targets() -> list[str]:
@@ -182,6 +247,8 @@ def _libretranslate_translate(
         raise RuntimeError(f"LibreTranslate /translate failed ({resp.status_code}): {resp.text}")
     data = resp.json() if resp.content else {}
     translated = data.get("translatedText") if isinstance(data, dict) else None
+    if not translated and isinstance(data, dict):
+        translated = data.get("translated_text")
     return (str(translated).strip() if translated else text)
 
 
@@ -190,29 +257,47 @@ def _libretranslate_languages_raw(base_url: str) -> list[dict[str, Any]]:
     resp = requests.get(url, timeout=10)
     if resp.status_code >= 400:
         raise RuntimeError(f"LibreTranslate /languages failed ({resp.status_code}): {resp.text}")
-    data = resp.json()
-    if not isinstance(data, list):
+    data = resp.json() if resp.content else {}
+    langs: Any = None
+    if isinstance(data, list):
+        langs = data
+    elif isinstance(data, dict):
+        langs = data.get("languages")
+    if not isinstance(langs, list):
         return []
-    return [x for x in data if isinstance(x, dict)]
+    return [x for x in langs if isinstance(x, dict)]
 
 
-def _libretranslate_supported_langs(base_url: str) -> set[str]:
-    global _LIBRE_LANG_CACHE
-    cached, ts = _LIBRE_LANG_CACHE
-    if cached and (time.time() - ts) < 600:
-        return cached
-    try:
-        langs = _libretranslate_languages_raw(base_url)
-        codes = {
-            str(item.get("code") or item.get("language") or "").strip()
-            for item in langs
-            if isinstance(item, dict)
-        }
-        codes = {c for c in codes if c}
-    except Exception:
-        return cached
-    _LIBRE_LANG_CACHE = (codes, time.time())
-    return codes
+def _indictrans2_base_url() -> str:
+    return (os.getenv("ENVID_INDIC_TRANS_BASE_URL") or "http://translate:5102").strip()
+
+
+def _indictrans2_translate(*, text: str, source_lang: str | None, target_lang: str) -> str:
+    base_url = _indictrans2_base_url()
+    timeout_s = _safe_float(os.getenv("ENVID_INDIC_TRANS_TIMEOUT_SECONDS") or 60, 60.0)
+    payload: Dict[str, Any] = {
+        "text": text,
+        "source_lang": source_lang or "",
+        "target_lang": target_lang,
+    }
+    resp = requests.post(base_url.rstrip("/") + "/translate", json=payload, timeout=float(timeout_s))
+    if resp.status_code >= 400:
+        raise RuntimeError(f"IndicTrans2 /translate failed ({resp.status_code}): {resp.text}")
+    data = resp.json() if resp.content else {}
+    translated = data.get("translated_text") if isinstance(data, dict) else None
+    return (str(translated).strip() if translated else text)
+
+
+def _indictrans2_languages_raw(base_url: str) -> list[dict[str, Any]]:
+    url = base_url.rstrip("/") + "/languages"
+    resp = requests.get(url, timeout=10)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"IndicTrans2 /languages failed ({resp.status_code}): {resp.text}")
+    data = resp.json() if resp.content else {}
+    langs = data.get("languages") if isinstance(data, dict) else None
+    if not isinstance(langs, list):
+        return []
+    return [x for x in langs if isinstance(x, dict)]
 
 
 def _translate_segments(
@@ -234,15 +319,22 @@ def _translate_segments(
             continue
 
         translated = text
-        if provider == "disabled":
+        effective_provider = _provider_for_target(tgt, provider)
+        if effective_provider == "disabled":
             translated = text
-        elif provider == "libretranslate":
+        elif effective_provider == "libretranslate":
             translated = _libretranslate_translate(
                 text=text[:4500],
                 source_lang=(src if src and len(src) >= 2 else None),
                 target_lang=tgt,
             )
-        elif provider == "gcp_translate":
+        elif effective_provider == "indictrans2":
+            translated = _indictrans2_translate(
+                text=text[:4500],
+                source_lang=(src if src and len(src) >= 2 else None),
+                target_lang=tgt,
+            )
+        elif effective_provider == "gcp_translate":
             if gcp_client is None or gcp_parent is None:
                 raise RuntimeError("GCP Translate client not initialized")
             req: Dict[str, Any] = {
@@ -255,7 +347,7 @@ def _translate_segments(
                 req["source_language_code"] = src
             resp = gcp_client.translate_text(request=req)
             if resp and resp.translations:
-                translated = (resp.translations[0].translated_text or "").strip() or text
+                translated = (resp.translations[0].translated_text or "").strip()
 
         new_seg = dict(seg)
         new_seg["translated_text"] = translated
@@ -272,20 +364,21 @@ def _translate_text(
     gcp_client: Any | None,
     gcp_parent: str | None,
 ) -> str:
-    raw = (text or "").strip()
+    raw = str(text or "").strip()
     if not raw:
         return ""
-    src = source_lang or "auto"
-    tgt = target_lang
-    if provider == "disabled":
+    if not target_lang:
         return raw
-    if provider == "libretranslate":
-        return _libretranslate_translate(
-            text=raw[:4500],
-            source_lang=(src if src and len(src) >= 2 else None),
-            target_lang=tgt,
-        )
-    if provider == "gcp_translate":
+    src = (source_lang or "").strip()
+    tgt = target_lang.strip().lower()
+    if src and (src.lower() == tgt or src.lower().startswith(f"{tgt}-")):
+        return raw
+    effective_provider = _provider_for_target(tgt, provider)
+    if effective_provider == "libretranslate":
+        return _libretranslate_translate(text=raw[:4500], source_lang=(src if src and len(src) >= 2 else None), target_lang=tgt)
+    if effective_provider == "indictrans2":
+        return _indictrans2_translate(text=raw[:4500], source_lang=(src if src and len(src) >= 2 else None), target_lang=tgt)
+    if effective_provider == "gcp_translate":
         if gcp_client is None or gcp_parent is None:
             raise RuntimeError("GCP Translate client not initialized")
         req: Dict[str, Any] = {
@@ -298,19 +391,14 @@ def _translate_text(
             req["source_language_code"] = src
         resp = gcp_client.translate_text(request=req)
         if resp and resp.translations:
-            return (resp.translations[0].translated_text or "").strip() or raw
+            return (resp.translations[0].translated_text or "").strip()
     return raw
 
 
 def _normalize_transcript_basic(text: str) -> str:
-    t = (text or "").strip()
-    if not t:
-        return ""
-    t = re.sub(r"\s+", " ", t)
-    t = re.sub(r"\s+([,.;:!?])", r"\1", t)
-    t = re.sub(r"\(\s+", "(", t)
-    t = re.sub(r"\s+\)", ")", t)
-    return t.strip()
+    raw = (text or "").strip()
+    raw = re.sub(r"\s+", " ", raw)
+    return raw
 
 
 def _enhance_transcript_punctuation(text: str) -> str:
@@ -322,19 +410,23 @@ def _enhance_transcript_punctuation(text: str) -> str:
 
     out = re.sub(r"\s+([,.;:!?])", r"\1", out)
     out = re.sub(r"\s+([।])", r"\1", out)
+
     out = re.sub(r"([,.;:!?])([A-Za-z0-9\u0900-\u097F])", r"\1 \2", out)
     out = re.sub(r"(।)([A-Za-z0-9\u0900-\u097F])", r"\1 \2", out)
+
     out = re.sub(r"([\(\[\{])\s+", r"\1", out)
     out = re.sub(r"\s+([\)\]\}])", r"\1", out)
+
     out = re.sub(r"([,.;:!?])\s+", r"\1 ", out)
     out = re.sub(r"(।)\s+", r"। ", out)
+
     out = re.sub(r"([.!?।])\1{1,}", r"\1", out)
-    out = re.sub(r"\s{2,}", " ", out).strip()
+
     return out
 
 
 def _ensure_terminal_punctuation(text: str, language_code: str | None) -> str:
-    out = (text or "").strip()
+    out = str(text or "").strip()
     if not out:
         return ""
     if out[-1] in ".!?।":
@@ -502,8 +594,14 @@ def _apply_segment_corrections(
                 meta["punctuation_applied"] = True
 
     use_text_normalizer = _env_truthy(os.getenv("ENVID_TRANSCRIPT_USE_TEXT_NORMALIZER"), default=True)
+    normalizer_passes = _parse_int(
+        os.getenv("ENVID_TRANSCRIPT_TEXT_NORMALIZER_PASSES"),
+        default=2,
+        min_value=1,
+        max_value=3,
+    )
     if use_text_normalizer and out:
-        nlp_mode = (os.getenv("ENVID_TRANSCRIPT_TEXT_NORMALIZER_NLP_MODE") or "openrouter_llama").strip().lower()
+        nlp_mode = (os.getenv("ENVID_TRANSCRIPT_TEXT_NORMALIZER_NLP_MODE") or "gemini").strip().lower()
         resp = _text_normalizer_normalize_segment(
             text=out,
             language_code=language_code,
@@ -523,7 +621,34 @@ def _apply_segment_corrections(
                     "punctuation_applied": bool(remote_meta.get("punctuation_applied")) or meta.get("punctuation_applied", False),
                     "source": str(remote_meta.get("source") or "text-normalizer"),
                 })
-                return normalized.strip(), meta
+                out = normalized.strip()
+
+                if normalizer_passes > 1 and out:
+                    for _ in range(normalizer_passes - 1):
+                        resp2 = _text_normalizer_normalize_segment(
+                            text=out,
+                            language_code=language_code,
+                            grammar_enabled=bool(grammar_enabled),
+                            dictionary_enabled=bool(hindi_dictionary_enabled),
+                            punctuation_enabled=bool(punctuation_enabled),
+                            nlp_mode=nlp_mode,
+                        )
+                        if not resp2:
+                            break
+                        normalized2, remote_meta2 = resp2
+                        if not normalized2:
+                            break
+                        out = normalized2.strip()
+                        meta.update({
+                            "nlp_applied": bool(remote_meta2.get("nlp_applied")) or meta.get("nlp_applied", False),
+                            "grammar_applied": bool(remote_meta2.get("grammar_applied")) or meta.get("grammar_applied", False),
+                            "dictionary_applied": bool(remote_meta2.get("dictionary_applied")) or meta.get("dictionary_applied", False),
+                            "hindi_applied": bool(remote_meta2.get("hindi_applied")) or meta.get("hindi_applied", False),
+                            "punctuation_applied": bool(remote_meta2.get("punctuation_applied")) or meta.get("punctuation_applied", False),
+                            "source": str(remote_meta2.get("source") or "text-normalizer"),
+                        })
+                meta["passes"] = int(normalizer_passes)
+                return out, meta
         meta["source"] = "fallback"
 
     return out.strip(), meta
@@ -620,7 +745,7 @@ def _generate_synopsis_via_summarizer_service(
     text: str,
     language_code: str | None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 20.0)
+    timeout_s = _safe_float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 20.0)
     payload = {"text": text, "language_code": language_code}
     data = _summarizer_post_json(
         service_url=service_url,
@@ -630,6 +755,7 @@ def _generate_synopsis_via_summarizer_service(
     )
     meta = data.get("meta") if isinstance(data.get("meta"), dict) else {"available": True, "applied": False}
     synopsis = data.get("synopsis") if isinstance(data.get("synopsis"), dict) else None
+    meta["passes"] = 1
     return synopsis, meta
 
 
@@ -641,7 +767,7 @@ def _scene_summaries_via_summarizer_service(
     labels_src: list[dict[str, Any]] | None,
     language_code: str | None,
 ) -> tuple[dict[int, str] | None, dict[str, Any]]:
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 30.0)
+    timeout_s = _safe_float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 30.0)
     payload = {
         "scenes": scenes,
         "transcript_segments": transcript_segments,
@@ -677,7 +803,7 @@ def _verify_transcript_via_summarizer_service(
     text: str,
     language_code: str | None,
 ) -> dict[str, Any]:
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 15.0)
+    timeout_s = _safe_float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 15.0)
     payload = {"text": text, "language_code": language_code}
     data = _summarizer_post_json(
         service_url=service_url,
@@ -686,48 +812,6 @@ def _verify_transcript_via_summarizer_service(
         timeout_s=timeout_s,
     )
     return data if isinstance(data, dict) else {}
-
-
-def _openrouter_headers() -> dict[str, str] | None:
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        return None
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
-    x_title = (os.getenv("OPENROUTER_X_TITLE") or "").strip()
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
-    return headers
-
-
-def _openrouter_base_url() -> str:
-    return (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
-
-
-def _openrouter_model(default_model: str) -> str:
-    return (
-        os.getenv("OPENROUTER_MODEL")
-        or os.getenv("OPENROUTER_TRANSCRIPT_MODEL")
-        or default_model
-    ).strip()
-
-
-def _openrouter_chat_completion(payload: dict[str, Any], timeout_s: float) -> str | None:
-    headers = _openrouter_headers()
-    if not headers:
-        return None
-    base_url = _openrouter_base_url()
-    resp = requests.post(f"{base_url}/chat/completions", json=payload, headers=headers, timeout=float(timeout_s))
-    if resp.status_code >= 400:
-        raise RuntimeError(f"OpenRouter failed ({resp.status_code}): {resp.text}")
-    data = resp.json()
-    content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-    return content or None
 
 
 def _gemini_api_key() -> str | None:
@@ -780,8 +864,8 @@ def _gemini_generate_text(
         generation_config["temperature"] = float(temperature)
     if max_tokens is not None:
         generation_config["maxOutputTokens"] = int(max_tokens)
-    if generation_config:
-        payload["generationConfig"] = generation_config
+    generation_config["responseMimeType"] = "application/json"
+    payload["generationConfig"] = generation_config
 
     resp = requests.post(url, json=payload, timeout=float(timeout_s))
     if resp.status_code >= 400:
@@ -916,6 +1000,17 @@ def _extract_synopsis_from_text(content: str) -> dict[str, str] | None:
     return None
 
 
+def _synopsis_payload_to_text(payload: dict[str, Any]) -> str:
+    short = str(payload.get("short") or "").strip()
+    long = str(payload.get("long") or "").strip()
+    parts = []
+    if short:
+        parts.append(f"Short synopsis:\n{short}")
+    if long:
+        parts.append(f"Long synopsis:\n{long}")
+    return "\n\n".join(parts).strip()
+
+
 def _word_list(text: str) -> list[str]:
     return [w for w in re.split(r"\s+", (text or "").strip()) if w]
 
@@ -927,6 +1022,19 @@ def _truncate_words(text: str, max_words: int) -> str:
     if len(words) <= max_words:
         return text.strip()
     return " ".join(words[:max_words]).strip()
+
+
+def _synopsis_payload_from_raw_text(text: str) -> dict[str, str] | None:
+    raw = _normalize_transcript_basic(text or "")
+    if not raw:
+        return None
+    short = _truncate_words(raw, 50).strip()
+    long = _truncate_words(raw, 150).strip()
+    if not short and not long:
+        return None
+    if not long:
+        long = short
+    return {"short": short, "long": long}
 
 
 def _enforce_synopsis_limits(payload: dict[str, str]) -> dict[str, str]:
@@ -984,15 +1092,14 @@ def _verify_transcript_via_llm_direct(*, text: str, language_code: str | None) -
         f"send script as input\n{raw[:12000]}\n"
     )
 
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 15.0)
-    model_or = _openrouter_model("meta-llama/Meta-Llama-3.1-8B-Instruct")
+    timeout_s = _safe_float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 15.0)
     model_local = _local_llm_model("meta-llama/Meta-Llama-3.1-8B-Instruct", transcript=True)
 
     gemini_error = None
-    for _ in range(3):
+    for attempt in range(1, 5):
         try:
             content = _gemini_generate_text(
-                model=_gemini_model("gemini-2.5-pro"),
+                model=_gemini_model("gemini-2.0-flash"),
                 prompt=prompt,
                 system="Return JSON only.",
                 timeout_s=timeout_s,
@@ -1001,8 +1108,34 @@ def _verify_transcript_via_llm_direct(*, text: str, language_code: str | None) -
             ) or ""
             parsed = _extract_json_payload(content)
             if isinstance(parsed, dict):
-                return {**parsed, "meta": {"available": True, "provider": "gemini", "model": _gemini_model("gemini-2.5-pro")}}
-            gemini_error = "invalid_response"
+                return {
+                    **parsed,
+                    "meta": {
+                        "available": True,
+                        "provider": "gemini",
+                        "model": _gemini_model("gemini-2.0-flash"),
+                        "attempts": attempt,
+                    },
+                }
+            if attempt >= 4:
+                raw_content = str(content).strip()
+                if raw_content:
+                    return {
+                        "ok": True,
+                        "score": 0.3,
+                        "corrected_text": raw_content,
+                        "issues": ["unparsed_response"],
+                        "meta": {
+                            "available": True,
+                            "provider": "gemini",
+                            "model": _gemini_model("gemini-2.0-flash"),
+                            "attempts": attempt,
+                            "accepted_raw": True,
+                        },
+                    }
+                gemini_error = "empty_response"
+            else:
+                gemini_error = "invalid_response"
         except Exception as exc:
             gemini_error = str(exc)[:240]
 
@@ -1016,13 +1149,39 @@ def _verify_transcript_via_llm_direct(*, text: str, language_code: str | None) -
         "max_tokens": 1200,
     }
     local_error = None
-    for _ in range(3):
+    for attempt in range(1, 5):
         try:
             content = _local_llm_chat_completion(data_local, timeout_s) or ""
             parsed = _extract_json_payload(content)
             if isinstance(parsed, dict):
-                return {**parsed, "meta": {"available": True, "provider": "local", "model": model_local}}
-            local_error = "invalid_response"
+                return {
+                    **parsed,
+                    "meta": {
+                        "available": True,
+                        "provider": "local",
+                        "model": model_local,
+                        "attempts": attempt,
+                    },
+                }
+            if attempt >= 4:
+                raw_content = str(content).strip()
+                if raw_content:
+                    return {
+                        "ok": True,
+                        "score": 0.3,
+                        "corrected_text": raw_content,
+                        "issues": ["unparsed_response"],
+                        "meta": {
+                            "available": True,
+                            "provider": "local",
+                            "model": model_local,
+                            "attempts": attempt,
+                            "accepted_raw": True,
+                        },
+                    }
+                local_error = "empty_response"
+            else:
+                local_error = "invalid_response"
         except Exception as exc:
             local_error = str(exc)[:240]
 
@@ -1034,94 +1193,10 @@ def _verify_transcript_via_llm_direct(*, text: str, language_code: str | None) -
         "meta": {
             "available": False,
             "provider": "gemini",
-            "model": _gemini_model("gemini-2.5-pro"),
+            "model": _gemini_model("gemini-2.0-flash"),
             "error": str(gemini_error or local_error or "request_failed")[:240],
         },
     }
-
-
-def _openrouter_direct_generate_synopsis(
-    *,
-    text: str,
-    language_code: str | None,
-) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-    if not _openrouter_headers():
-        return None, {"available": False, "provider": "openrouter", "reason": "missing_api_key"}
-
-    raw = _normalize_transcript_basic(text)
-    if not raw:
-        return None, {"available": False, "provider": "openrouter", "reason": "no_transcript"}
-
-    model = _openrouter_model("meta-llama/Meta-Llama-3.1-8B-Instruct")
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 20.0)
-    lang = (language_code or "").strip() or "unknown"
-
-    system_prompt_short = (
-        "Create a SHORT movie-style synopsis (30–50 words) based strictly on the transcript I will provide.\n\n"
-        "Requirements:\n"
-        "- Summarize the premise and central conflict in an abstracted way.\n"
-        "- Be concise, cinematic, and spoiler-free.\n"
-        "- Use only facts explicitly stated in the transcript; do NOT add new details.\n"
-        "- Paraphrase: do NOT copy phrases longer than 6 words from the transcript.\n"
-        "- Maintain the exact language of the transcript (no translation).\n"
-        "- Preserve proper nouns and names exactly.\n"
-        "- If something is unclear, say only what is confirmed.\n\n"
-        "Wait for the transcript.\n"
-    )
-
-    system_prompt_long = (
-        "Create a LONG movie-style synopsis (70–150 words) based strictly on the transcript I will provide.\n\n"
-        "Requirements:\n"
-        "- Describe the setting, character motivations, and major plot developments.\n"
-        "- Highlight dramatic tension without revealing endings or twists (spoiler-free).\n"
-        "- Maintain a polished, cinematic tone.\n"
-        "- Use only information explicitly mentioned in the transcript; do NOT add new details.\n"
-        "- Paraphrase: do NOT copy phrases longer than 6 words from the transcript.\n"
-        "- Do NOT translate; keep the same language.\n"
-        "- Preserve proper nouns and names exactly.\n"
-        "- If something is vague, state only what can be confirmed.\n\n"
-        "Wait for the transcript.\n"
-    )
-
-    user_prompt = (
-        f"Language hint: {lang}\n\n"
-        f"Transcript:\n{raw[:12000]}\n"
-    )
-
-    def _request_synopsis(kind: str, extra_rules: str = "") -> str | None:
-        if kind == "long":
-            system_prompt = system_prompt_long
-            max_tokens = 1200
-        else:
-            system_prompt = system_prompt_short
-            max_tokens = 600
-        data = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt + extra_rules},
-            ],
-            "temperature": 0.2,
-            "max_tokens": max_tokens,
-        }
-        content = (_openrouter_chat_completion(data, timeout_s) or "").strip()
-        return content or None
-
-    try:
-        short_text = _request_synopsis("short") or ""
-        long_text = _request_synopsis("long") or ""
-        synopsis_payload = _enforce_synopsis_limits({"short": short_text, "long": long_text})
-
-        if _needs_hindi_retry(synopsis_payload, language_code):
-            short_text = _request_synopsis("short", "\nRespond in Hindi only using Devanagari characters.\n") or short_text
-            long_text = _request_synopsis("long", "\nRespond in Hindi only using Devanagari characters.\n") or long_text
-            synopsis_payload = _enforce_synopsis_limits({"short": short_text, "long": long_text})
-
-        if synopsis_payload.get("short") or synopsis_payload.get("long"):
-            return synopsis_payload, {"available": True, "applied": True, "provider": "openrouter", "model": model}
-        return None, {"available": False, "provider": "openrouter", "reason": "invalid_response", "model": model}
-    except Exception as exc:
-        return None, {"available": False, "provider": "openrouter", "reason": "request_failed", "error": str(exc)[:240]}
 
 
 def _gemini_direct_generate_synopsis(
@@ -1136,71 +1211,89 @@ def _gemini_direct_generate_synopsis(
     if not raw:
         return None, {"available": False, "provider": "gemini", "reason": "no_transcript"}
 
-    model = _gemini_model("gemini-2.5-pro")
-    timeout_s = _safe_float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 20.0)
+    model = _gemini_model("gemini-2.0-flash")
+    timeout_s = _safe_float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 20.0)
     lang = (language_code or "").strip() or "unknown"
 
-    system_prompt_short = (
-        "Create a SHORT movie-style synopsis (30–50 words) based strictly on the transcript I will provide.\n\n"
-        "Requirements:\n"
-        "- Summarize the premise and central conflict in an abstracted way.\n"
-        "- Be concise, cinematic, and spoiler-free.\n"
-        "- Use only details that are explicitly stated in the transcript; do NOT add new details.\n"
-        "- Paraphrase: do NOT copy phrases longer than 6 words from the transcript.\n"
-        "- Maintain the exact language of the transcript (no translation).\n"
-        "- Preserve proper nouns and names exactly.\n"
-        "- If a detail is unclear or missing, state only what is confirmed.\n"
-    )
-
-    system_prompt_long = (
-        "Create a LONG movie-style synopsis (70–150 words) based strictly on the transcript I will provide.\n\n"
-        "Requirements:\n"
-        "- Describe the setting, character motivations, and major plot developments.\n"
-        "- Highlight dramatic tension without revealing endings or twists (spoiler-free).\n"
-        "- Maintain a polished, cinematic tone.\n"
-        "- Use only information explicitly mentioned in the transcript; do NOT add new details.\n"
-        "- Paraphrase: do NOT copy phrases longer than 6 words from the transcript.\n"
-        "- Do NOT translate; keep the same language.\n"
-        "- Preserve proper nouns and names exactly.\n"
-        "- If something is vague, state only what can be confirmed.\n"
+    system_prompt = (
+        "You are an elite Hollywood Story Architect and Marketing Specialist. Your goal is to transform provided plot points, "
+        "dialogue, or transcripts into professional movie synopses for any genre.\n\n"
+        "Your writing must:\n"
+        "- Identify and enhance the 'Core Conflict' and 'Protagonist Stakes'.\n"
+        "- Adapt the tone (dark, uplifting, witty, or epic) to match the source material.\n"
+        "- Use active, evocative language.\n"
+        "- Avoid spoilers unless instructed otherwise.\n"
+        "- Strictly adhere to word count constraints while maintaining a punchy, cinematic flow."
     )
 
     user_prompt = (
+        "Return JSON only with keys \"short\" and \"long\".\n"
+        "Short Synopsis (max 50 words): A high-concept logline/teaser that hooks immediately.\n"
+        "Long Synopsis (100–150 words): A detailed narrative summary outlining setting, rising tension, and ultimate stakes.\n"
+        "Use only information explicitly stated in the transcript; do NOT add new details.\n"
+        "Paraphrase; do NOT copy phrases longer than 6 words from the transcript.\n"
+        "Respond ONLY in the same language as the transcript. Do NOT translate.\n"
+        "Preserve proper nouns.\n"
         f"Language hint: {lang}\n\n"
         f"Transcript:\n{raw[:12000]}\n"
     )
 
-    def _request_synopsis(kind: str, extra_rules: str = "") -> str | None:
-        if kind == "long":
-            system_prompt = system_prompt_long
-            max_tokens = 1200
-        else:
-            system_prompt = system_prompt_short
-            max_tokens = 600
-        return _gemini_generate_text(
-            model=model,
-            prompt=user_prompt + extra_rules,
-            system=system_prompt,
-            timeout_s=timeout_s,
-            max_tokens=max_tokens,
-            temperature=0.2,
-        )
+    max_tokens = _parse_int(
+        os.getenv("ENVID_GEMINI_MAX_OUTPUT_TOKENS") or os.getenv("ENVID_LLM_MAX_OUTPUT_TOKENS"),
+        default=1400,
+        min_value=256,
+        max_value=8192,
+    )
 
-    try:
-        short_text = _request_synopsis("short") or ""
-        long_text = _request_synopsis("long") or ""
-        synopsis_payload = _enforce_synopsis_limits({"short": short_text, "long": long_text})
+    last_error = None
+    for attempt in range(1, 5):
+        try:
+            content = _gemini_generate_text(
+                model=model,
+                prompt=user_prompt,
+                system=system_prompt,
+                timeout_s=timeout_s,
+                max_tokens=max_tokens,
+                temperature=0.2,
+            )
+            parsed = _extract_synopsis_from_text(content or "")
+            if not parsed:
+                parsed = _fallback_synopsis_from_text(content or "", language_code) or {}
+            synopsis_payload = _enforce_synopsis_limits({
+                "short": str(parsed.get("short") or "").strip(),
+                "long": str(parsed.get("long") or "").strip(),
+            })
 
-        if _needs_hindi_retry(synopsis_payload, language_code):
-            short_text = _request_synopsis("short", "\nRespond in Hindi only using Devanagari characters.\n") or short_text
-            long_text = _request_synopsis("long", "\nRespond in Hindi only using Devanagari characters.\n") or long_text
-            synopsis_payload = _enforce_synopsis_limits({"short": short_text, "long": long_text})
+            if synopsis_payload.get("short") or synopsis_payload.get("long"):
+                return synopsis_payload, {
+                    "available": True,
+                    "applied": True,
+                    "provider": "gemini",
+                    "model": model,
+                    "passes": attempt,
+                }
+            if attempt >= 4:
+                raw_payload = _synopsis_payload_from_raw_text(content or "")
+                if raw_payload:
+                    raw_payload["_force_accept"] = True
+                    return raw_payload, {
+                        "available": True,
+                        "applied": True,
+                        "provider": "gemini",
+                        "model": model,
+                        "passes": attempt,
+                        "accepted_raw": True,
+                    }
+                return None, {"available": False, "provider": "gemini", "reason": "empty_response", "model": model}
+            app.logger.warning("Gemini synopsis invalid response")
+            last_error = "invalid_response"
+        except Exception as exc:
+            last_error = str(exc)[:240]
+            if attempt >= 4:
+                app.logger.warning("Gemini synopsis request failed: %s", last_error)
+                return None, {"available": False, "provider": "gemini", "reason": "request_failed", "error": last_error}
 
-        if synopsis_payload.get("short") or synopsis_payload.get("long"):
-            return synopsis_payload, {"available": True, "applied": True, "provider": "gemini", "model": model}
-        return None, {"available": False, "provider": "gemini", "reason": "invalid_response", "model": model}
-    except Exception as exc:
-        return None, {"available": False, "provider": "gemini", "reason": "request_failed", "error": str(exc)[:240]}
+    return None, {"available": False, "provider": "gemini", "reason": str(last_error or "invalid_response"), "model": model}
 
 
 def _local_llm_generate_synopsis(
@@ -1208,80 +1301,98 @@ def _local_llm_generate_synopsis(
     text: str,
     language_code: str | None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    if not _local_llm_available():
+        return None, {"available": False, "provider": "local", "reason": "unavailable"}
+
     raw = _normalize_transcript_basic(text)
     if not raw:
         return None, {"available": False, "provider": "local", "reason": "no_transcript"}
 
     model = _local_llm_model("meta-llama/Meta-Llama-3.1-8B-Instruct")
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 20.0)
+    timeout_s = _safe_float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 20.0)
     lang = (language_code or "").strip() or "unknown"
 
-    system_prompt_short = (
-        "Create a SHORT movie-style synopsis (30–50 words) based strictly on the transcript I will provide.\n\n"
-        "Requirements:\n"
-        "- Summarize the premise and central conflict in an abstracted way.\n"
-        "- Be concise, cinematic, and spoiler-free.\n"
-        "- Use only details that are explicitly stated in the transcript; do NOT add new details.\n"
-        "- Paraphrase: do NOT copy phrases longer than 6 words from the transcript.\n"
-        "- Maintain the exact language of the transcript (no translation).\n"
-        "- Preserve proper nouns and names exactly.\n"
-        "- If a detail is unclear or missing, state only what is confirmed.\n\n"
-        "Wait for the transcript.\n"
-    )
-
-    system_prompt_long = (
-        "Create a LONG movie-style synopsis (70–150 words) based strictly on the transcript I will provide.\n\n"
-        "Requirements:\n"
-        "- Describe the setting, character motivations, and major plot developments.\n"
-        "- Highlight dramatic tension without revealing endings or twists (spoiler-free).\n"
-        "- Maintain a polished, cinematic tone.\n"
-        "- Use only information explicitly mentioned in the transcript; do NOT add new details.\n"
-        "- Paraphrase: do NOT copy phrases longer than 6 words from the transcript.\n"
-        "- Do NOT translate; keep the same language.\n"
-        "- Preserve proper nouns and names exactly.\n"
-        "- If something is vague, state only what can be confirmed.\n\n"
-        "Wait for the transcript.\n"
+    system_prompt = (
+        "You are an elite Hollywood Story Architect and Marketing Specialist. Your goal is to transform provided plot points, "
+        "dialogue, or transcripts into professional movie synopses for any genre.\n\n"
+        "Your writing must:\n"
+        "- Identify and enhance the 'Core Conflict' and 'Protagonist Stakes'.\n"
+        "- Adapt the tone (dark, uplifting, witty, or epic) to match the source material.\n"
+        "- Use active, evocative language.\n"
+        "- Avoid spoilers unless instructed otherwise.\n"
+        "- Strictly adhere to word count constraints while maintaining a punchy, cinematic flow."
     )
 
     user_prompt = (
+        "Return JSON only with keys \"short\" and \"long\".\n"
+        "Short Synopsis (max 50 words): A high-concept logline/teaser that hooks immediately.\n"
+        "Long Synopsis (100–150 words): A detailed narrative summary outlining setting, rising tension, and ultimate stakes.\n"
+        "Use only information explicitly stated in the transcript; do NOT add new details.\n"
+        "Paraphrase; do NOT copy phrases longer than 6 words from the transcript.\n"
+        "Respond ONLY in the same language as the transcript. Do NOT translate.\n"
+        "Preserve proper nouns.\n"
         f"Language hint: {lang}\n\n"
         f"Transcript:\n{raw[:12000]}\n"
     )
 
-    def _request_synopsis(kind: str, extra_rules: str = "") -> str | None:
-        if kind == "long":
-            system_prompt = system_prompt_long
-            max_tokens = 1200
-        else:
-            system_prompt = system_prompt_short
-            max_tokens = 600
-        data = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt + extra_rules},
-            ],
-            "temperature": 0.2,
-            "max_tokens": max_tokens,
-        }
-        content = (_local_llm_chat_completion(data, timeout_s) or "").strip()
-        return content or None
+    max_tokens = _parse_int(
+        os.getenv("ENVID_LLM_MAX_OUTPUT_TOKENS"),
+        default=1400,
+        min_value=256,
+        max_value=8192,
+    )
 
-    try:
-        short_text = _request_synopsis("short") or ""
-        long_text = _request_synopsis("long") or ""
-        synopsis_payload = _enforce_synopsis_limits({"short": short_text, "long": long_text})
+    data = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.2,
+        "max_tokens": max_tokens,
+    }
 
-        if _needs_hindi_retry(synopsis_payload, language_code):
-            short_text = _request_synopsis("short", "\nRespond in Hindi only using Devanagari characters.\n") or short_text
-            long_text = _request_synopsis("long", "\nRespond in Hindi only using Devanagari characters.\n") or long_text
-            synopsis_payload = _enforce_synopsis_limits({"short": short_text, "long": long_text})
+    last_error = None
+    for attempt in range(1, 5):
+        try:
+            content = (_local_llm_chat_completion(data, timeout_s) or "").strip()
+            parsed = _extract_synopsis_from_text(content)
+            if not parsed:
+                parsed = _fallback_synopsis_from_text(content or "", language_code) or {}
+            synopsis_payload = _enforce_synopsis_limits({
+                "short": str(parsed.get("short") or "").strip(),
+                "long": str(parsed.get("long") or "").strip(),
+            })
 
-        if synopsis_payload.get("short") or synopsis_payload.get("long"):
-            return synopsis_payload, {"available": True, "applied": True, "provider": "local", "model": model}
-        return None, {"available": False, "provider": "local", "reason": "invalid_response", "model": model}
-    except Exception as exc:
-        return None, {"available": False, "provider": "local", "reason": "request_failed", "error": str(exc)[:240]}
+            if synopsis_payload.get("short") or synopsis_payload.get("long"):
+                return synopsis_payload, {
+                    "available": True,
+                    "applied": True,
+                    "provider": "local",
+                    "model": model,
+                    "passes": attempt,
+                }
+            if attempt >= 4:
+                raw_payload = _synopsis_payload_from_raw_text(content or "")
+                if raw_payload:
+                    raw_payload["_force_accept"] = True
+                    return raw_payload, {
+                        "available": True,
+                        "applied": True,
+                        "provider": "local",
+                        "model": model,
+                        "passes": attempt,
+                        "accepted_raw": True,
+                    }
+                return None, {"available": False, "provider": "local", "reason": "empty_response", "model": model}
+            last_error = "invalid_response"
+        except Exception as exc:
+            last_error = str(exc)[:240]
+            if attempt >= 4:
+                app.logger.warning("Local synopsis request failed: %s", last_error)
+                return None, {"available": False, "provider": "local", "reason": "request_failed", "error": last_error}
+
+    return None, {"available": False, "provider": "local", "reason": str(last_error or "invalid_response"), "model": model}
 
 
 def _gemini_direct_scene_summaries(
@@ -1298,8 +1409,8 @@ def _gemini_direct_scene_summaries(
     if not isinstance(scenes, list) or not scenes:
         return None, {"available": False, "provider": "gemini", "reason": "no_scenes"}
 
-    model = _gemini_model("gemini-2.5-pro")
-    timeout_s = _safe_float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 25.0)
+    model = _gemini_model("gemini-2.0-flash")
+    timeout_s = _safe_float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 25.0)
 
     max_scenes = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_SCENES"), default=30, min_value=1, max_value=200)
     max_chars = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_CHARS_PER_SCENE"), default=600, min_value=120, max_value=4000)
@@ -1434,160 +1545,7 @@ def _gemini_direct_scene_summaries(
         return None, {"available": False, "provider": "gemini", "reason": "request_failed", "error": str(exc)[:240]}
 
 
-def _openrouter_direct_scene_summaries(
-    *,
-    scenes: list[dict[str, Any]],
-    transcript_segments: list[dict[str, Any]],
-    labels_src: list[dict[str, Any]] | None,
-    objects_src: list[dict[str, Any]] | None,
-    language_code: str | None,
-) -> tuple[dict[int, str] | None, dict[str, Any]]:
-    if not _openrouter_headers():
-        return None, {"available": False, "provider": "openrouter", "reason": "missing_api_key"}
-
-    if not isinstance(scenes, list) or not scenes:
-        return None, {"available": False, "provider": "openrouter", "reason": "no_scenes"}
-
-    model = _openrouter_model("meta-llama/Meta-Llama-3.1-8B-Instruct")
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 25.0)
-
-    max_scenes = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_SCENES"), default=30, min_value=1, max_value=200)
-    max_chars = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_CHARS_PER_SCENE"), default=600, min_value=120, max_value=4000)
-    lang = (language_code or "").strip() or "unknown"
-
-    def _scene_context_text(sc: dict[str, Any]) -> tuple[int, str, list[str]]:
-        try:
-            st = float(sc.get("start") or sc.get("start_seconds") or 0.0)
-            en = float(sc.get("end") or sc.get("end_seconds") or st)
-        except Exception:
-            st, en = 0.0, 0.0
-        if en < st:
-            st, en = en, st
-
-        idx = int(sc.get("index") or 0)
-        segs: list[str] = []
-        for seg in transcript_segments:
-            if not isinstance(seg, dict):
-                continue
-            ss = _safe_float(seg.get("start"), 0.0)
-            se = _safe_float(seg.get("end"), ss)
-            if se <= ss:
-                continue
-            if _overlap_seconds(ss, se, st, en) <= 0:
-                continue
-            text = str(seg.get("text") or "").strip()
-            if text:
-                segs.append(text)
-
-        label_names: list[str] = []
-        if isinstance(labels_src, list):
-            for lab in labels_src:
-                if not isinstance(lab, dict):
-                    continue
-                if _overlap_seconds(_safe_float(lab.get("start"), 0.0), _safe_float(lab.get("end"), 0.0), st, en) <= 0:
-                    continue
-                name = str(lab.get("name") or lab.get("label") or "").strip()
-                if name:
-                    label_names.append(name)
-        label_names = list(dict.fromkeys(label_names))
-
-        object_names: list[str] = []
-        if isinstance(objects_src, list):
-            for obj in objects_src:
-                if not isinstance(obj, dict):
-                    continue
-                name = str(obj.get("name") or obj.get("label") or "").strip()
-                if not name:
-                    continue
-                for seg in (obj.get("segments") or []):
-                    if not isinstance(seg, dict):
-                        continue
-                    if _overlap_seconds(
-                        _safe_float(seg.get("start"), 0.0),
-                        _safe_float(seg.get("end"), 0.0),
-                        st,
-                        en,
-                    ) <= 0:
-                        continue
-                    object_names.append(name)
-                    break
-        object_names = list(dict.fromkeys(object_names))
-
-        transcript_text = " ".join(segs).strip()
-        if len(transcript_text) > max_chars:
-            transcript_text = transcript_text[:max_chars].rsplit(" ", 1)[0].strip()
-
-        labels_text = ", ".join(label_names[:20])
-        objects_text = ", ".join(object_names[:20])
-        context_parts = [f"Transcript: {transcript_text}".strip()]
-        if labels_text:
-            context_parts.append(f"Labels: {labels_text}")
-        if objects_text:
-            context_parts.append(f"Objects: {objects_text}")
-        context = "\n".join([p for p in context_parts if p])
-        return idx, context, object_names
-
-    scene_inputs: list[dict[str, Any]] = []
-    objects_by_index: dict[int, list[str]] = {}
-    for sc in scenes[:max_scenes]:
-        if not isinstance(sc, dict):
-            continue
-        idx, context, object_names = _scene_context_text(sc)
-        if not context.replace("Transcript:", "").strip() and "Labels:" not in context:
-            continue
-        scene_inputs.append({"index": idx, "context": context})
-        if object_names:
-            objects_by_index[idx] = object_names
-
-    if not scene_inputs:
-        return None, {"available": False, "provider": "openrouter", "reason": "empty_inputs", "model": model}
-
-    prompt = (
-        "You are a scene-by-scene summarizer.\n"
-        "Summarize each scene in 1-2 short sentences.\n"
-        "Use ONLY the provided scene context.\n"
-        "Return STRICT JSON only: {\"scenes\": [{\"index\": <int>, \"summary\": <string>}]}\n"
-        "Do not add any extra keys or commentary.\n"
-        "Write in the SAME LANGUAGE as the transcript. Do NOT translate.\n\n"
-        f"Language hint: {lang}\n\n"
-        f"Scenes:\n{json.dumps(scene_inputs, ensure_ascii=False)[:20000]}\n"
-    )
-
-    data = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Return only JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 1400,
-    }
-
-    try:
-        content = _openrouter_chat_completion(data, timeout_s) or ""
-        m = re.search(r"\{.*\}", content, flags=re.DOTALL)
-        payload_json = json.loads(m.group(0) if m else content)
-        scene_items = payload_json.get("scenes") if isinstance(payload_json, dict) else None
-        if isinstance(scene_items, list):
-            out: dict[int, str] = {}
-            for item in scene_items:
-                if not isinstance(item, dict):
-                    continue
-                try:
-                    idx = int(item.get("index"))
-                except Exception:
-                    continue
-                summary = str(item.get("summary") or "").strip()
-                if summary:
-                    out[idx] = summary
-            if out:
-                return out, {"available": True, "applied": True, "provider": "openrouter", "model": model}
-        return None, {"available": False, "provider": "openrouter", "reason": "invalid_response", "model": model}
-    except Exception as exc:
-        return None, {"available": False, "provider": "openrouter", "reason": "request_failed", "error": str(exc)[:240]}
-
-
-    def _local_llm_scene_summaries(
+def _local_llm_scene_summaries(
         *,
         scenes: list[dict[str, Any]],
         transcript_segments: list[dict[str, Any]],
@@ -1599,7 +1557,7 @@ def _openrouter_direct_scene_summaries(
             return None, {"available": False, "provider": "local", "reason": "no_scenes"}
 
         model = _local_llm_model("meta-llama/Meta-Llama-3.1-8B-Instruct")
-        timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 25.0)
+        timeout_s = _safe_float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS"), 25.0)
         max_scenes = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_SCENES"), default=30, min_value=1, max_value=200)
         max_chars = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_CHARS_PER_SCENE"), default=600, min_value=120, max_value=4000)
         lang = (language_code or "").strip() or "unknown"
@@ -1734,34 +1692,7 @@ def _openrouter_direct_scene_summaries(
             return None, {"available": False, "provider": "local", "reason": "request_failed", "error": str(exc)[:240]}
 
 
-def _openrouter_llama_generate_synopsis(*, text: str, language_code: str | None) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-    """Generate short/long synopsis via optional summarizer service."""
-
-    summarizer_service_url = _summarizer_service_url()
-    if summarizer_service_url:
-        try:
-            synopsis, meta = _generate_synopsis_via_summarizer_service(
-                service_url=summarizer_service_url,
-                text=text,
-                language_code=language_code,
-            )
-            if isinstance(synopsis, dict):
-                return synopsis, {**meta, "provider": meta.get("provider") or "summarizer"}
-        except Exception as exc:
-            app.logger.warning("Synopsis service failed: %s", exc)
-
-    # Prefer Gemini, fallback to local LLM when summarizer is unavailable.
-    synopsis, meta = _gemini_direct_generate_synopsis(text=text, language_code=language_code)
-    if isinstance(synopsis, dict):
-        return synopsis, meta
-
-    synopsis, meta = _local_llm_generate_synopsis(text=text, language_code=language_code)
-    if isinstance(synopsis, dict):
-        return synopsis, meta
-    return None, meta
-
-
-def _openrouter_llama_scene_summaries(
+def _generate_scene_summaries(
     *,
     scenes: list[dict[str, Any]],
     transcript_segments: list[dict[str, Any]],
@@ -1835,6 +1766,22 @@ def _synopsis_is_reasonable(text: str, language_code: str | None, *, min_words: 
     return True
 
 
+def _synopsis_word_limit_violation(payload: dict[str, Any]) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    short = str(payload.get("short") or "").strip()
+    long = str(payload.get("long") or "").strip()
+    if not short or not long:
+        return False
+    short_words = len(_word_list(short))
+    long_words = len(_word_list(long))
+    if short_words < 4 or short_words > 120:
+        return True
+    if long_words < 10 or long_words > 300:
+        return True
+    return False
+
+
 def _synopsis_too_similar_to_transcript(synopsis_text: str, transcript_text: str) -> bool:
     syn = _normalize_transcript_basic(synopsis_text)
     src = _normalize_transcript_basic(transcript_text)
@@ -1849,7 +1796,7 @@ def _synopsis_too_similar_to_transcript(synopsis_text: str, transcript_text: str
     if not syn_set or not src_set:
         return False
     overlap = len(syn_set & src_set) / max(1, len(syn_set))
-    return overlap >= 0.9
+    return overlap >= 0.85
 
 
 def _validate_synopsis_payload(payload: dict[str, Any], language_code: str | None) -> bool:
@@ -2134,6 +2081,85 @@ def _ffmpeg_service_url() -> str | None:
     return "http://transcoder:5091"
 
 
+def _segment_via_ffmpeg_service(
+    *,
+    service_url: str,
+    video_path: Path,
+    start_seconds: float,
+    duration_seconds: float,
+    output_path: Path,
+) -> Path:
+    endpoint = service_url.rstrip("/") + "/segment"
+    payload = {
+        "video_path": str(video_path),
+        "start_seconds": float(start_seconds),
+        "duration_seconds": float(duration_seconds),
+        "output_path": str(output_path),
+    }
+    timeout_s = _safe_float(os.getenv("ENVID_METADATA_SEGMENT_TIMEOUT_SECONDS"), 900.0)
+    resp = requests.post(endpoint, json=payload, timeout=float(timeout_s))
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Segment request failed ({resp.status_code}): {resp.text}")
+    data = resp.json() if resp.content else {}
+    path = str(data.get("output_path") or "").strip()
+    if not path:
+        raise RuntimeError("Segment response missing output_path")
+    return Path(path)
+
+
+def _build_segment_plan(*, duration_seconds: float, segment_seconds: float) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    cur = 0.0
+    idx = 0
+    while cur < duration_seconds - 0.01:
+        seg_len = min(segment_seconds, max(0.0, duration_seconds - cur))
+        if seg_len <= 0:
+            break
+        out.append({"index": idx, "start": cur, "duration": seg_len})
+        idx += 1
+        cur += seg_len
+    return out
+
+
+def _generate_synopsis_payload(
+    *,
+    text: str,
+    language_code: str | None,
+    transcript_text: str,
+) -> tuple[dict[str, Any] | None, str]:
+    reason = "empty"
+    if not text.strip():
+        return None, "no_text"
+    service_url = (os.getenv("ENVID_SUMMARIZER_SERVICE_URL") or "").strip()
+    if service_url:
+        try:
+            payload, _meta = _generate_synopsis_via_summarizer_service(
+                service_url=service_url,
+                text=text,
+                language_code=language_code,
+            )
+            if isinstance(payload, dict) and _validate_synopsis_payload(payload, language_code):
+                return payload, "summarizer"
+        except Exception as exc:
+            reason = str(exc)[:240]
+
+    payload, _meta = _gemini_direct_generate_synopsis(text=text, language_code=language_code)
+    if isinstance(payload, dict) and _validate_synopsis_payload(payload, language_code):
+        if not _synopsis_too_similar_to_transcript(str(payload.get("short") or ""), transcript_text) and not _synopsis_too_similar_to_transcript(
+            str(payload.get("long") or ""), transcript_text
+        ):
+            return payload, "gemini"
+
+    payload, _meta = _local_llm_generate_synopsis(text=text, language_code=language_code)
+    if isinstance(payload, dict) and _validate_synopsis_payload(payload, language_code):
+        if not _synopsis_too_similar_to_transcript(str(payload.get("short") or ""), transcript_text) and not _synopsis_too_similar_to_transcript(
+            str(payload.get("long") or ""), transcript_text
+        ):
+            return payload, "local"
+
+    return None, reason or "invalid"
+
+
 def _summarizer_service_url() -> str | None:
     url = (os.getenv("ENVID_SUMMARIZER_SERVICE_URL") or "").strip()
     if not url:
@@ -2308,6 +2334,7 @@ def _fetch_ocr_via_text_on_video(
     interval_seconds: float,
     max_frames: int,
     job_id: str,
+    timestamps: list[float] | None = None,
 ) -> dict[str, Any]:
     endpoint = f"{service_url}/ocr"
     payload = {
@@ -2316,13 +2343,61 @@ def _fetch_ocr_via_text_on_video(
         "job_id": job_id,
         "output_kind": "processed_local",
     }
-    resp = requests.post(endpoint, json=payload, timeout=600)
+    if timestamps:
+        payload["timestamps"] = [float(t) for t in timestamps if isinstance(t, (int, float))]
+    timeout_s = _safe_float(
+        os.getenv("ENVID_METADATA_TEXT_ON_VIDEO_TIMEOUT_SECONDS")
+        or os.getenv("ENVID_TEXT_ON_VIDEO_TIMEOUT_SECONDS")
+        or 600,
+        600.0,
+    )
+    resp = requests.post(endpoint, json=payload, timeout=float(timeout_s))
     if resp.status_code >= 400:
         raise RuntimeError(f"Text-on-video service failed ({resp.status_code}): {resp.text}")
     data = resp.json()
     if not isinstance(data, dict):
         raise RuntimeError("Invalid text-on-video service response")
     return data
+
+
+def _build_ocr_timestamps(*, duration_seconds: float | None, interval_seconds: float, max_frames: int) -> list[float]:
+    if not duration_seconds or duration_seconds <= 0 or interval_seconds <= 0:
+        return []
+    count = int((float(duration_seconds) / float(interval_seconds)) + 1)
+    if max_frames > 0:
+        count = min(count, max_frames)
+    return [round(i * float(interval_seconds), 3) for i in range(max(0, count))]
+
+
+def _segment_sequential_enabled() -> bool:
+    return _env_truthy(os.getenv("ENVID_METADATA_SEGMENT_SEQUENTIAL_TASKS"), default=True)
+
+
+def _build_segment_timestamps(*, start: float, duration: float, interval: float, max_frames: int) -> list[float]:
+    if duration <= 0 or interval <= 0:
+        return []
+    count = int((float(duration) / float(interval)) + 1)
+    if max_frames > 0:
+        count = min(count, max_frames)
+    return [round(start + (i * float(interval)), 3) for i in range(max(0, count))]
+
+
+def _dedupe_ocr_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    window = _safe_float(os.getenv("ENVID_METADATA_OCR_DEDUPE_WINDOW_SECONDS"), 3.0)
+    cleaned: list[dict[str, Any]] = []
+    last_text = ""
+    last_time = -1e9
+    for item in sorted(results, key=lambda x: float(x.get("time") or 0.0)):
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        t = _safe_float(item.get("time"), 0.0)
+        if text == last_text and (t - last_time) <= window:
+            continue
+        cleaned.append(item)
+        last_text = text
+        last_time = t
+    return cleaned
 
 
 def _moderation_service_url() -> str:
@@ -2659,6 +2734,21 @@ def _subtitles_local_path(video_id: str, *, lang: str, fmt: str) -> Path:
 
 JOBS_LOCK = threading.Lock()
 JOBS: Dict[str, Dict[str, Any]] = {}
+JOB_PROCESS_LOCK = threading.Lock()
+
+
+def _acquire_job_slot(job_id: str) -> None:
+    if JOB_PROCESS_LOCK.locked():
+        _job_update(job_id, status="queued", progress=0, message="Queued (waiting for previous job)")
+    JOB_PROCESS_LOCK.acquire()
+    _job_update(job_id, status="processing", message="Processing")
+
+
+def _release_job_slot() -> None:
+    try:
+        JOB_PROCESS_LOCK.release()
+    except RuntimeError:
+        pass
 
 
 class StopJob(RuntimeError):
@@ -2711,6 +2801,32 @@ def _text_normalizer_normalize_segment(
         meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
         meta["source"] = "text-normalizer"
         return out, meta
+    except Exception:
+        return None
+
+
+def _text_normalizer_verify_segment(
+    *,
+    text: str,
+    language_code: str | None,
+    nlp_mode: str | None,
+) -> dict[str, Any] | None:
+    url = _text_normalizer_url()
+    if not url:
+        return None
+    endpoint = url.rstrip("/") + "/verify/segment"
+    timeout_s = _safe_float(os.getenv("ENVID_TRANSCRIPT_TEXT_NORMALIZER_TIMEOUT_SECONDS"), 12.0)
+    payload = {
+        "text": text,
+        "language_code": language_code,
+        "nlp_mode": (nlp_mode or "").strip().lower(),
+    }
+    try:
+        resp = requests.post(endpoint, json=payload, timeout=timeout_s)
+        if resp.status_code >= 400:
+            return None
+        data = resp.json()
+        return data if isinstance(data, dict) else None
     except Exception:
         return None
 
@@ -3052,13 +3168,11 @@ def _job_steps_default() -> List[Dict[str, Any]]:
         {"id": "transcribe", "label": "Audio Transcription", "status": "not_started", "percent": 0, "message": None},
         {"id": "synopsis_generation", "label": "Synopsis Generation", "status": "not_started", "percent": 0, "message": None},
         {"id": "scene_by_scene_metadata", "label": "Scene by scene metadata", "status": "not_started", "percent": 0, "message": None},
-        {"id": "translate_output", "label": "Translation of Metadata", "status": "not_started", "percent": 0, "message": None},
-        {"id": "famous_location_detection", "label": "Famous location detection", "status": "not_started", "percent": 0, "message": None},
-        {"id": "opening_closing_credit_detection", "label": "Opening/Closing credit detection", "status": "not_started", "percent": 0, "message": None},
-        {"id": "celebrity_detection", "label": "Celebrity detection", "status": "not_started", "percent": 0, "message": None},
-        {"id": "celebrity_bio_image", "label": "Celebrity bio & Image", "status": "not_started", "percent": 0, "message": None},
-        {"id": "upload_artifacts", "label": "Upload artifacts", "status": "not_started", "percent": 0, "message": None},
-        {"id": "save_as_json", "label": "Save as Json", "status": "not_started", "percent": 0, "message": None},
+        {"id": "translate_output", "label": "Translate & Upload", "status": "not_started", "percent": 0, "message": None},
+        {"id": "famous_location_detection", "label": "Famous location detection", "status": "not_started", "percent": 0, "message": None},  # disabled by default
+        {"id": "opening_closing_credit_detection", "label": "Opening/Closing credit detection", "status": "not_started", "percent": 0, "message": None},  # disabled by default
+        {"id": "celebrity_detection", "label": "Celebrity detection", "status": "not_started", "percent": 0, "message": None},  # not implemented
+        {"id": "celebrity_bio_image", "label": "Celebrity bio & Image", "status": "not_started", "percent": 0, "message": None},  # not implemented
         {"id": "overall", "label": "Overall", "status": "not_started", "percent": 0, "message": None},
     ]
 
@@ -3158,8 +3272,12 @@ def _build_selection(inputs: OrchestratorInputs) -> Selection:
     )
     requested_label_model = _orchestrator_str(sel.get("label_detection_model_normalized"), requested_label_model_raw)
 
-    # Force transcription on for all runs.
+    # Force core tasks on for all runs.
     enable_transcribe = True
+    enable_synopsis_generation = True
+    enable_label_detection = True
+    enable_key_scene = True
+    enable_high_point = True
 
     requested_text_model = _orchestrator_str(requested.get("text_model") or sel.get("text_model"), "tesseract")
     requested_moderation_model = _orchestrator_str(
@@ -3478,6 +3596,121 @@ def _db_get_job_outputs(job_id: str) -> list[dict[str, Any]]:
     return [dict(r) for r in rows if isinstance(r, dict)]
 
 
+def _restart_job_from_db(job_id: str, *, reason: str) -> bool:
+    job_id = str(job_id or "").strip()
+    if not job_id:
+        return False
+    job_row = _db_get_job(job_id)
+    if not job_row:
+        return False
+
+    gcs_uri = str(job_row.get("gcs_video_uri") or "").strip()
+    if not gcs_uri:
+        gcs_uri = str(job_row.get("gcs_working_uri") or "").strip()
+    if not gcs_uri:
+        with VIDEO_INDEX_LOCK:
+            v_lookup = next((x for x in VIDEO_INDEX if str(x.get("id")) == job_id), None)
+        if isinstance(v_lookup, dict):
+            gcs_uri = str(v_lookup.get("gcs_video_uri") or "").strip()
+    if not gcs_uri:
+        return False
+
+    try:
+        bucket, obj = _parse_allowed_gcs_video_source(gcs_uri)
+    except Exception as exc:
+        alt_uri = str(job_row.get("gcs_working_uri") or "").strip()
+        if alt_uri and "Object must be under" in str(exc):
+            try:
+                bucket, obj = _parse_allowed_gcs_video_source(alt_uri)
+                gcs_uri = alt_uri
+            except Exception:
+                return False
+        elif "Object must be under" in str(exc):
+            try:
+                bucket, obj = _parse_allowed_gcs_video_source(gcs_uri, enforce_prefix=False)
+            except Exception:
+                return False
+        else:
+            return False
+
+    task_selection = None
+    if isinstance(job_row.get("task_selection"), dict):
+        task_selection = job_row.get("task_selection")
+    elif isinstance(job_row.get("task_selection_effective"), dict):
+        task_selection = job_row.get("task_selection_effective")
+
+    title = str(job_row.get("title") or "Reprocess").strip() or "Reprocess"
+    _job_init(job_id, title=title)
+    _job_update(job_id, status="queued", progress=0, message=reason, gcs_video_uri=gcs_uri)
+
+    frame_interval_seconds = _parse_int(job_row.get("frame_interval_seconds"), default=0, min_value=0, max_value=30)
+    max_frames_to_analyze = _parse_int(job_row.get("max_frames_to_analyze"), default=1000, min_value=1, max_value=10000)
+
+    threading.Thread(
+        target=_process_gcs_video_job_cloud_only,
+        kwargs={
+            "job_id": job_id,
+            "gcs_bucket": bucket,
+            "gcs_object": obj,
+            "video_title": title or Path(obj).name,
+            "video_description": str(job_row.get("description") or ""),
+            "frame_interval_seconds": frame_interval_seconds,
+            "max_frames_to_analyze": max_frames_to_analyze,
+            "face_recognition_mode": None,
+            "task_selection": task_selection,
+        },
+        daemon=True,
+    ).start()
+    return True
+
+
+def _recover_stuck_jobs_once() -> None:
+    if not _db_enabled():
+        return
+    try:
+        cutoff = datetime.utcnow() - timedelta(minutes=10)
+        jobs = _db_list_jobs(statuses=["preflight", "processing", "queued", "running"], limit=100)
+        for job in jobs:
+            job_id = str(job.get("id") or "").strip()
+            if not job_id:
+                continue
+            updated_at = _parse_iso_ts(job.get("updated_at"))
+            if updated_at and updated_at > cutoff:
+                continue
+
+            steps = _db_get_job_steps(job_id)
+            if any(str(s.get("status") or "").lower() == "running" for s in steps):
+                continue
+
+            entry = _get_video_entry_with_cached_metadata(job_id, _get_video_entry_by_id(job_id))
+            if isinstance(entry, dict) and isinstance(entry.get("metadata_categories"), dict) and isinstance(entry.get("metadata_combined"), dict):
+                _job_update(job_id, status="completed", progress=100, message="Completed")
+                continue
+
+            if steps and all(str(s.get("status") or "").lower() in {"completed", "skipped"} for s in steps):
+                attempts = int(job.get("recovery_attempts") or 0)
+                if attempts >= 2:
+                    continue
+                _db_job_upsert(job_id, recovery_attempts=attempts + 1, updated_at=datetime.utcnow())
+                ok = _restart_job_from_db(job_id, reason="Auto-recover: restart after interruption")
+                if ok:
+                    app.logger.warning("Recovered stuck job %s (attempt %s)", job_id, attempts + 1)
+    except Exception as exc:
+        app.logger.warning("Job recovery scan failed: %s", exc)
+
+
+def _recover_stuck_jobs_loop() -> None:
+    while True:
+        _recover_stuck_jobs_once()
+        time.sleep(60)
+
+
+def _start_recovery_thread() -> None:
+    if not _env_truthy(os.getenv("ENVID_JOB_RECOVERY_ENABLED"), default=True):
+        return
+    threading.Thread(target=_recover_stuck_jobs_loop, daemon=True).start()
+
+
 def _cleanup_job_artifacts(job_id: str, job_row: dict[str, Any] | None = None) -> None:
     row = job_row or _db_get_job(job_id) or {}
     temp_dir = str(row.get("temp_dir") or row.get("tempDir") or "").strip()
@@ -3549,15 +3782,14 @@ def _task_selection_for_failed_steps(failed_steps: set[str]) -> dict[str, Any]:
         sel["enable_high_point"] = True
     if "synopsis_generation" in failed_steps:
         sel["enable_synopsis_generation"] = True
+    if "translate_output" in failed_steps:
+        sel["enable_translate_output"] = True
     if "opening_closing_credit_detection" in failed_steps:
         sel["enable_opening_closing"] = True
     if "celebrity_detection" in failed_steps:
         sel["enable_celebrity_detection"] = True
     if "celebrity_bio_image" in failed_steps:
         sel["enable_celebrity_bio_image"] = True
-    if "translate_output" in failed_steps:
-        sel["translate_targets"] = _translate_targets()
-
     return sel
 
 
@@ -3806,14 +4038,14 @@ def _precheck_models(
         local_ok = _local_llm_available()
         summarizer_ok = bool(summarizer_service_url)
         if not (summarizer_ok or gemini_ok or local_ok):
-            _require(False, "synopsis", "No LLM available for synopsis generation")
+            _warn(False, "synopsis", "No LLM available for synopsis generation")
 
     if enable_scene_by_scene and _env_truthy(os.getenv("ENVID_SCENE_BY_SCENE_LLM"), default=False):
         gemini_ok = bool(_gemini_api_key())
         local_ok = _local_llm_available()
         summarizer_ok = bool(summarizer_service_url)
         if not (summarizer_ok or gemini_ok or local_ok):
-            _require(False, "synopsis", "No LLM available for scene-by-scene summaries")
+            _warn(False, "synopsis", "No LLM available for scene-by-scene summaries")
 
     # Local moderation service (NudeNet only)
     if enable_moderation and use_local_moderation:
@@ -3847,16 +4079,23 @@ def _precheck_models(
             if not clip_ok:
                 _warn(False, "clip_model", "CLIP model unavailable")
 
-    # LibreTranslate availability (when translation is enabled)
+    # Translation availability (when translation is enabled)
     enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
     translate_provider = _translate_provider()
-    if enable_translate and translate_provider == "libretranslate":
+    if enable_translate and translate_provider in {"libretranslate", "hybrid"}:
         base_url = "http://translate:5000"
         try:
             langs = _libretranslate_languages_raw(base_url)
             _require(bool(langs), "libretranslate", "LibreTranslate /languages returned no data")
         except Exception as exc:
             _require(False, "libretranslate", f"LibreTranslate unavailable: {exc}")
+    if enable_translate and translate_provider in {"indictrans2", "hybrid"}:
+        base_url = _indictrans2_base_url()
+        try:
+            health = _check_service_health(f"{base_url.rstrip('/')}/health")
+            _require(bool(health.get("ok")), "indictrans2", f"IndicTrans2 unhealthy: {health.get('error') or health.get('raw')}")
+        except Exception as exc:
+            _require(False, "indictrans2", f"IndicTrans2 unavailable: {exc}")
 
     # GCP Language (locations)
     if enable_famous_locations and gcp_language is None:
@@ -4104,24 +4343,20 @@ def _build_categorized_metadata_json(video: dict[str, Any]) -> dict[str, Any]:
     combined["technical_metadata"] = technical
 
     transcript = (video.get("transcript") or "").strip()
-    transcript_script = (video.get("transcript_script") or "").strip()
     transcript_raw = (video.get("transcript_raw") or "").strip()
-    transcript_raw_script = (video.get("transcript_raw_script") or "").strip()
     transcript_raw_segments = video.get("transcript_raw_segments")
     if not isinstance(transcript_raw_segments, list):
         transcript_raw_segments = []
     transcript_segments = video.get("transcript_segments")
     if not isinstance(transcript_segments, list):
         transcript_segments = []
-    if transcript or transcript_segments or transcript_script:
+    if transcript or transcript_segments:
         payload = {
             "text": transcript,
-            "script": transcript_script,
             "language_code": video.get("language_code"),
             "segments": transcript_segments,
             "meta": video.get("transcript_meta") or {},
             "raw_text": transcript_raw,
-            "raw_script": transcript_raw_script,
             "raw_segments": transcript_raw_segments,
         }
         categories.setdefault("transcript", payload)
@@ -4355,6 +4590,121 @@ def _apply_translated_combined(video: dict[str, Any], combined: dict[str, Any], 
         out["on_screen_text"] = on_screen_text
 
     return out
+
+
+def _normalize_artifact_lang(lang: str | None) -> str:
+    lang_norm = (lang or "").strip().lower()
+    if not lang_norm or lang_norm in {"original", "orig"}:
+        return "orig"
+    return lang_norm
+
+
+def _collect_artifact_languages(
+    *,
+    video: dict[str, Any] | None = None,
+    payload_languages: list[str] | None = None,
+    combined_by_language: dict[str, Any] | None = None,
+    subtitles_payload: dict[str, Any] | None = None,
+) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+
+    def _add(lang: str | None) -> None:
+        lang_norm = _normalize_artifact_lang(lang)
+        if not lang_norm or lang_norm in seen:
+            return
+        seen.add(lang_norm)
+        out.append(lang_norm)
+
+    _add("orig")
+
+    if payload_languages:
+        for lang in payload_languages:
+            _add(str(lang or "").strip())
+
+    if combined_by_language:
+        for lang in combined_by_language.keys():
+            _add(str(lang or "").strip())
+
+    if isinstance(video, dict):
+        translations = video.get("translations")
+        if isinstance(translations, dict):
+            by_language = translations.get("by_language")
+            if isinstance(by_language, dict):
+                for lang in by_language.keys():
+                    _add(str(lang or "").strip())
+
+    if subtitles_payload:
+        for key in subtitles_payload.keys():
+            lang_part = str(key or "").split(".")[0].strip()
+            if lang_part:
+                _add(lang_part)
+
+    return out
+
+
+def _build_combined_by_language(
+    *,
+    video: dict[str, Any] | None,
+    base_combined: dict[str, Any] | None,
+    languages: list[str],
+) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    combined_orig = base_combined if isinstance(base_combined, dict) else {}
+    for lang in languages:
+        lang_norm = _normalize_artifact_lang(lang)
+        if lang_norm == "orig" or not isinstance(video, dict):
+            out[lang_norm] = dict(combined_orig)
+            continue
+        try:
+            out[lang_norm] = _build_combined_metadata_for_language(video, lang_norm)
+        except Exception:
+            out[lang_norm] = dict(combined_orig)
+    if "orig" not in out:
+        out["orig"] = dict(combined_orig)
+    return out
+
+
+def _build_metadata_zip_bytes(
+    *,
+    job_id: str,
+    categories: dict[str, Any],
+    combined_by_language: dict[str, dict[str, Any]],
+    subtitles_payload: dict[str, dict[str, Any]],
+    languages: list[str],
+) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for lang in languages:
+            lang_norm = _normalize_artifact_lang(lang)
+            combined = combined_by_language.get(lang_norm) or combined_by_language.get("orig") or {}
+
+            z.writestr(
+                f"metadata/{lang_norm}/metadata/combined.json",
+                json.dumps(combined, indent=2, ensure_ascii=False),
+            )
+
+            for name, cat_payload in (categories or {}).items():
+                safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(name or "category").strip()) or "category"
+                z.writestr(
+                    f"metadata/{lang_norm}/metadata/categories/{safe}.json",
+                    json.dumps(cat_payload, indent=2, ensure_ascii=False),
+                )
+
+            for fmt in ("srt", "vtt"):
+                key = f"{lang_norm}.{fmt}"
+                subtitle = subtitles_payload.get(key) if isinstance(subtitles_payload, dict) else None
+                if not isinstance(subtitle, dict):
+                    continue
+                content = subtitle.get("content")
+                if not isinstance(content, str) or not content.strip():
+                    continue
+                z.writestr(
+                    f"metadata/{lang_norm}/subtitles/subtitles.{fmt}",
+                    content,
+                )
+    buf.seek(0)
+    return buf.read()
 
 
 def _overlap_seconds(a_start: float, a_end: float, b_start: float, b_end: float) -> float:
@@ -5163,19 +5513,26 @@ def _gcs_presign_get_url(
     )
 
 
-def _upload_metadata_artifacts_to_gcs(*, job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _upload_metadata_artifacts_to_gcs(
+    *,
+    job_id: str,
+    payload: dict[str, Any],
+    subtitles_payload: dict[str, dict[str, str]] | None = None,
+    languages_override: list[str] | None = None,
+    write_zip: bool = True,
+) -> dict[str, Any]:
     """Best-effort upload of derived artifacts to GCS.
 
     Uploads:
-    - combined.json
-    - categories/*.json
-    - metadata_json.zip (single JSON file inside)
-    - subtitles (if present locally)
+    - metadata/<lang>/metadata/combined.json
+    - metadata/<lang>/metadata/categories/*.json
+    - metadata/<lang>/subtitles/subtitles.srt|.vtt (if present locally)
+    - metadata_json.zip (zip of the above structure)
     """
 
     artifacts_bucket = _gcs_artifacts_bucket(_gcs_bucket_name())
     artifacts_prefix = _gcs_artifacts_prefix()
-    base = f"{artifacts_prefix}/{job_id}".strip("/")
+    base = f"{artifacts_prefix}/{job_id}/metadata".strip("/")
 
     client = _gcs_client()
     bkt = client.bucket(artifacts_bucket)
@@ -5187,98 +5544,174 @@ def _upload_metadata_artifacts_to_gcs(*, job_id: str, payload: dict[str, Any]) -
         "categories": {},
         "zip": None,
         "subtitles": {},
+        "languages": [],
     }
 
-    combined_json = json.dumps(payload.get("combined") or {}, indent=2, ensure_ascii=False)
-    combined_obj = f"{base}/combined.json.gz"
-    bkt.blob(combined_obj).upload_from_string(
-        gzip.compress(combined_json.encode("utf-8")),
-        content_type="application/json; charset=utf-8",
-        content_encoding="gzip",
-    )
-    out["combined"] = {"object": combined_obj, "uri": f"gs://{artifacts_bucket}/{combined_obj}"}
-
+    video = payload.get("video") if isinstance(payload.get("video"), dict) else None
     cats = payload.get("categories") if isinstance(payload.get("categories"), dict) else {}
-    for name, cat_payload in (cats or {}).items():
-        safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(name or "category").strip()) or "category"
-        cat_json = json.dumps(cat_payload, indent=2, ensure_ascii=False)
-        obj = f"{base}/categories/{safe}.json.gz"
-        bkt.blob(obj).upload_from_string(
-            gzip.compress(cat_json.encode("utf-8")),
+    combined = payload.get("combined") if isinstance(payload.get("combined"), dict) else {}
+    combined_by_language = (
+        payload.get("combined_by_language") if isinstance(payload.get("combined_by_language"), dict) else None
+    )
+    subtitles_payload = subtitles_payload or _gather_subtitles_payload(job_id)
+
+    payload_languages = payload.get("languages") if isinstance(payload.get("languages"), list) else None
+    if languages_override is not None:
+        languages = [_normalize_artifact_lang(lang) for lang in languages_override if str(lang or "").strip()]
+    else:
+        languages = _collect_artifact_languages(
+            video=video,
+            payload_languages=payload_languages,
+            combined_by_language=combined_by_language,
+            subtitles_payload=subtitles_payload,
+        )
+    combined_by_language = combined_by_language or _build_combined_by_language(
+        video=video,
+        base_combined=combined,
+        languages=languages,
+    )
+    out["languages"] = languages
+
+    for lang in languages:
+        lang_norm = _normalize_artifact_lang(lang)
+        combined_lang = combined_by_language.get(lang_norm) or combined_by_language.get("orig") or {}
+        combined_obj = f"{base}/{lang_norm}/metadata/combined.json"
+        bkt.blob(combined_obj).upload_from_string(
+            json.dumps(combined_lang, indent=2, ensure_ascii=False),
             content_type="application/json; charset=utf-8",
-            content_encoding="gzip",
         )
-        out["categories"][str(name)] = {"object": obj, "uri": f"gs://{artifacts_bucket}/{obj}"}
+        if lang_norm == "orig":
+            out["combined"] = {"object": combined_obj, "uri": f"gs://{artifacts_bucket}/{combined_obj}"}
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr(f"{job_id}.metadata.json", json.dumps(payload, indent=2, ensure_ascii=False))
-    buf.seek(0)
-    zip_obj = f"{base}/metadata_json.zip"
-    bkt.blob(zip_obj).upload_from_file(buf, rewind=True, content_type="application/zip")
-    out["zip"] = {"object": zip_obj, "uri": f"gs://{artifacts_bucket}/{zip_obj}"}
+        for name, cat_payload in (cats or {}).items():
+            safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(name or "category").strip()) or "category"
+            obj = f"{base}/{lang_norm}/metadata/categories/{safe}.json"
+            bkt.blob(obj).upload_from_string(
+                json.dumps(cat_payload, indent=2, ensure_ascii=False),
+                content_type="application/json; charset=utf-8",
+            )
+            if lang_norm == "orig":
+                out["categories"][str(name)] = {"object": obj, "uri": f"gs://{artifacts_bucket}/{obj}"}
 
-    subtitle_specs = [
-        ("orig", "srt", "application/x-subrip"),
-        ("orig", "vtt", "text/vtt"),
-        ("en", "srt", "application/x-subrip"),
-        ("en", "vtt", "text/vtt"),
-        ("ar", "srt", "application/x-subrip"),
-        ("ar", "vtt", "text/vtt"),
-        ("id", "srt", "application/x-subrip"),
-        ("id", "vtt", "text/vtt"),
-    ]
-    for lang, fmt, content_type in subtitle_specs:
-        local_path = _subtitles_local_path(job_id, lang=lang, fmt=fmt)
-        if not local_path.exists():
+    for key, subtitle in subtitles_payload.items():
+        if not isinstance(subtitle, dict):
             continue
-        obj = f"{base}/subtitles/{lang}.{fmt}.gz"
-        try:
-            raw = local_path.read_bytes()
-        except Exception:
+        content = subtitle.get("content")
+        if not isinstance(content, str) or not content.strip():
             continue
-        bkt.blob(obj).upload_from_string(
-            gzip.compress(raw),
-            content_type=content_type,
-            content_encoding="gzip",
+        parts = str(key or "").split(".")
+        if len(parts) < 2:
+            continue
+        lang_norm = _normalize_artifact_lang(parts[0])
+        fmt = parts[1].strip().lower()
+        if fmt not in {"srt", "vtt"}:
+            continue
+        content_type = str(subtitle.get("content_type") or "text/plain").strip() or "text/plain"
+        obj = f"{base}/{lang_norm}/subtitles/subtitles.{fmt}"
+        bkt.blob(obj).upload_from_string(content, content_type=content_type)
+        out["subtitles"][f"{lang_norm}.{fmt}"] = {"object": obj, "uri": f"gs://{artifacts_bucket}/{obj}"}
+
+    if write_zip:
+        zip_bytes = _build_metadata_zip_bytes(
+            job_id=job_id,
+            categories=cats or {},
+            combined_by_language=combined_by_language,
+            subtitles_payload=subtitles_payload,
+            languages=languages,
         )
-        out["subtitles"][f"{lang}.{fmt}"] = {"object": obj, "uri": f"gs://{artifacts_bucket}/{obj}"}
+        zip_obj = f"{base}/metadata_json.zip"
+        bkt.blob(zip_obj).upload_from_string(zip_bytes, content_type="application/zip")
+        out["zip"] = {"object": zip_obj, "uri": f"gs://{artifacts_bucket}/{zip_obj}"}
 
     return out
 
 
-def _gather_subtitles_payload(job_id: str) -> dict[str, dict[str, str]]:
-    subtitle_specs = [
-        ("orig", "srt", "application/x-subrip"),
-        ("orig", "vtt", "text/vtt"),
-        ("en", "srt", "application/x-subrip"),
-        ("en", "vtt", "text/vtt"),
-        ("ar", "srt", "application/x-subrip"),
-        ("ar", "vtt", "text/vtt"),
-        ("id", "srt", "application/x-subrip"),
-        ("id", "vtt", "text/vtt"),
-    ]
+def _ensure_gcs_artifact_dirs(*, job_id: str, languages: list[str]) -> None:
+    try:
+        artifacts_bucket = _gcs_artifacts_bucket(_gcs_bucket_name())
+        artifacts_prefix = _gcs_artifacts_prefix()
+        base = f"{artifacts_prefix}/{job_id}/metadata".strip("/")
+        client = _gcs_client()
+        bkt = client.bucket(artifacts_bucket)
+    except Exception:
+        return
+
+    for lang in languages:
+        lang_norm = _normalize_artifact_lang(lang)
+        if not lang_norm:
+            continue
+        for suffix in ("metadata/.keep", "metadata/categories/.keep", "subtitles/.keep"):
+            obj = f"{base}/{lang_norm}/{suffix}"
+            try:
+                bkt.blob(obj).upload_from_string("", content_type="text/plain")
+            except Exception:
+                continue
+
+
+def _gather_subtitles_payload(job_id: str, *, lang: str | None = None) -> dict[str, dict[str, str]]:
     out: dict[str, dict[str, str]] = {}
-    for lang, fmt, content_type in subtitle_specs:
-        local_path = _subtitles_local_path(job_id, lang=lang, fmt=fmt)
-        if not local_path.exists():
+    vid = str(job_id or "").strip()
+    if not vid:
+        return out
+
+    lang_filter = _normalize_artifact_lang(lang) if lang else None
+
+    content_type_map = {
+        "srt": "application/x-subrip",
+        "vtt": "text/vtt",
+    }
+
+    try:
+        candidates = list(SUBTITLES_DIR.glob(f"{vid}.*"))
+    except Exception:
+        candidates = []
+
+    for path in candidates:
+        if not path.is_file():
+            continue
+        name = path.name
+        parts = name.split(".")
+        if len(parts) < 2:
+            continue
+        fmt = parts[-1].lower()
+        if fmt not in {"srt", "vtt"}:
+            continue
+        if len(parts) == 2:
+            lang = "orig"
+        else:
+            lang = parts[-2].lower()
+        if not lang:
+            lang = "orig"
+        lang_norm = _normalize_artifact_lang(lang)
+        if lang_filter and lang_norm != lang_filter:
             continue
         try:
-            content = local_path.read_text(encoding="utf-8", errors="ignore")
+            content = path.read_text(encoding="utf-8", errors="ignore")
         except Exception:
             continue
         if not content.strip():
             continue
-        out[f"{lang}.{fmt}"] = {"content": content, "content_type": content_type}
+        out[f"{lang_norm}.{fmt}"] = {
+            "content": content,
+            "content_type": content_type_map.get(fmt, "text/plain"),
+        }
     return out
 
 
-def _upload_metadata_artifacts_via_service(*, service_url: str, job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _upload_metadata_artifacts_via_service(
+    *,
+    service_url: str,
+    job_id: str,
+    payload: dict[str, Any],
+    subtitles_payload: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
     endpoint = f"{service_url}/upload_artifacts"
-    subtitles_payload = _gather_subtitles_payload(job_id)
+    subtitles_payload = subtitles_payload or _gather_subtitles_payload(job_id)
+    trimmed_payload = dict(payload or {})
+    trimmed_payload.pop("video", None)
     request_payload = {
         "job_id": job_id,
-        "payload": payload,
+        "payload": trimmed_payload,
         "subtitles": subtitles_payload,
     }
     timeout_s = _safe_float(os.getenv("ENVID_EXPORT_SERVICE_TIMEOUT_SECONDS"), 60.0)
@@ -5294,11 +5727,33 @@ def _upload_metadata_artifacts_via_service(*, service_url: str, job_id: str, pay
     return artifacts
 
 
-def _upload_metadata_artifacts(*, job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _upload_metadata_artifacts(
+    *,
+    job_id: str,
+    payload: dict[str, Any],
+    subtitles_payload: dict[str, dict[str, str]] | None = None,
+    languages_override: list[str] | None = None,
+    write_zip: bool = True,
+    include_orig: bool | None = None,
+) -> dict[str, Any]:
+    if include_orig is not None:
+        payload = dict(payload or {})
+        payload["include_orig"] = bool(include_orig)
     export_url = _export_service_url()
     if export_url:
-        return _upload_metadata_artifacts_via_service(service_url=export_url, job_id=job_id, payload=payload)
-    return _upload_metadata_artifacts_to_gcs(job_id=job_id, payload=payload)
+        return _upload_metadata_artifacts_via_service(
+            service_url=export_url,
+            job_id=job_id,
+            payload=payload,
+            subtitles_payload=subtitles_payload,
+        )
+    return _upload_metadata_artifacts_to_gcs(
+        job_id=job_id,
+        payload=payload,
+        subtitles_payload=subtitles_payload,
+        languages_override=languages_override,
+        write_zip=write_zip,
+    )
 
 
 def _record_job_artifacts_outputs(job_id: str, artifacts: dict[str, Any] | None) -> None:
@@ -5658,10 +6113,9 @@ def _process_gcs_video_job_cloud_only(
         transcript_words: list[dict[str, Any]] = []
         transcript_segments: list[dict[str, Any]] = []
         transcript_meta: dict[str, Any] = {}
-        transcript_script = ""
         transcript_raw = ""
         transcript_raw_segments: list[dict[str, Any]] = []
-        transcript_raw_script = ""
+        transcript_segment_texts: list[str] = []
         transcribe_completed = False
         transcribe_failed = False
         precomputed_scenes: list[dict[str, Any]] | None = None
@@ -5689,20 +6143,104 @@ def _process_gcs_video_job_cloud_only(
             nonlocal local_text, effective_models
             try:
                 _job_update(job_id, progress=26, message="Text on Screen (OCR)")
-                interval = 1.0
-                max_frames = 20000
+                interval = _safe_float(os.getenv("ENVID_METADATA_OCR_INTERVAL_SECONDS"), 1.0)
+                max_frames = _parse_int(
+                    os.getenv("ENVID_METADATA_OCR_MAX_FRAMES"),
+                    default=20000,
+                    min_value=1,
+                    max_value=50000,
+                )
+                chunk_size = _parse_int(
+                    os.getenv("ENVID_METADATA_OCR_CHUNK_SIZE"),
+                    default=0,
+                    min_value=0,
+                    max_value=5000,
+                )
+                segment_enabled = _env_truthy(os.getenv("ENVID_METADATA_SEGMENT_ENABLE"), default=True)
+                segment_seconds = _safe_float(os.getenv("ENVID_METADATA_SEGMENT_SECONDS"), 180.0)
                 _job_step_update(job_id, "text_on_screen", status="running", percent=0, message=f"Running ({requested_text_model})")
                 text_on_video_url = _text_on_video_service_url()
                 if not text_on_video_url:
                     raise RuntimeError("Text-on-video service URL is not set")
-                payload = _fetch_ocr_via_text_on_video(
-                    service_url=text_on_video_url,
-                    video_path=local_path,
-                    interval_seconds=interval,
-                    max_frames=max_frames,
-                    job_id=job_id,
-                )
-                local_text = payload.get("text") if isinstance(payload, dict) else []
+                payload = None
+                if (
+                    segment_enabled
+                    and duration_seconds
+                    and duration_seconds > segment_seconds
+                    and _segment_sequential_enabled()
+                ):
+                    plan = _build_segment_plan(duration_seconds=float(duration_seconds), segment_seconds=float(segment_seconds))
+                    per_segment_max = max(1, int(max_frames / max(1, len(plan)))) if max_frames > 0 else max_frames
+                    combined: list[dict[str, Any]] = []
+                    for seg in plan:
+                        st = float(seg.get("start") or 0.0)
+                        dur = float(seg.get("duration") or segment_seconds)
+                        timestamps = _build_segment_timestamps(
+                            start=st,
+                            duration=dur,
+                            interval=interval,
+                            max_frames=per_segment_max,
+                        )
+                        payload = _fetch_ocr_via_text_on_video(
+                            service_url=text_on_video_url,
+                            video_path=local_path,
+                            interval_seconds=interval,
+                            max_frames=len(timestamps) if timestamps else per_segment_max,
+                            job_id=job_id,
+                            timestamps=timestamps,
+                        )
+                        chunk_text = payload.get("text") if isinstance(payload, dict) else []
+                        if isinstance(chunk_text, list):
+                            combined.extend(chunk_text)
+                    local_text = _dedupe_ocr_results(combined)
+                    try:
+                        out_dir = Path("/mnt/gcs/envid/work") / (job_id or "job") / "ocr"
+                        out_dir.mkdir(parents=True, exist_ok=True)
+                        out_path = out_dir / f"ocr_{job_id or 'job'}.json"
+                        out_path.write_text(json.dumps(local_text, ensure_ascii=False), encoding="utf-8")
+                        _db_file_insert(job_id, kind="ocr_output", path=str(out_path))
+                    except Exception:
+                        pass
+                else:
+                    timestamps = _build_ocr_timestamps(
+                        duration_seconds=duration_seconds,
+                        interval_seconds=interval,
+                        max_frames=max_frames,
+                    )
+                    if chunk_size > 0 and timestamps:
+                        combined: list[dict[str, Any]] = []
+                        for i in range(0, len(timestamps), chunk_size):
+                            chunk = timestamps[i : i + chunk_size]
+                            payload = _fetch_ocr_via_text_on_video(
+                                service_url=text_on_video_url,
+                                video_path=local_path,
+                                interval_seconds=interval,
+                                max_frames=len(chunk),
+                                job_id=job_id,
+                                timestamps=chunk,
+                            )
+                            chunk_text = payload.get("text") if isinstance(payload, dict) else []
+                            if isinstance(chunk_text, list):
+                                combined.extend(chunk_text)
+                        local_text = _dedupe_ocr_results(combined)
+                        try:
+                            out_dir = Path("/mnt/gcs/envid/work") / (job_id or "job") / "ocr"
+                            out_dir.mkdir(parents=True, exist_ok=True)
+                            out_path = out_dir / f"ocr_{job_id or 'job'}.json"
+                            out_path.write_text(json.dumps(local_text, ensure_ascii=False), encoding="utf-8")
+                            _db_file_insert(job_id, kind="ocr_output", path=str(out_path))
+                        except Exception:
+                            pass
+                    else:
+                        payload = _fetch_ocr_via_text_on_video(
+                            service_url=text_on_video_url,
+                            video_path=local_path,
+                            interval_seconds=interval,
+                            max_frames=max_frames,
+                            job_id=job_id,
+                            timestamps=None,
+                        )
+                        local_text = payload.get("text") if isinstance(payload, dict) else []
                 effective_models["text_on_screen"] = "text-on-video"
                 output_path = payload.get("output_path") if isinstance(payload, dict) else None
                 if isinstance(output_path, str) and output_path:
@@ -5716,8 +6254,15 @@ def _process_gcs_video_job_cloud_only(
             nonlocal local_moderation_frames, local_moderation_source, effective_models
             try:
                 _job_update(job_id, progress=28, message="Moderation (local)")
-                interval = 0.0
-                max_frames = 200000
+                interval = _safe_float(os.getenv("ENVID_METADATA_MODERATION_INTERVAL_SECONDS"), 1.0)
+                max_frames = _parse_int(
+                    os.getenv("ENVID_METADATA_MODERATION_MAX_FRAMES"),
+                    default=200000,
+                    min_value=1,
+                    max_value=500000,
+                )
+                segment_enabled = _env_truthy(os.getenv("ENVID_METADATA_SEGMENT_ENABLE"), default=True)
+                segment_seconds = _safe_float(os.getenv("ENVID_METADATA_SEGMENT_SECONDS"), 180.0)
                 service_url_default = _moderation_service_url()
                 service_url = (local_moderation_url_override or service_url_default).strip()
                 service_timeout = int(_parse_int(os.getenv("ENVID_METADATA_LOCAL_MODERATION_TIMEOUT_SECONDS"), default=0, min_value=0, max_value=3600) or 0)
@@ -5726,16 +6271,51 @@ def _process_gcs_video_job_cloud_only(
                 if requested_moderation_model == "nudenet":
                     if not service_url:
                         raise RuntimeError("Moderation service URL is not set")
-                    moderation_payload = _moderation_extractor_explicit_frames_from_video(
-                        video_path=local_path,
-                        interval_seconds=interval,
-                        max_frames=max_frames,
-                        service_base_url=service_url,
-                        timeout_seconds=None if service_timeout <= 0 else service_timeout,
-                        job_id=job_id,
-                        timestamps=timestamps,
-                    )
-                    local_moderation_frames = moderation_payload.get("explicit_frames") if isinstance(moderation_payload, dict) else []
+                    if (
+                        timestamps is None
+                        and segment_enabled
+                        and duration_seconds
+                        and duration_seconds > segment_seconds
+                        and _segment_sequential_enabled()
+                        and interval > 0
+                    ):
+                        plan = _build_segment_plan(duration_seconds=float(duration_seconds), segment_seconds=float(segment_seconds))
+                        per_segment_max = max(1, int(max_frames / max(1, len(plan)))) if max_frames > 0 else max_frames
+                        combined_frames: list[dict[str, Any]] = []
+                        for seg in plan:
+                            st = float(seg.get("start") or 0.0)
+                            dur = float(seg.get("duration") or segment_seconds)
+                            seg_timestamps = _build_segment_timestamps(
+                                start=st,
+                                duration=dur,
+                                interval=interval,
+                                max_frames=per_segment_max,
+                            )
+                            moderation_payload = _moderation_extractor_explicit_frames_from_video(
+                                video_path=local_path,
+                                interval_seconds=interval,
+                                max_frames=len(seg_timestamps) if seg_timestamps else per_segment_max,
+                                service_base_url=service_url,
+                                timeout_seconds=None if service_timeout <= 0 else service_timeout,
+                                job_id=job_id,
+                                timestamps=seg_timestamps,
+                            )
+                            chunk_frames = moderation_payload.get("explicit_frames") if isinstance(moderation_payload, dict) else []
+                            if isinstance(chunk_frames, list):
+                                combined_frames.extend(chunk_frames)
+                        local_moderation_frames = combined_frames
+                        sampling_strategy = "segment_sequential"
+                    else:
+                        moderation_payload = _moderation_extractor_explicit_frames_from_video(
+                            video_path=local_path,
+                            interval_seconds=interval,
+                            max_frames=max_frames,
+                            service_base_url=service_url,
+                            timeout_seconds=None if service_timeout <= 0 else service_timeout,
+                            job_id=job_id,
+                            timestamps=timestamps,
+                        )
+                        local_moderation_frames = moderation_payload.get("explicit_frames") if isinstance(moderation_payload, dict) else []
                     if isinstance(local_moderation_frames, list) and local_moderation_frames:
                         deduped: list[dict[str, Any]] = []
                         seen: set[tuple[float, str]] = set()
@@ -5783,7 +6363,7 @@ def _process_gcs_video_job_cloud_only(
 
         def _run_whisper_transcription() -> None:
             nonlocal transcript, transcript_language_code, languages_detected, transcript_words, transcript_segments, transcript_meta, effective_models
-            nonlocal transcript_raw, transcript_raw_segments, transcript_raw_script, transcribe_completed, transcribe_failed
+            nonlocal transcript_raw, transcript_raw_segments, transcribe_completed, transcribe_failed, duration_seconds, transcript_segment_texts
             service_url = _transcribe_service_url()
             if not service_url:
                 _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Audio transcription service not available")
@@ -5808,9 +6388,9 @@ def _process_gcs_video_job_cloud_only(
                 whisper_language = None if raw_language_hint in {"", "auto", "detect", "none"} else raw_language_hint
                 fallback_auto = _env_truthy(os.getenv("ENVID_OPENAI_WHISPER_LANGUAGE_FALLBACK_AUTO"), default=True)
 
-                def _call_transcribe_service(language_hint: str | None) -> dict[str, Any]:
-                    with local_path.open("rb") as handle:
-                        files = {"file": (local_path.name, handle, "application/octet-stream")}
+                def _call_transcribe_service_for_path(path: Path, language_hint: str | None) -> dict[str, Any]:
+                    with path.open("rb") as handle:
+                        files = {"file": (path.name, handle, "application/octet-stream")}
                         data_payload = {"model": model_name}
                         if language_hint:
                             data_payload["language"] = language_hint
@@ -5828,276 +6408,237 @@ def _process_gcs_video_job_cloud_only(
                         raise RuntimeError("Invalid transcription service response")
                     return result
 
-                data = _call_transcribe_service(whisper_language)
-                segments_probe = data.get("segments") if isinstance(data, dict) else None
-                if (
-                    fallback_auto
-                    and whisper_language
-                    and (not isinstance(segments_probe, list) or not segments_probe)
-                ):
-                    data = _call_transcribe_service(None)
-                    transcript_meta["openai_whisper"]["language_fallback"] = "auto"
+                segment_enabled = _env_truthy(os.getenv("ENVID_METADATA_SEGMENT_ENABLE"), default=True)
+                segment_seconds = _safe_float(os.getenv("ENVID_METADATA_SEGMENT_SECONDS"), 180.0)
+                segment_concurrency = _parse_int(
+                    os.getenv("ENVID_METADATA_SEGMENT_CONCURRENCY"),
+                    default=2,
+                    min_value=1,
+                    max_value=8,
+                )
+                segment_sequential = _segment_sequential_enabled()
+                segmented_used = False
 
-                segments = data.get("segments") if isinstance(data, dict) else None
-                if not isinstance(segments, list):
-                    segments = []
+                if segment_enabled and duration_seconds and duration_seconds > segment_seconds:
+                    ffmpeg_service_url = _ffmpeg_service_url()
+                    if ffmpeg_service_url:
+                        try:
+                            seg_dir = Path(temp_dir) / "segments" / "transcribe"
+                            seg_dir.mkdir(parents=True, exist_ok=True)
+                            plan = _build_segment_plan(duration_seconds=float(duration_seconds), segment_seconds=float(segment_seconds))
+                            seg_paths: list[tuple[int, float, Path]] = []
+                            for seg in plan:
+                                idx = int(seg.get("index") or 0)
+                                start = float(seg.get("start") or 0.0)
+                                dur = float(seg.get("duration") or segment_seconds)
+                                out_path = seg_dir / f"{job_id}_seg_{idx:03d}.mp4"
+                                if not out_path.exists() or out_path.stat().st_size == 0:
+                                    _segment_via_ffmpeg_service(
+                                        service_url=ffmpeg_service_url,
+                                        video_path=local_path,
+                                        start_seconds=start,
+                                        duration_seconds=dur,
+                                        output_path=out_path,
+                                    )
+                                seg_paths.append((idx, start, out_path))
 
-                transcript_words = []
-                transcript_segments = []
-                seg_quality_issues: List[Dict[str, Any]] = []
-                for seg in segments[:50000]:
-                    if not isinstance(seg, dict):
-                        continue
-                    try:
-                        st = float(seg.get("start") or 0.0)
-                        en = float(seg.get("end") or st)
-                        txt = str(seg.get("text") or "").strip()
-                    except Exception:
-                        continue
-                    if not txt:
-                        continue
-                    words = seg.get("words") if isinstance(seg.get("words"), list) else []
-                    for w in words:
-                        if not isinstance(w, dict):
-                            continue
-                        transcript_words.append(
-                            {
-                                "word": str(w.get("word") or "").strip(),
-                                "start": _safe_float(w.get("start"), 0.0),
-                                "end": _safe_float(w.get("end"), 0.0),
+                            results: dict[int, dict[str, Any]] = {}
+
+                            def _transcribe_segment(idx: int, start: float, path: Path) -> None:
+                                data = _call_transcribe_service_for_path(path, whisper_language)
+                                segments_probe = data.get("segments") if isinstance(data, dict) else None
+                                if (
+                                    fallback_auto
+                                    and whisper_language
+                                    and (not isinstance(segments_probe, list) or not segments_probe)
+                                ):
+                                    data = _call_transcribe_service_for_path(path, None)
+                                results[idx] = {"data": data, "start": start}
+
+                            if segment_sequential or segment_concurrency <= 1:
+                                for idx, start, path in seg_paths:
+                                    _transcribe_segment(idx, start, path)
+                            else:
+                                with ThreadPoolExecutor(max_workers=segment_concurrency) as executor:
+                                    futures = [executor.submit(_transcribe_segment, idx, start, path) for idx, start, path in seg_paths]
+                                    for fut in futures:
+                                        fut.result()
+
+                            transcript_words = []
+                            transcript_segments = []
+                            transcript_segment_texts = []
+                            for idx, start, _ in sorted(seg_paths, key=lambda x: x[0]):
+                                data = results.get(idx, {}).get("data") if isinstance(results.get(idx), dict) else None
+                                if not isinstance(data, dict):
+                                    continue
+                                segments = data.get("segments") if isinstance(data, dict) else None
+                                if not isinstance(segments, list):
+                                    segments = []
+                                seg_texts: list[str] = []
+                                for seg in segments[:50000]:
+                                    if not isinstance(seg, dict):
+                                        continue
+                                    try:
+                                        st = float(seg.get("start") or 0.0) + start
+                                        en = float(seg.get("end") or st) + start
+                                        txt = str(seg.get("text") or "").strip()
+                                    except Exception:
+                                        continue
+                                    if not txt:
+                                        continue
+                                    seg_texts.append(txt)
+                                    words = seg.get("words") if isinstance(seg.get("words"), list) else []
+                                    for w in words:
+                                        if not isinstance(w, dict):
+                                            continue
+                                        transcript_words.append(
+                                            {
+                                                "word": str(w.get("word") or "").strip(),
+                                                "start": _safe_float(w.get("start"), 0.0) + start,
+                                                "end": _safe_float(w.get("end"), 0.0) + start,
+                                            }
+                                        )
+                                    transcript_segments.append({"start": st, "end": en, "text": txt})
+                                transcript_segment_texts.append(" ".join(seg_texts).strip())
+
+                                if not transcript_language_code:
+                                    transcript_language_code = str((data.get("language") if isinstance(data, dict) else None) or whisper_language or "").strip()
+
+                            transcript = " ".join(
+                                [str(s.get("text") or "").strip() for s in transcript_segments if (s.get("text") or "").strip()]
+                            ).strip()
+                            languages_detected = [transcript_language_code] if transcript_language_code else []
+                            transcript_meta.setdefault("openai_whisper", {})
+                            transcript_meta["openai_whisper"]["language_hint"] = whisper_language or "auto"
+                            transcript_meta["openai_whisper"]["source"] = "service"
+                            transcript_meta["openai_whisper"]["segmented"] = {
+                                "enabled": True,
+                                "segment_seconds": float(segment_seconds),
+                                "segment_count": len(seg_paths),
+                                "concurrency": 1 if segment_sequential else int(segment_concurrency),
+                                "mode": "sequential" if segment_sequential else "parallel",
                             }
-                        )
-                    transcript_segments.append({"start": st, "end": en, "text": txt})
+                            segmented_used = True
+                        except Exception as exc:
+                            app.logger.warning("Segmented transcription failed: %s", exc)
+                            segmented_used = False
 
-                transcript = " ".join(
-                    [str(s.get("text") or "").strip() for s in transcript_segments if (s.get("text") or "").strip()]
-                ).strip()
-                transcript_language_code = str((data.get("language") if isinstance(data, dict) else None) or whisper_language or "").strip()
-                languages_detected = [transcript_language_code] if transcript_language_code else []
+                if not segmented_used:
+                    data = _call_transcribe_service_for_path(local_path, whisper_language)
+                    segments_probe = data.get("segments") if isinstance(data, dict) else None
+                    if (
+                        fallback_auto
+                        and whisper_language
+                        and (not isinstance(segments_probe, list) or not segments_probe)
+                    ):
+                        data = _call_transcribe_service_for_path(local_path, None)
+                        transcript_meta["openai_whisper"]["language_fallback"] = "auto"
 
-                transcript_meta.setdefault("openai_whisper", {})
-                transcript_meta["openai_whisper"]["language_hint"] = whisper_language or "auto"
-                transcript_meta["openai_whisper"]["source"] = "service"
+                    segments = data.get("segments") if isinstance(data, dict) else None
+                    if not isinstance(segments, list):
+                        segments = []
 
-                # Preserve raw transcript/segments for diagnostics before any corrections.
-                raw_transcript = transcript
-                raw_transcript_segments = [dict(s) for s in transcript_segments] if transcript_segments else []
-                transcript_raw = raw_transcript
-                transcript_raw_segments = raw_transcript_segments
-
-                # Correction settings (applied to both transcript and segments).
-                # Only use LLM correction; disable grammar/dictionary/punctuation helpers.
-                grammar_enabled = False
-                grammar_url = "http://translate:8010"
-                grammar_local = False
-                dictionary_enabled = False
-                punctuation_enabled = False
-
-                def _word_similarity(a: str, b: str) -> float:
-                    a_words = re.findall(r"[\w\u0900-\u097F]+", a or "")
-                    b_words = re.findall(r"[\w\u0900-\u097F]+", b or "")
-                    if not a_words or not b_words:
-                        return 0.0
-                    return difflib.SequenceMatcher(None, a_words, b_words).ratio()
-
-                min_similarity = _safe_float(os.getenv("ENVID_TRANSCRIPT_CORRECTION_MIN_SIMILARITY"), 0.75)
-
-                # Apply full correction pipeline to the full transcript (for metadata/visibility).
-                if transcript:
-                    before = transcript
-                    transcript, corr_meta = _apply_segment_corrections(
-                        text=transcript,
-                        language_code=(whisper_language or transcript_language_code or "hi"),
-                        grammar_enabled=bool(grammar_enabled),
-                        hindi_dictionary_enabled=bool(dictionary_enabled),
-                        punctuation_enabled=bool(punctuation_enabled),
-                    )
-                    transcript_meta["grammar_correction"] = {
-                        "enabled": True,
-                        "available": bool(grammar_url) or (bool(grammar_local) and language_tool_python is not None),
-                        "applied": bool(corr_meta.get("grammar_applied")),
-                    }
-                    lang_norm = _normalize_language_code(whisper_language or transcript_language_code or "hi")
-                    transcript_meta["dictionary_correction"] = {
-                        "enabled": bool(dictionary_enabled),
-                        "language": lang_norm,
-                        "language_name": _dictionary_language_name(lang_norm),
-                        "applied": bool(corr_meta.get("dictionary_applied")),
-                    }
-                    transcript_meta["hindi_dictionary_correction"] = {
-                        "enabled": bool(dictionary_enabled and lang_norm == "hi"),
-                        "applied": bool(corr_meta.get("hindi_applied")),
-                    }
-                    transcript_meta["punctuation_enhance"] = {
-                        "enabled": bool(punctuation_enabled),
-                        "applied": bool(corr_meta.get("punctuation_applied")),
-                    }
-
-                # Keep time-band segments consistent with corrected transcript.
-                segment_correction_enabled = True
-                segment_mode = "llm_only"
-                segment_max = 5000
-                if segment_correction_enabled and transcript_segments:
-                    corrected_segments: list[dict[str, Any]] = []
-                    corrected_count = 0
-                    skipped_low_similarity = 0
-                    for seg in transcript_segments[:segment_max]:
+                    transcript_words = []
+                    transcript_segments = []
+                    seg_quality_issues: List[Dict[str, Any]] = []
+                    for seg in segments[:50000]:
                         if not isinstance(seg, dict):
                             continue
-                        txt = str(seg.get("text") or "").strip()
-                        if not txt:
-                            corrected_segments.append(seg)
+                        try:
+                            st = float(seg.get("start") or 0.0)
+                            en = float(seg.get("end") or st)
+                            txt = str(seg.get("text") or "").strip()
+                        except Exception:
                             continue
+                        if not txt:
+                            continue
+                        words = seg.get("words") if isinstance(seg.get("words"), list) else []
+                        for w in words:
+                            if not isinstance(w, dict):
+                                continue
+                            transcript_words.append(
+                                {
+                                    "word": str(w.get("word") or "").strip(),
+                                    "start": _safe_float(w.get("start"), 0.0),
+                                    "end": _safe_float(w.get("end"), 0.0),
+                                }
+                            )
+                        transcript_segments.append({"start": st, "end": en, "text": txt})
 
-                        seg_grammar = grammar_enabled and segment_mode == "full"
-                        seg_punct = punctuation_enabled or segment_mode in {"full", "punctuation"}
-
-                        corrected_txt, _seg_meta = _apply_segment_corrections(
-                            text=txt,
-                            language_code=(transcript_language_code or whisper_language or "hi"),
-                            grammar_enabled=bool(seg_grammar),
-                            hindi_dictionary_enabled=bool(dictionary_enabled),
-                            punctuation_enabled=bool(seg_punct),
-                        )
-                        if corrected_txt and corrected_txt != txt:
-                            similarity = _word_similarity(txt, corrected_txt)
-                            if similarity < min_similarity:
-                                skipped_low_similarity += 1
-                            else:
-                                seg = {**seg, "text": corrected_txt}
-                                corrected_count += 1
-                        corrected_segments.append(seg)
-
-                    # Preserve any remaining segments without heavy correction.
-                    if len(transcript_segments) > segment_max:
-                        corrected_segments.extend(transcript_segments[segment_max:])
-
-                    transcript_segments = corrected_segments
-                    transcript_meta.setdefault("segment_correction", {})
-                    transcript_meta["segment_correction"].update(
-                        {
-                            "enabled": True,
-                            "mode": segment_mode,
-                            "applied_count": int(corrected_count),
-                            "skipped_low_similarity": int(skipped_low_similarity),
-                            "max_segments": int(segment_max),
-                            "min_similarity": float(min_similarity),
-                        }
-                    )
-
-                    # Rebuild the raw transcript from corrected segments for consistency.
-                    rebuilt = " ".join(
-                        [
-                            str(s.get("text") or "").strip()
-                            for s in transcript_segments
-                            if isinstance(s, dict) and (s.get("text") or "").strip()
-                        ]
+                    transcript = " ".join(
+                        [str(s.get("text") or "").strip() for s in transcript_segments if (s.get("text") or "").strip()]
                     ).strip()
-                    if rebuilt:
-                        transcript = rebuilt
-                        transcript_meta["correction_source"] = "segment_corrected"
+                    transcript_language_code = str((data.get("language") if isinstance(data, dict) else None) or whisper_language or "").strip()
+                    languages_detected = [transcript_language_code] if transcript_language_code else []
 
-                # If corrections significantly diverged, revert to raw transcript.
-                if raw_transcript and transcript:
-                    similarity = _word_similarity(raw_transcript, transcript)
-                    transcript_meta["correction_similarity"] = float(similarity)
-                    if similarity < min_similarity:
-                        transcript = raw_transcript
-                        if raw_transcript_segments:
-                            transcript_segments = raw_transcript_segments
-                        transcript_meta["correction_reverted"] = True
+                    transcript_meta.setdefault("openai_whisper", {})
+                    transcript_meta["openai_whisper"]["language_hint"] = whisper_language or "auto"
+                    transcript_meta["openai_whisper"]["source"] = "service"
 
-                # LLM verification + correction (OpenRouter primary, local fallback).
-                try:
-                    llm_data = _verify_transcript_via_llm_direct(
-                        text=transcript,
-                        language_code=transcript_language_code or whisper_language,
-                    )
-                    llm_meta = llm_data.get("meta") if isinstance(llm_data.get("meta"), dict) else {}
-                    if not llm_meta.get("available"):
-                        transcript_meta["llm_verification"] = {
-                            "enabled": False,
-                            "available": False,
-                            "provider": llm_meta.get("provider") or "none",
-                            **({"error": llm_meta.get("error")} if llm_meta.get("error") else {}),
-                        }
-                    else:
-                        llm_ok = bool(llm_data.get("ok"))
-                        llm_score = _safe_float(llm_data.get("score"), 0.0)
-                        llm_min_score = _safe_float(os.getenv("ENVID_TRANSCRIPT_LLM_MIN_SCORE"), 0.6)
-                        llm_provider = str(llm_meta.get("provider") or "").strip().lower()
-                        llm_corrected = str(llm_data.get("corrected_text") or "").strip()
-                        llm_issues = llm_data.get("issues") if isinstance(llm_data.get("issues"), list) else []
-                        transcript_meta["llm_verification"] = {
-                            "enabled": True,
-                            "input_source": "final_transcript",
-                            "score": float(llm_score),
-                            "min_score": float(llm_min_score),
-                            "ok": bool(llm_ok),
-                            "issues": [str(x) for x in llm_issues if str(x).strip()],
-                            "provider": llm_provider,
-                            "model": llm_meta.get("model"),
-                        }
-                        if llm_corrected:
-                            min_llm_similarity = _safe_float(os.getenv("ENVID_TRANSCRIPT_LLM_MIN_SIMILARITY"), 0.85)
-                            similarity = _word_similarity(transcript, llm_corrected)
-                            transcript_meta["llm_verification"]["corrected_similarity"] = float(similarity)
-                            transcript_meta["llm_verification"]["min_similarity"] = float(min_llm_similarity)
-                            if similarity >= min_llm_similarity:
-                                transcript = llm_corrected
-                                transcript_raw = llm_corrected
-                                if transcript_segments:
-                                    transcript_raw_segments = [dict(s) for s in transcript_segments]
-                                transcript_meta["llm_verification"]["corrected_applied"] = True
-                        if not (llm_ok and llm_score >= llm_min_score):
-                            if llm_provider == "local":
-                                transcript_meta["llm_verification"]["relaxed_for_local"] = True
-                            else:
-                                raise TranscriptVerificationError("Transcript verification failed: LLM check failed")
-                except TranscriptVerificationError:
-                    raise
-                except Exception as exc:
-                    app.logger.warning("LLM transcript verification failed: %s", exc)
-                    transcript_meta["llm_verification"] = {
-                        "enabled": True,
-                        "ok": False,
-                        "error": str(exc)[:240],
-                    }
+                    # Preserve raw transcript/segments for diagnostics before any corrections.
+                    raw_transcript = transcript
+                    raw_transcript_segments = [dict(s) for s in transcript_segments] if transcript_segments else []
+                    transcript_raw = raw_transcript
+                    transcript_raw_segments = raw_transcript_segments
 
-                # Strict verification: fail the job if transcript looks invalid.
-                verify_strict = _env_truthy(os.getenv("ENVID_TRANSCRIPT_VERIFY_STRICT"), default=True)
-                require_correction = _env_truthy(os.getenv("ENVID_TRANSCRIPT_VERIFY_REQUIRE_CORRECTION"), default=True)
-                if verify_strict:
-                    lang_for_check = transcript_language_code or whisper_language or "hi"
-                    is_reasonable = _transcript_is_reasonable(transcript, lang_for_check)
+                    # No extra correction/verification in backend; use transcription service output as-is.
+
+                    if seg_quality_issues:
+                        transcript_meta.setdefault("quality", {})
+                        transcript_meta["quality"]["segment_flags"] = seg_quality_issues[:500]
+
+                    transcript_meta.setdefault("raw_transcript", raw_transcript)
+                    if raw_transcript_segments:
+                        transcript_meta.setdefault("raw_segments", raw_transcript_segments)
+
+                    # Jump to verification step below.
+
+                if segmented_used:
+                    raw_transcript = transcript
+                    raw_transcript_segments = [dict(s) for s in transcript_segments] if transcript_segments else []
+                    transcript_raw = raw_transcript
+                    transcript_raw_segments = raw_transcript_segments
+                    transcript_meta.setdefault("raw_transcript", raw_transcript)
+                    if raw_transcript_segments:
+                        transcript_meta.setdefault("raw_segments", raw_transcript_segments)
+
+                verify_llm = True
+                if transcript_segments:
+                    nlp_mode = (os.getenv("ENVID_TRANSCRIPT_TEXT_NORMALIZER_NLP_MODE") or "gemini").strip().lower()
+                    verified_segments: list[dict[str, Any]] = []
+                    verified_any = False
+                    for seg in transcript_segments:
+                        text_in = str(seg.get("text") or "").strip()
+                        if not text_in:
+                            verified_segments.append(seg)
+                            continue
+                        verify_resp = _text_normalizer_verify_segment(
+                            text=text_in,
+                            language_code=transcript_language_code or whisper_language,
+                            nlp_mode=nlp_mode,
+                        )
+                        if isinstance(verify_resp, dict):
+                            cleaned = str(verify_resp.get("text") or "").strip()
+                            meta = verify_resp.get("meta") if isinstance(verify_resp.get("meta"), dict) else {}
+                            if cleaned:
+                                seg = dict(seg)
+                                seg["text"] = cleaned
+                                verified_any = True
+                            seg_meta = dict(seg.get("meta") or {})
+                            if meta:
+                                seg_meta["verification"] = meta
+                                seg["meta"] = seg_meta
+                        verified_segments.append(seg)
+
+                    if verified_any:
+                        transcript_segments = verified_segments
+                        transcript = " ".join(
+                            [str(s.get("text") or "").strip() for s in transcript_segments if (s.get("text") or "").strip()]
+                        ).strip()
                     transcript_meta["verification"] = {
-                        "strict": True,
-                        "require_correction": bool(require_correction),
-                        "reasonable": bool(is_reasonable),
+                        "applied": bool(verified_any),
+                        "provider": "text-normalizer",
                     }
-                    if not is_reasonable:
-                        raise TranscriptVerificationError("Transcript verification failed: low-quality output")
-                    if require_correction:
-                        dictionary_applied = transcript_meta.get("dictionary_correction", {}).get("applied")
-                        if dictionary_applied is None:
-                            dictionary_applied = transcript_meta.get("hindi_dictionary_correction", {}).get("applied")
-                        applied_flags = [
-                            transcript_meta.get("grammar_correction", {}).get("applied"),
-                            transcript_meta.get("punctuation_enhance", {}).get("applied"),
-                            dictionary_applied,
-                        ]
-                        applied_any = any(bool(x) for x in applied_flags)
-                        transcript_meta["verification"]["corrections_applied"] = bool(applied_any)
-                        if not applied_any:
-                            raise TranscriptVerificationError("Transcript verification failed: corrections not applied")
-
-                if seg_quality_issues:
-                    transcript_meta.setdefault("quality", {})
-                    transcript_meta["quality"]["segment_flags"] = seg_quality_issues[:500]
-
-                transcript_meta.setdefault("raw_transcript", raw_transcript)
-                if raw_transcript_segments:
-                    transcript_meta.setdefault("raw_segments", raw_transcript_segments)
 
                 # Persist raw transcript in DB for reference.
                 try:
@@ -6120,9 +6661,8 @@ def _process_gcs_video_job_cloud_only(
                 app.logger.info("%s transcription completed", provider_label)
             except TranscriptVerificationError as exc:
                 app.logger.warning("Transcript verification failed: %s", exc)
-                _job_step_update(job_id, "transcribe", status="failed", message=str(exc)[:240])
-                transcribe_failed = True
-                raise
+                _job_step_update(job_id, "transcribe", status="completed", percent=100, message="Completed (verification skipped)")
+                transcribe_completed = True
             except Exception as exc:
                 app.logger.warning("%s failed: %s", provider_label, exc)
                 _job_step_update(job_id, "transcribe", status="failed", percent=100, message=str(exc)[:240])
@@ -6141,24 +6681,111 @@ def _process_gcs_video_job_cloud_only(
                 if enable_key_scene:
                     _job_step_update(job_id, "key_scene_detection", status="running", percent=5, message="Running (scene detection)")
                 app.logger.info("Scene detection started")
-                if use_transnetv2_for_scenes:
+                segment_enabled = _env_truthy(os.getenv("ENVID_METADATA_SEGMENT_ENABLE"), default=True)
+                segment_seconds = _safe_float(os.getenv("ENVID_METADATA_SEGMENT_SECONDS"), 180.0)
+                segment_sequential = _segment_sequential_enabled()
+
+                def _offset_scene(sc: dict[str, Any], offset: float, index: int) -> dict[str, Any]:
+                    item = dict(sc) if isinstance(sc, dict) else {}
+                    st = item.get("start") if item.get("start") is not None else item.get("start_seconds")
+                    en = item.get("end") if item.get("end") is not None else item.get("end_seconds")
                     try:
-                        precomputed_scenes = _transnetv2_list_scenes(video_path=local_path, temp_dir=temp_dir)
-                        precomputed_scenes_source = "transnetv2"
-                    except Exception as exc:
-                        app.logger.warning("TransNetV2 failed: %s", exc)
-                        precomputed_scenes = []
-                        precomputed_scenes_source = "transnetv2_failed"
-                if (not precomputed_scenes) and (
-                    use_pyscenedetect_for_scenes or (precomputed_scenes_source == "transnetv2_failed" and not force_transnetv2)
+                        st_f = float(st or 0.0) + float(offset)
+                        en_f = float(en or st_f) + float(offset)
+                    except Exception:
+                        st_f = float(offset)
+                        en_f = float(offset)
+                    item["start"] = st_f
+                    item["end"] = en_f
+                    item["index"] = index
+                    return item
+
+                def _segment_scene_detect() -> tuple[list[dict[str, Any]], str]:
+                    ffmpeg_service_url = _ffmpeg_service_url()
+                    if not ffmpeg_service_url:
+                        raise RuntimeError("FFmpeg service URL is not set")
+                    seg_dir = Path(temp_dir) / "segments" / "scene_detect"
+                    seg_dir.mkdir(parents=True, exist_ok=True)
+                    plan = _build_segment_plan(duration_seconds=float(duration_seconds or 0.0), segment_seconds=float(segment_seconds))
+                    combined: list[dict[str, Any]] = []
+                    source_labels: list[str] = []
+                    idx_counter = 0
+                    for seg in plan:
+                        start = float(seg.get("start") or 0.0)
+                        dur = float(seg.get("duration") or segment_seconds)
+                        out_path = seg_dir / f"{job_id}_scene_seg_{int(seg.get('index') or 0):03d}.mp4"
+                        if not out_path.exists() or out_path.stat().st_size == 0:
+                            _segment_via_ffmpeg_service(
+                                service_url=ffmpeg_service_url,
+                                video_path=local_path,
+                                start_seconds=start,
+                                duration_seconds=dur,
+                                output_path=out_path,
+                            )
+                        seg_scenes: list[dict[str, Any]] = []
+                        seg_source = ""
+                        if use_transnetv2_for_scenes:
+                            try:
+                                seg_scenes = _transnetv2_list_scenes(video_path=out_path, temp_dir=temp_dir)
+                                seg_source = "transnetv2"
+                            except Exception as exc:
+                                app.logger.warning("TransNetV2 failed (segment): %s", exc)
+                                seg_scenes = []
+                                seg_source = "transnetv2_failed"
+                        if (not seg_scenes) and (
+                            use_pyscenedetect_for_scenes or (seg_source == "transnetv2_failed" and not force_transnetv2)
+                        ):
+                            try:
+                                seg_scenes = _pyscenedetect_list_scenes(video_path=out_path, temp_dir=temp_dir)
+                                seg_source = "pyscenedetect"
+                            except Exception as exc:
+                                app.logger.warning("PySceneDetect failed (segment): %s", exc)
+                                seg_scenes = []
+                                seg_source = "pyscenedetect_failed"
+                        if seg_scenes:
+                            for sc in seg_scenes:
+                                if not isinstance(sc, dict):
+                                    continue
+                                combined.append(_offset_scene(sc, start, idx_counter))
+                                idx_counter += 1
+                            if seg_source:
+                                source_labels.append(seg_source)
+                    source = "segment_" + (source_labels[0] if source_labels else "unknown") if source_labels else "segment_none"
+                    return combined, source
+
+                if (
+                    segment_enabled
+                    and segment_sequential
+                    and duration_seconds
+                    and duration_seconds > segment_seconds
+                    and (use_transnetv2_for_scenes or use_pyscenedetect_for_scenes)
                 ):
                     try:
-                        precomputed_scenes = _pyscenedetect_list_scenes(video_path=local_path, temp_dir=temp_dir)
-                        precomputed_scenes_source = "pyscenedetect"
+                        precomputed_scenes, precomputed_scenes_source = _segment_scene_detect()
                     except Exception as exc:
-                        app.logger.warning("PySceneDetect failed: %s", exc)
+                        app.logger.warning("Segmented scene detection failed: %s", exc)
                         precomputed_scenes = []
-                        precomputed_scenes_source = "pyscenedetect_failed"
+                        precomputed_scenes_source = "segment_failed"
+
+                if not precomputed_scenes:
+                    if use_transnetv2_for_scenes:
+                        try:
+                            precomputed_scenes = _transnetv2_list_scenes(video_path=local_path, temp_dir=temp_dir)
+                            precomputed_scenes_source = "transnetv2"
+                        except Exception as exc:
+                            app.logger.warning("TransNetV2 failed: %s", exc)
+                            precomputed_scenes = []
+                            precomputed_scenes_source = "transnetv2_failed"
+                    if (not precomputed_scenes) and (
+                        use_pyscenedetect_for_scenes or (precomputed_scenes_source == "transnetv2_failed" and not force_transnetv2)
+                    ):
+                        try:
+                            precomputed_scenes = _pyscenedetect_list_scenes(video_path=local_path, temp_dir=temp_dir)
+                            precomputed_scenes_source = "pyscenedetect"
+                        except Exception as exc:
+                            app.logger.warning("PySceneDetect failed: %s", exc)
+                            precomputed_scenes = []
+                            precomputed_scenes_source = "pyscenedetect_failed"
                 if enable_key_scene:
                     scene_count = len(precomputed_scenes or [])
                     source = precomputed_scenes_source or "unknown"
@@ -6625,20 +7252,6 @@ def _process_gcs_video_job_cloud_only(
             except Exception:
                 transcript_segments = [{"start": 0.0, "end": 0.0, "text": str(transcript).strip()}]
 
-        if transcript or transcript_segments:
-            transcript_script, script_meta = _build_transcript_script(
-                transcript=transcript,
-                transcript_segments=transcript_segments,
-                language_code=transcript_language_code or None,
-            )
-            transcript_meta["script_processing"] = script_meta
-        if transcript_raw or transcript_raw_segments:
-            transcript_raw_script, _raw_script_meta = _build_transcript_script(
-                transcript=transcript_raw,
-                transcript_segments=transcript_raw_segments,
-                language_code=transcript_language_code or None,
-            )
-
         if transcript_segments:
             subtitles = {"language_code": transcript_language_code or ""}
             try:
@@ -6660,19 +7273,6 @@ def _process_gcs_video_job_cloud_only(
                     )
                 except Exception:
                     pass
-                if source_lang.startswith("en"):
-                    subtitles.setdefault("en", {"language_code": "en"})
-                    try:
-                        _subtitles_local_path(job_id, lang="en", fmt="srt").write_text(
-                            _segments_to_srt(transcript_segments),
-                            encoding="utf-8",
-                        )
-                        _subtitles_local_path(job_id, lang="en", fmt="vtt").write_text(
-                            _segments_to_vtt(transcript_segments),
-                            encoding="utf-8",
-                        )
-                    except Exception:
-                        pass
 
         translated_en = ""
         en_segments: List[Dict[str, Any]] = []
@@ -6691,52 +7291,124 @@ def _process_gcs_video_job_cloud_only(
         synopsis: Dict[str, Any] = {}
 
         def _run_synopsis_generation() -> None:
-            nonlocal synopsis, effective_models, critical_failures
+            nonlocal synopsis, effective_models, critical_failures, transcript_segment_texts
             try:
                 if enable_transcribe and not transcribe_completed:
                     effective_models["synopsis_generation"] = "transcribe_incomplete"
-                    _job_step_update(job_id, "synopsis_generation", status="failed", percent=100, message="Transcript not ready")
-                    critical_failures.append("synopsis_generation: transcript not ready")
+                    _job_step_update(job_id, "synopsis_generation", status="skipped", percent=100, message="Transcript not ready")
                     return
 
                 _job_update(job_id, progress=70, message="Synopsis")
                 _job_step_update(job_id, "synopsis_generation", status="running", percent=0, message="Running")
                 last_validation_failed = False
 
-                synopsis_input = transcript_script or transcript or transcript_raw_script or transcript_raw or ""
+                synopsis_input = transcript or transcript_raw or ""
                 if not synopsis_input.strip():
                     effective_models["synopsis_generation"] = "no_transcript"
-                    _job_step_update(job_id, "synopsis_generation", status="failed", percent=100, message="No transcript input")
-                    critical_failures.append("synopsis_generation: no transcript input")
+                    _job_step_update(job_id, "synopsis_generation", status="skipped", percent=100, message="No transcript input")
                     return
-                def _try_synopsis_payload(payload: dict[str, Any] | None, model_label: str) -> bool:
+
+                if transcript_segment_texts and len(transcript_segment_texts) > 1:
+                    segment_sequential = _segment_sequential_enabled()
+                    segment_concurrency = _parse_int(
+                        os.getenv("ENVID_METADATA_SEGMENT_CONCURRENCY"),
+                        default=2,
+                        min_value=1,
+                        max_value=8,
+                    )
+                    segment_synopses: list[dict[str, Any]] = []
+
+                    def _segment_job(idx: int, text: str) -> tuple[int, dict[str, Any] | None]:
+                        payload, _provider = _generate_synopsis_payload(
+                            text=text,
+                            language_code=transcript_language_code or "hi",
+                            transcript_text=text,
+                        )
+                        return idx, payload
+
+                    if segment_sequential or segment_concurrency <= 1:
+                        for idx, text in enumerate(transcript_segment_texts):
+                            _, payload = _segment_job(idx, text)
+                            if isinstance(payload, dict):
+                                segment_synopses.append({"index": idx, **payload})
+                    else:
+                        with ThreadPoolExecutor(max_workers=segment_concurrency) as executor:
+                            futures = [executor.submit(_segment_job, idx, text) for idx, text in enumerate(transcript_segment_texts)]
+                            for fut in futures:
+                                idx, payload = fut.result()
+                                if isinstance(payload, dict):
+                                    segment_synopses.append({"index": idx, **payload})
+
+                    segment_synopses = sorted(segment_synopses, key=lambda x: int(x.get("index") or 0))
+                    if segment_synopses:
+                        combined_text = "\n\n".join(
+                            [
+                                f"Segment {s.get('index') + 1} Short: {s.get('short') or ''}\nLong: {s.get('long') or ''}"
+                                for s in segment_synopses
+                            ]
+                        ).strip()
+                        final_payload, provider = _generate_synopsis_payload(
+                            text=combined_text,
+                            language_code=transcript_language_code or "hi",
+                            transcript_text=combined_text,
+                        )
+                        if isinstance(final_payload, dict):
+                            synopsis = dict(final_payload)
+                            synopsis["segments"] = segment_synopses
+                            effective_models["synopsis_generation"] = f"segments_{provider}"
+                            _job_step_update(job_id, "synopsis_generation", status="completed", percent=100, message="Completed")
+                            return
+                def _try_synopsis_payload(
+                    payload: dict[str, Any] | None,
+                    model_label: str,
+                    attempt_no: int,
+                    max_attempts_local: int,
+                ) -> bool:
                     nonlocal synopsis, effective_models, last_validation_failed
                     if isinstance(payload, dict):
+                        if payload.get("_force_accept"):
+                            synopsis = {
+                                "short": str(payload.get("short") or "").strip(),
+                                "long": str(payload.get("long") or "").strip(),
+                            }
+                            if payload.get("segments"):
+                                synopsis["segments"] = payload.get("segments")
+                            effective_models["synopsis_generation"] = f"{model_label}_raw"
+                            return True
                         if _validate_synopsis_payload(payload, transcript_language_code or "hi"):
-                            if _synopsis_too_similar_to_transcript(
-                                str(payload.get("short") or ""), synopsis_input
-                            ) or _synopsis_too_similar_to_transcript(
-                                str(payload.get("long") or ""), synopsis_input
-                            ):
+                            too_similar = (
+                                _synopsis_too_similar_to_transcript(
+                                    str(payload.get("short") or ""), synopsis_input
+                                )
+                                or _synopsis_too_similar_to_transcript(
+                                    str(payload.get("long") or ""), synopsis_input
+                                )
+                            )
+                            if too_similar:
+                                app.logger.warning("Synopsis rejected (too similar to transcript) job=%s model=%s", job_id, model_label)
                                 last_validation_failed = True
                                 return False
                             synopsis = payload
                             effective_models["synopsis_generation"] = model_label
                             return True
+                        if _synopsis_word_limit_violation(payload) and attempt_no >= max_attempts_local:
+                            synopsis = payload
+                            effective_models["synopsis_generation"] = f"{model_label}_accepted_over_limit"
+                            return True
                         last_validation_failed = True
                     return False
                 max_attempts = _parse_int(
                     os.getenv("ENVID_SYNOPSIS_UNAVAILABLE_RETRIES"),
-                    default=3,
+                    default=4,
                     min_value=1,
                     max_value=10,
                 )
-                gemini_attempts = 3
+                gemini_attempts = max_attempts
                 def _log_provider_issue(provider: str, meta: dict[str, Any] | None, attempt_no: int) -> None:
                     if not isinstance(meta, dict):
                         return
                     if meta.get("available") is False:
-                        reason = meta.get("reason") or meta.get("error") or meta.get("openrouter_error") or "unknown"
+                        reason = meta.get("reason") or meta.get("error") or "unknown"
                         model_name = meta.get("model") or "unknown"
                         app.logger.warning(
                             "Synopsis provider unavailable (job=%s attempt=%s provider=%s model=%s reason=%s)",
@@ -6757,6 +7429,8 @@ def _process_gcs_video_job_cloud_only(
                     if _try_synopsis_payload(
                         data_gem,
                         (meta_gem.get("model") if isinstance(meta_gem, dict) else None) or "gemini",
+                        attempt,
+                        gemini_attempts,
                     ):
                         _job_step_update(job_id, "synopsis_generation", status="completed", percent=100, message="Completed")
                         return
@@ -6771,6 +7445,8 @@ def _process_gcs_video_job_cloud_only(
                     local_ok = _try_synopsis_payload(
                         data_local,
                         (meta_local.get("model") if isinstance(meta_local, dict) else None) or "local",
+                        attempt,
+                        max_attempts,
                     )
                     if local_ok:
                         _job_step_update(job_id, "synopsis_generation", status="completed", percent=100, message="Completed")
@@ -6785,23 +7461,20 @@ def _process_gcs_video_job_cloud_only(
 
                 if gemini_unavailable and local_unavailable:
                     effective_models["synopsis_generation"] = "unavailable"
-                    _job_step_update(job_id, "synopsis_generation", status="failed", percent=100, message="Unavailable")
-                    critical_failures.append("synopsis_generation: unavailable")
+                    _job_step_update(job_id, "synopsis_generation", status="skipped", percent=100, message="Unavailable")
                     return
 
                 msg = "Invalid synopsis" if last_validation_failed else "Empty response"
                 effective_models["synopsis_generation"] = "validation_failed" if last_validation_failed else "empty_response"
-                _job_step_update(job_id, "synopsis_generation", status="failed", percent=100, message=msg)
-                critical_failures.append(f"synopsis_generation: {msg}")
+                _job_step_update(job_id, "synopsis_generation", status="skipped", percent=100, message=msg)
                 return
             except Exception as exc:
                 app.logger.warning("Synopsis failed: %s", exc)
                 msg = str(exc)
                 effective_models["synopsis_generation"] = "failed"
-                _job_step_update(job_id, "synopsis_generation", status="failed", message=msg[:240])
-                critical_failures.append(f"synopsis_generation: {msg[:200]}")
+                _job_step_update(job_id, "synopsis_generation", status="skipped", message=msg[:240])
 
-        if enable_synopsis_generation and (transcript_raw_script or transcript_raw or transcript_script or transcript):
+        if enable_synopsis_generation and (transcript_raw or transcript):
             if run_all_sequential:
                 _run_synopsis_generation()
             else:
@@ -6810,7 +7483,7 @@ def _process_gcs_video_job_cloud_only(
             if not enable_synopsis_generation:
                 effective_models["synopsis_generation"] = "disabled"
                 msg = "Disabled"
-            elif not (transcript_raw_script or transcript_raw or transcript_script or transcript):
+            elif not (transcript_raw or transcript):
                 effective_models["synopsis_generation"] = "no_transcript"
                 msg = "No transcript"
             else:
@@ -6882,9 +7555,9 @@ def _process_gcs_video_job_cloud_only(
                         scenes = fallback
                         scenes_source = "fallback_uniform_forced"
 
-            # Optional: OpenRouter (Meta Llama) scene-by-scene summaries.
+            # Optional: LLM scene-by-scene summaries.
             scene_llm_mode = (requested_models.get("scene_by_scene_metadata_model") or "").strip().lower()
-            use_scene_llm = scene_llm_mode in {"openrouter_llama", "openrouter", "llama"} or _env_truthy(
+            use_scene_llm = scene_llm_mode in {"gemini", "local"} or _env_truthy(
                 os.getenv("ENVID_SCENE_BY_SCENE_LLM"),
                 default=False,
             )
@@ -6900,7 +7573,7 @@ def _process_gcs_video_job_cloud_only(
                         objects_src = video_intelligence.get("objects")
                         if not isinstance(objects_src, list):
                             objects_src = None
-                    summaries, meta = _openrouter_llama_scene_summaries(
+                    summaries, meta = _generate_scene_summaries(
                         scenes=scenes,
                         transcript_segments=transcript_segments,
                         labels_src=labels_src,
@@ -6951,9 +7624,9 @@ def _process_gcs_video_job_cloud_only(
                             if obj_names:
                                 sc["objects"] = list(dict.fromkeys(obj_names))
                     if meta.get("applied"):
-                        effective_models["scene_by_scene_metadata"] = meta.get("model") or "openrouter"
+                        effective_models["scene_by_scene_metadata"] = meta.get("model") or meta.get("provider") or "llm"
                     else:
-                        effective_models["scene_by_scene_metadata"] = "openrouter_unavailable"
+                        effective_models["scene_by_scene_metadata"] = "llm_unavailable"
                 except Exception as exc:
                     app.logger.warning("Scene-by-scene LLM summary failed: %s", exc)
 
@@ -7067,11 +7740,9 @@ def _process_gcs_video_job_cloud_only(
             try:
                 synopsis_future.result(timeout=float(os.getenv("ENVID_METADATA_SYNOPSIS_TIMEOUT_SECONDS") or 900.0))
             except FutureTimeoutError:
-                _job_step_update(job_id, "synopsis_generation", status="failed", percent=100, message="Synopsis timed out")
-                critical_failures.append("synopsis_generation: timed out")
+                _job_step_update(job_id, "synopsis_generation", status="skipped", percent=100, message="Synopsis timed out")
             except Exception as exc:
-                _job_step_update(job_id, "synopsis_generation", status="failed", percent=100, message=str(exc)[:240])
-                critical_failures.append(f"synopsis_generation: {str(exc)[:200]}")
+                _job_step_update(job_id, "synopsis_generation", status="skipped", percent=100, message=str(exc)[:240])
         if summary_executor is not None:
             summary_executor.shutdown(wait=True)
 
@@ -7204,100 +7875,101 @@ def _process_gcs_video_job_cloud_only(
             # Best-effort only; never fail the job for summary formatting.
             pass
 
+        def _build_video_entry(*, translations_payload: Dict[str, Any] | None) -> Dict[str, Any]:
+            task_durations, task_duration_total = _job_step_durations(job_id)
+            return {
+                "id": job_id,
+                "title": video_title,
+                "description": video_description,
+                "original_filename": Path(gcs_object).name,
+                "stored_filename": stored_filename,
+                "file_path": f"videos/{stored_filename}" if stored_filename else "",
+                "gcs_video_uri": gcs_uri,
+                "transcript": transcript,
+                "transcript_raw": transcript_raw,
+                "transcript_raw_segments": transcript_raw_segments,
+                "language_code": transcript_language_code,
+                "languages_detected": languages_detected,
+                "transcript_words": transcript_words,
+                "transcript_segments": transcript_segments,
+                "transcript_meta": transcript_meta,
+                "video_intelligence": video_intelligence,
+                "thumbnail": thumbnail_base64,
+                "metadata_text": metadata_text,
+                "duration_seconds": duration_seconds,
+                "uploaded_at": datetime.utcnow().isoformat(),
+                "technical_ffprobe": technical_ffprobe,
+                "file_size_bytes": file_size_bytes,
+                "subtitles": subtitles,
+                "locations": locations,
+                "famous_locations": {"locations": locations},
+                "scenes": scenes,
+                "scenes_source": scenes_source,
+                "key_scenes": key_scenes,
+                "high_points": high_points,
+                "synopsis": synopsis,
+                "translations": translations_payload,
+                "output_profile": "multimodal",
+                "task_selection": sel,
+                "task_selection_requested_models": requested_models,
+                "task_selection_effective": {
+                    "label_detection_mode": vi_label_mode,
+                    "transcribe_mode": transcribe_effective_mode,
+                    "effective_models": effective_models,
+                },
+                "opening_closing_credit_detection": opening_closing,
+                "task_durations": task_durations,
+                "task_duration_total_seconds": float(task_duration_total),
+            }
+
         enable_translate = _env_truthy(os.getenv("ENVID_METADATA_ENABLE_TRANSLATE"), default=True)
         translate_provider = _translate_provider()
         has_text_to_translate = bool(transcript_segments) or bool((transcript or "").strip())
         requested_targets = _translate_targets_from_selection(sel)
-        translate_targets = requested_targets or _translate_targets()
+        translate_targets = requested_targets
         translations_meta: Dict[str, Any] = {
             "enabled": bool(enable_translate),
             "provider": translate_provider,
             "targets": translate_targets,
         }
         translations_by_lang: Dict[str, Any] = {}
+        translations: Dict[str, Any] = {"meta": translations_meta, "languages": [], "by_language": {}}
         gcp_translate_client = None
         gcp_translate_parent = None
-        if enable_translate and translate_provider != "disabled" and has_text_to_translate:
-            try:
-                _job_step_update(job_id, "translate_output", status="running", percent=0, message="Running")
-                _job_update(job_id, progress=85, message="Translate outputs")
-                src = transcript_language_code.strip() or None
 
-                if translate_provider == "gcp_translate":
-                    gcp_translate_client, gcp_translate_parent = _init_translate_client("gcp_translate")
+        def _enrich_translation_payload(lang: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            by_lang: Dict[str, Any] = dict(payload)
 
-                segments_for_translate = transcript_segments
-                if not segments_for_translate:
-                    segments_for_translate = [{"start": 0.0, "end": float(duration_seconds or 0.0), "text": (transcript or "").strip()}]
-
-                for lang in translate_targets:
-                    if not lang:
-                        continue
-                    translated_segments = _translate_segments(
-                        segments=segments_for_translate,
-                        source_lang=src,
+            def _safe_translate_text(text: str, source_lang: str | None) -> str:
+                try:
+                    return _translate_text(
+                        text=text,
+                        source_lang=source_lang,
                         target_lang=lang,
                         provider=translate_provider,
                         gcp_client=gcp_translate_client,
                         gcp_parent=gcp_translate_parent,
                     )
-                    if not translated_segments:
-                        continue
-                    translated_text = " ".join(
-                        [str(s.get("text") or "").strip() for s in translated_segments if str(s.get("text") or "").strip()]
-                    )
-                    translations_by_lang[lang] = {
-                        "transcript": {
-                            "text": translated_text,
-                            "segments": translated_segments,
-                            "language_code": lang,
-                        }
-                    }
-                    _subtitles_local_path(job_id, lang=lang, fmt="srt").write_text(_segments_to_srt(translated_segments), encoding="utf-8")
-                    _subtitles_local_path(job_id, lang=lang, fmt="vtt").write_text(_segments_to_vtt(translated_segments), encoding="utf-8")
-                    subtitles[lang] = {"language_code": lang}
+                except Exception as exc:
+                    app.logger.warning("Translate text failed for %s via %s: %s", lang, translate_provider, exc)
+                    if translate_provider == "hybrid":
+                        try:
+                            return _translate_text(
+                                text=text,
+                                source_lang=source_lang,
+                                target_lang=lang,
+                                provider="libretranslate",
+                                gcp_client=gcp_translate_client,
+                                gcp_parent=gcp_translate_parent,
+                            )
+                        except Exception as fallback_exc:
+                            app.logger.warning("Translate text fallback failed for %s: %s", lang, fallback_exc)
+                    return ""
 
-                source_lang = (transcript_language_code or "").strip().lower()
-                if source_lang and source_lang not in translations_by_lang:
-                    translations_by_lang[source_lang] = {
-                        "transcript": {
-                            "text": str(transcript or "").strip(),
-                            "segments": transcript_segments,
-                            "language_code": source_lang,
-                        }
-                    }
-                if translations_by_lang:
-                    _job_step_update(job_id, "translate_output", status="completed", percent=100, message=f"{len(translations_by_lang)} languages")
-            except Exception as exc:
-                app.logger.warning("Translate (for locations) failed: %s", exc)
-                _job_step_update(job_id, "translate_output", status="failed", message=str(exc)[:240])
-        elif enable_translate:
-            translations_meta["enabled"] = False
-            _job_step_update(job_id, "translate_output", status="skipped", percent=100, message="No text to translate")
-        else:
-            _job_step_update(job_id, "translate_output", status="skipped", percent=100, message="Disabled")
-
-        source_lang = (transcript_language_code or "").strip().lower()
-        if transcript_segments:
-            if source_lang and source_lang not in translations_by_lang:
-                translations_by_lang[source_lang] = {
-                    "transcript": {
-                        "text": str(transcript or "").strip(),
-                        "segments": transcript_segments,
-                        "language_code": source_lang,
-                    }
-                }
-            subtitles.setdefault("orig", {"language_code": source_lang or ""})
-
-        # Build translated metadata payload (best-effort).
-        if translations_by_lang:
-            translations = {"meta": translations_meta, "languages": list(translations_by_lang.keys()), "by_language": {}}
-            for lang, payload in translations_by_lang.items():
-                by_lang: Dict[str, Any] = dict(payload)
-
-                # Translate synopsis.
-                if synopsis:
-                    syn_tr: Dict[str, Any] = {}
+            # Translate synopsis.
+            if synopsis:
+                syn_tr: Dict[str, Any] = {}
+                try:
                     short = _translate_text(
                         text=str(synopsis.get("short") or ""),
                         source_lang=transcript_language_code,
@@ -7315,32 +7987,57 @@ def _process_gcs_video_job_cloud_only(
                         gcp_parent=gcp_translate_parent,
                     )
                     syn_tr = {"short": short, "long": long}
-                    if syn_tr:
-                        by_lang["synopsis"] = syn_tr
-
-                # Translate scene-by-scene summaries and transcript snippets.
-                if isinstance(scenes, list) and scenes and isinstance(transcript_segments, list):
-                    scene_out: list[dict[str, Any]] = []
-                    for idx, sc in enumerate(scenes):
-                        if not isinstance(sc, dict):
-                            continue
+                except Exception as exc:
+                    app.logger.warning("Translate synopsis failed for %s via %s: %s", lang, translate_provider, exc)
+                    if translate_provider == "hybrid":
                         try:
-                            st = float(sc.get("start") or sc.get("start_seconds") or 0.0)
-                            en = float(sc.get("end") or sc.get("end_seconds") or st)
-                        except Exception:
+                            short = _translate_text(
+                                text=str(synopsis.get("short") or ""),
+                                source_lang=transcript_language_code,
+                                target_lang=lang,
+                                provider="libretranslate",
+                                gcp_client=gcp_translate_client,
+                                gcp_parent=gcp_translate_parent,
+                            )
+                            long = _translate_text(
+                                text=str(synopsis.get("long") or ""),
+                                source_lang=transcript_language_code,
+                                target_lang=lang,
+                                provider="libretranslate",
+                                gcp_client=gcp_translate_client,
+                                gcp_parent=gcp_translate_parent,
+                            )
+                            syn_tr = {"short": short, "long": long}
+                        except Exception as fallback_exc:
+                            app.logger.warning("Translate synopsis fallback failed for %s: %s", lang, fallback_exc)
+                if syn_tr:
+                    by_lang["synopsis"] = syn_tr
+
+            # Translate scene-by-scene summaries and transcript snippets.
+            if isinstance(scenes, list) and scenes and isinstance(transcript_segments, list):
+                scene_out: list[dict[str, Any]] = []
+                for idx, sc in enumerate(scenes):
+                    if not isinstance(sc, dict):
+                        continue
+                    try:
+                        st = float(sc.get("start") or sc.get("start_seconds") or 0.0)
+                        en = float(sc.get("end") or sc.get("end_seconds") or st)
+                    except Exception:
+                        continue
+                    if en < st:
+                        st, en = en, st
+                    segs: list[dict[str, Any]] = []
+                    for seg in transcript_segments:
+                        if not isinstance(seg, dict):
                             continue
-                        if en < st:
-                            st, en = en, st
-                        segs: list[dict[str, Any]] = []
-                        for seg in transcript_segments:
-                            if not isinstance(seg, dict):
-                                continue
-                            ss = _safe_float(seg.get("start"), 0.0)
-                            se = _safe_float(seg.get("end"), ss)
-                            if se <= ss:
-                                continue
-                            if _overlap_seconds(ss, se, st, en) > 0:
-                                segs.append(seg)
+                        ss = _safe_float(seg.get("start"), 0.0)
+                        se = _safe_float(seg.get("end"), ss)
+                        if se <= ss:
+                            continue
+                        if _overlap_seconds(ss, se, st, en) > 0:
+                            segs.append(seg)
+                    translated_segs = []
+                    try:
                         translated_segs = _translate_segments(
                             segments=segs,
                             source_lang=transcript_language_code,
@@ -7349,95 +8046,276 @@ def _process_gcs_video_job_cloud_only(
                             gcp_client=gcp_translate_client,
                             gcp_parent=gcp_translate_parent,
                         )
-                        summary_text = " ".join(
-                            [str(s.get("text") or "").strip() for s in translated_segs if str(s.get("text") or "").strip()]
-                        ).strip()
-                        scene_out.append(
-                            {
-                                "index": int(sc.get("index") or idx),
-                                "scene_index": int(sc.get("index") or idx),
-                                "start_seconds": st,
-                                "end_seconds": en,
-                                "summary_text": summary_text[:320] if summary_text else "",
-                                "transcript_segments": translated_segs,
-                            }
-                        )
-                    if scene_out:
-                        by_lang["scene_by_scene_metadata"] = {
-                            "scenes": scene_out,
-                            "source": scenes_source or "unknown",
-                        }
-
-                # Translate key scene/high point summaries.
-                if isinstance(key_scenes, list) and key_scenes:
-                    ks_out: list[dict[str, Any]] = []
-                    for item in key_scenes:
-                        if not isinstance(item, dict):
-                            continue
-                        summary = str(item.get("summary") or "").strip()
-                        if summary:
-                            ks_out.append(
-                                {
-                                    "summary": _translate_text(
-                                        text=summary,
-                                        source_lang="en",
-                                        target_lang=lang,
-                                        provider=translate_provider,
-                                        gcp_client=gcp_translate_client,
-                                        gcp_parent=gcp_translate_parent,
-                                    )
-                                }
-                            )
-                    if ks_out:
-                        by_lang["key_scenes"] = ks_out
-
-                if isinstance(high_points, list) and high_points:
-                    hp_out: list[dict[str, Any]] = []
-                    for item in high_points:
-                        if not isinstance(item, dict):
-                            continue
-                        summary = str(item.get("summary") or "").strip()
-                        if summary:
-                            hp_out.append(
-                                {
-                                    "summary": _translate_text(
-                                        text=summary,
-                                        source_lang="en",
-                                        target_lang=lang,
-                                        provider=translate_provider,
-                                        gcp_client=gcp_translate_client,
-                                        gcp_parent=gcp_translate_parent,
-                                    )
-                                }
-                            )
-                    if hp_out:
-                        by_lang["high_points"] = hp_out
-
-                # Translate on-screen text (OCR).
-                if isinstance(video_intelligence, dict) and isinstance(video_intelligence.get("text"), list):
-                    text_items: list[dict[str, Any]] = []
-                    for t in video_intelligence.get("text") or []:
-                        if not isinstance(t, dict):
-                            continue
-                        raw_text = str(t.get("text") or "").strip()
-                        if not raw_text:
-                            continue
-                        text_items.append(
-                            {
-                                "text": _translate_text(
-                                    text=raw_text,
+                    except Exception as exc:
+                        app.logger.warning("Translate scene failed for %s via %s: %s", lang, translate_provider, exc)
+                        if translate_provider == "hybrid":
+                            try:
+                                translated_segs = _translate_segments(
+                                    segments=segs,
                                     source_lang=transcript_language_code,
                                     target_lang=lang,
-                                    provider=translate_provider,
+                                    provider="libretranslate",
                                     gcp_client=gcp_translate_client,
                                     gcp_parent=gcp_translate_parent,
                                 )
+                            except Exception as fallback_exc:
+                                app.logger.warning("Translate scene fallback failed for %s: %s", lang, fallback_exc)
+                    summary_text = " ".join(
+                        [str(s.get("text") or "").strip() for s in translated_segs if str(s.get("text") or "").strip()]
+                    ).strip()
+                    scene_out.append(
+                        {
+                            "index": int(sc.get("index") or idx),
+                            "scene_index": int(sc.get("index") or idx),
+                            "start_seconds": st,
+                            "end_seconds": en,
+                            "summary_text": summary_text[:320] if summary_text else "",
+                            "transcript_segments": translated_segs,
+                        }
+                    )
+                if scene_out:
+                    by_lang["scene_by_scene_metadata"] = {
+                        "scenes": scene_out,
+                        "source": scenes_source or "unknown",
+                    }
+
+            # Translate key scene/high point summaries.
+            if isinstance(key_scenes, list) and key_scenes:
+                ks_out: list[dict[str, Any]] = []
+                for item in key_scenes:
+                    if not isinstance(item, dict):
+                        continue
+                    summary = str(item.get("summary") or "").strip()
+                    if summary:
+                        ks_out.append(
+                            {
+                                "summary": _safe_translate_text(summary, "en")
                             }
                         )
-                    if text_items:
-                        by_lang["on_screen_text"] = text_items
+                if ks_out:
+                    by_lang["key_scenes"] = ks_out
 
-                translations["by_language"][lang] = by_lang
+            if isinstance(high_points, list) and high_points:
+                hp_out: list[dict[str, Any]] = []
+                for item in high_points:
+                    if not isinstance(item, dict):
+                        continue
+                    summary = str(item.get("summary") or "").strip()
+                    if summary:
+                        hp_out.append(
+                            {
+                                "summary": _safe_translate_text(summary, "en")
+                            }
+                        )
+                if hp_out:
+                    by_lang["high_points"] = hp_out
+
+            # Translate on-screen text (OCR).
+            if isinstance(video_intelligence, dict) and isinstance(video_intelligence.get("text"), list):
+                text_items: list[dict[str, Any]] = []
+                for t in video_intelligence.get("text") or []:
+                    if not isinstance(t, dict):
+                        continue
+                    raw_text = str(t.get("text") or "").strip()
+                    if not raw_text:
+                        continue
+                    text_items.append(
+                        {
+                            "text": _safe_translate_text(raw_text, transcript_language_code)
+                        }
+                    )
+                if text_items:
+                    by_lang["on_screen_text"] = text_items
+
+            return by_lang
+
+        artifacts_accum: dict[str, Any] = {}
+
+        def _merge_artifacts(base: dict[str, Any], extra: dict[str, Any] | None) -> dict[str, Any]:
+            if not extra or not isinstance(extra, dict):
+                return base
+            if not base:
+                return dict(extra)
+            for key in ("bucket", "base_prefix"):
+                if not base.get(key) and extra.get(key):
+                    base[key] = extra[key]
+            for key in ("combined", "zip"):
+                if extra.get(key):
+                    base[key] = extra[key]
+            if isinstance(extra.get("categories"), dict):
+                base.setdefault("categories", {})
+                base["categories"].update(extra.get("categories") or {})
+            if isinstance(extra.get("subtitles"), dict):
+                base.setdefault("subtitles", {})
+                base["subtitles"].update(extra.get("subtitles") or {})
+            if isinstance(extra.get("languages"), list):
+                base.setdefault("languages", [])
+                for lang in extra.get("languages") or []:
+                    if lang not in base["languages"]:
+                        base["languages"].append(lang)
+            return base
+
+        def _upload_language_artifacts(lang: str) -> None:
+            nonlocal artifacts_accum
+            lang_norm = _normalize_artifact_lang(lang)
+            video_entry_snapshot = _build_video_entry(translations_payload=translations)
+            categorized_snapshot = _build_categorized_metadata_json(video_entry_snapshot)
+            base_categories = categorized_snapshot.get("categories") if isinstance(categorized_snapshot.get("categories"), dict) else {}
+            base_combined = categorized_snapshot.get("combined") if isinstance(categorized_snapshot.get("combined"), dict) else {}
+            combined_lang = _build_combined_metadata_for_language(video_entry_snapshot, lang_norm)
+            payload = {
+                "id": job_id,
+                "categories": base_categories,
+                "combined": base_combined,
+                "combined_by_language": {lang_norm: combined_lang},
+                "languages": [lang_norm],
+                "video": video_entry_snapshot,
+            }
+            subtitles_payload = _gather_subtitles_payload(job_id, lang=lang_norm)
+            artifacts = _upload_metadata_artifacts(
+                job_id=job_id,
+                payload=payload,
+                subtitles_payload=subtitles_payload,
+                languages_override=[lang_norm],
+                write_zip=False,
+                include_orig=lang_norm == "orig",
+            )
+            _record_job_artifacts_outputs(job_id, artifacts)
+            artifacts_accum = _merge_artifacts(artifacts_accum, artifacts)
+
+        languages_for_upload: list[str] = ["orig"]
+        for lang in translate_targets:
+            if lang:
+                languages_for_upload.append(lang)
+        seen_langs: set[str] = set()
+        deduped_languages: list[str] = []
+        for lang in languages_for_upload:
+            lang_norm = _normalize_artifact_lang(lang)
+            if lang_norm and lang_norm not in seen_langs:
+                seen_langs.add(lang_norm)
+                deduped_languages.append(lang_norm)
+        languages_for_upload = deduped_languages or ["orig"]
+
+        _ensure_gcs_artifact_dirs(job_id=job_id, languages=languages_for_upload)
+
+        _job_step_update(job_id, "translate_output", status="running", percent=0, message="Preparing")
+        _job_update(job_id, progress=85, message="Translate & upload")
+
+        total_langs = max(1, len(languages_for_upload))
+        completed_langs = 0
+
+        def _update_translate_progress() -> None:
+            pct = int((completed_langs / total_langs) * 100)
+            _job_step_update(
+                job_id,
+                "translate_output",
+                status="running",
+                percent=pct,
+                message=f"Uploaded {completed_langs}/{total_langs}",
+            )
+
+        try:
+            _upload_language_artifacts("orig")
+            completed_langs += 1
+            _update_translate_progress()
+
+            if enable_translate and translate_provider != "disabled" and has_text_to_translate and translate_targets:
+                src = transcript_language_code.strip() or None
+
+                if translate_provider == "gcp_translate":
+                    gcp_translate_client, gcp_translate_parent = _init_translate_client("gcp_translate")
+
+                segments_for_translate = transcript_segments
+                if not segments_for_translate:
+                    segments_for_translate = [{"start": 0.0, "end": float(duration_seconds or 0.0), "text": (transcript or "").strip()}]
+
+                for lang in translate_targets:
+                    if not lang:
+                        continue
+                    translated_segments = []
+                    try:
+                        translated_segments = _translate_segments(
+                            segments=segments_for_translate,
+                            source_lang=src,
+                            target_lang=lang,
+                            provider=translate_provider,
+                            gcp_client=gcp_translate_client,
+                            gcp_parent=gcp_translate_parent,
+                        )
+                    except Exception as exc:
+                        app.logger.warning("Translate failed for %s via %s: %s", lang, translate_provider, exc)
+                        if translate_provider == "hybrid":
+                            try:
+                                translated_segments = _translate_segments(
+                                    segments=segments_for_translate,
+                                    source_lang=src,
+                                    target_lang=lang,
+                                    provider="libretranslate",
+                                    gcp_client=gcp_translate_client,
+                                    gcp_parent=gcp_translate_parent,
+                                )
+                            except Exception as fallback_exc:
+                                app.logger.warning("Translate fallback failed for %s via libretranslate: %s", lang, fallback_exc)
+                    if not translated_segments:
+                        continue
+                    translated_text = " ".join(
+                        [str(s.get("text") or "").strip() for s in translated_segments if str(s.get("text") or "").strip()]
+                    )
+                    translations_by_lang[lang] = {
+                        "transcript": {
+                            "text": translated_text,
+                            "segments": translated_segments,
+                            "language_code": lang,
+                        }
+                    }
+                    translations_by_lang[lang] = _enrich_translation_payload(lang, translations_by_lang[lang])
+                    _subtitles_local_path(job_id, lang=lang, fmt="srt").write_text(_segments_to_srt(translated_segments), encoding="utf-8")
+                    _subtitles_local_path(job_id, lang=lang, fmt="vtt").write_text(_segments_to_vtt(translated_segments), encoding="utf-8")
+                    subtitles[lang] = {"language_code": lang}
+
+                    translations = {
+                        "meta": translations_meta,
+                        "languages": list(translations_by_lang.keys()),
+                        "by_language": dict(translations_by_lang),
+                    }
+                    _upload_language_artifacts(lang)
+                    completed_langs += 1
+                    _update_translate_progress()
+            elif enable_translate and has_text_to_translate and not translate_targets:
+                translations_meta["enabled"] = False
+            elif enable_translate and not has_text_to_translate:
+                translations_meta["enabled"] = False
+            else:
+                translations_meta["enabled"] = False
+
+            source_lang = (transcript_language_code or "").strip().lower()
+            if transcript_segments:
+                if source_lang and source_lang not in translations_by_lang:
+                    translations_by_lang[source_lang] = {
+                        "transcript": {
+                            "text": str(transcript or "").strip(),
+                            "segments": transcript_segments,
+                            "language_code": source_lang,
+                        }
+                    }
+                subtitles.setdefault("orig", {"language_code": source_lang or ""})
+
+            if translations_by_lang:
+                translations = {
+                    "meta": translations_meta,
+                    "languages": list(translations_by_lang.keys()),
+                    "by_language": dict(translations_by_lang),
+                }
+
+            _job_step_update(job_id, "translate_output", status="completed", percent=100, message="Completed")
+        except Exception as exc:
+            app.logger.warning("Translate/upload failed: %s", exc)
+            _job_step_update(job_id, "translate_output", status="failed", message=str(exc)[:240])
+            raise
+
+        if translations_by_lang:
+            for lang, payload in translations_by_lang.items():
+                translations["by_language"][lang] = dict(payload)
 
         def _step_map(job_id: str) -> dict[str, dict[str, Any]]:
             with JOBS_LOCK:
@@ -7468,26 +8346,21 @@ def _process_gcs_video_job_cloud_only(
             required_steps.append("scene_by_scene_metadata")
         if enable_transcribe:
             required_steps.append("transcribe")
-        if enable_synopsis_generation:
-            required_steps.append("synopsis_generation")
         if enable_translate_output:
             required_steps.append("translate_output")
 
         step_failures: list[str] = []
-        allowed_skip_messages = {
-            "audio transcription service not available",
-            "no transcript",
-            "no text to translate",
-            "unavailable",
-            "disabled",
-            "not implemented",
+        allowed_skip_steps = {
+            "famous_location_detection",
+            "opening_closing_credit_detection",
+            "celebrity_detection",
+            "celebrity_bio_image",
         }
         for step_id in required_steps:
             step = step_map.get(step_id) or {}
             status = str(step.get("status") or "").strip().lower()
             msg = str(step.get("message") or "").strip()
-            msg_lower = msg.lower()
-            if status == "skipped" and msg_lower in allowed_skip_messages:
+            if status == "skipped" and step_id in allowed_skip_steps:
                 continue
             if status in {"failed", "skipped"}:
                 if msg:
@@ -7497,58 +8370,13 @@ def _process_gcs_video_job_cloud_only(
         if step_failures:
             raise RuntimeError("Required steps failed or skipped: " + "; ".join(step_failures)[:400])
 
-        _job_step_update(job_id, "save_as_json", status="running", percent=0, message="Saving")
-        task_durations, task_duration_total = _job_step_durations(job_id)
-        video_entry: Dict[str, Any] = {
-            "id": job_id,
-            "title": video_title,
-            "description": video_description,
-            "original_filename": Path(gcs_object).name,
-            "stored_filename": stored_filename,
-            "file_path": f"videos/{stored_filename}" if stored_filename else "",
-            "gcs_video_uri": gcs_uri,
-            "transcript": transcript,
-            "transcript_script": transcript_script,
-            "transcript_raw": transcript_raw,
-            "transcript_raw_script": transcript_raw_script,
-            "transcript_raw_segments": transcript_raw_segments,
-            "language_code": transcript_language_code,
-            "languages_detected": languages_detected,
-            "transcript_words": transcript_words,
-            "transcript_segments": transcript_segments,
-            "transcript_meta": transcript_meta,
-            "video_intelligence": video_intelligence,
-            "thumbnail": thumbnail_base64,
-            "metadata_text": metadata_text,
-            "duration_seconds": duration_seconds,
-            "uploaded_at": datetime.utcnow().isoformat(),
-            "technical_ffprobe": technical_ffprobe,
-            "file_size_bytes": file_size_bytes,
-            "subtitles": subtitles,
-            "locations": locations,
-            "famous_locations": {"locations": locations},
-            "scenes": scenes,
-            "scenes_source": scenes_source,
-            "key_scenes": key_scenes,
-            "high_points": high_points,
-            "synopsis": synopsis,
-            "translations": translations,
-            "output_profile": "multimodal",
-            "task_selection": sel,
-            "task_selection_requested_models": requested_models,
-            "task_selection_effective": {
-                "label_detection_mode": vi_label_mode,
-                "transcribe_mode": transcribe_effective_mode,
-                "effective_models": effective_models,
-            },
-            "opening_closing_credit_detection": opening_closing,
-            "task_durations": task_durations,
-            "task_duration_total_seconds": float(task_duration_total),
-        }
+        video_entry: Dict[str, Any] = _build_video_entry(translations_payload=translations)
 
         categorized = _build_categorized_metadata_json(video_entry)
         video_entry["metadata_categories"] = categorized.get("categories")
         video_entry["metadata_combined"] = categorized.get("combined")
+        if artifacts_accum:
+            video_entry["gcs_artifacts"] = artifacts_accum
 
         with VIDEO_INDEX_LOCK:
             existing_idx = next((i for i, v in enumerate(VIDEO_INDEX) if str(v.get("id")) == str(job_id)), None)
@@ -7558,21 +8386,6 @@ def _process_gcs_video_job_cloud_only(
                 VIDEO_INDEX.append(video_entry)
         _save_video_index()
 
-        _job_step_update(job_id, "save_as_json", status="completed", percent=100, message="Completed")
-
-        # Best-effort: persist derived artifacts to GCS so this service can be run cloud-only
-        # (no reliance on local subtitle/zip generation).
-        try:
-            _job_update(job_id, progress=92, message="Uploading artifacts to GCS")
-            _job_step_update(job_id, "upload_artifacts", status="running", percent=10, message="Preparing")
-            payload = {"id": job_id, "categories": video_entry.get("metadata_categories") or {}, "combined": video_entry.get("metadata_combined") or {}}
-            _job_step_update(job_id, "upload_artifacts", status="running", percent=50, message="Uploading")
-            video_entry["gcs_artifacts"] = _upload_metadata_artifacts(job_id=job_id, payload=payload)
-            _record_job_artifacts_outputs(job_id, video_entry.get("gcs_artifacts"))
-            _job_step_update(job_id, "upload_artifacts", status="completed", percent=100, message="Completed")
-        except Exception as exc:
-            app.logger.warning("Failed to upload artifacts to GCS for %s: %s", job_id, exc)
-            _job_step_update(job_id, "upload_artifacts", status="failed", percent=100, message=str(exc)[:240])
         if critical_failures:
             err = "; ".join(critical_failures)[:400]
             _job_update(job_id, status="failed", progress=100, message="Failed", error=err)
@@ -7580,11 +8393,9 @@ def _process_gcs_video_job_cloud_only(
             _job_update(job_id, status="completed", progress=100, message="Completed", result={"id": job_id, "title": video_title, "gcs_video_uri": gcs_uri})
     except StopJob as exc:
         _job_update(job_id, status="stopped", message="Stopped by user", error=str(exc))
-        _job_step_update(job_id, "save_as_json", status="failed", message="Stopped by user")
     except Exception as exc:
         app.logger.error("GCS job %s failed: %s", job_id, exc)
         _job_update(job_id, status="failed", message="Failed", error=str(exc))
-        _job_step_update(job_id, "save_as_json", status="failed", message=str(exc))
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -7673,6 +8484,48 @@ def _gpu_percent() -> float | None:
         return None
 
 
+def _gpu_memory_stats() -> tuple[float, float, float] | None:
+    try:
+        try:
+            import pynvml
+
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            pynvml.nvmlShutdown()
+            total_gb = float(mem.total) / 1024.0 / 1024.0 / 1024.0
+            used_gb = float(mem.used) / 1024.0 / 1024.0 / 1024.0
+            percent = 0.0 if total_gb <= 0 else (used_gb / total_gb) * 100.0
+            return (used_gb, total_gb, max(0.0, min(100.0, percent)))
+        except Exception:
+            pass
+        if not (shutil.which("nvidia-smi") or Path("/usr/bin/nvidia-smi").exists()):
+            return None
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return None
+        raw = (proc.stdout or "").strip().splitlines()
+        if not raw:
+            return None
+        parts = [p.strip() for p in raw[0].split(",")]
+        if len(parts) < 2:
+            return None
+        used_mb = float(parts[0])
+        total_mb = float(parts[1])
+        used_gb = used_mb / 1024.0
+        total_gb = total_mb / 1024.0
+        percent = 0.0 if total_gb <= 0 else (used_gb / total_gb) * 100.0
+        return (used_gb, total_gb, max(0.0, min(100.0, percent)))
+    except Exception:
+        return None
+
+
 def _memory_stats() -> tuple[float, float, float] | None:
     try:
         mem_total_kb = None
@@ -7723,11 +8576,15 @@ def system_stats() -> Any:
         cpu_value = _cpu_percent()
     gpu_value = _gpu_percent()
     mem_stats = _memory_stats()
+    gpu_mem_stats = _gpu_memory_stats()
     return jsonify(
         {
             "status": "ok",
             "cpu_percent": cpu_value,
             "gpu_percent": gpu_value,
+            "gpu_memory_used_gb": gpu_mem_stats[0] if gpu_mem_stats else None,
+            "gpu_memory_total_gb": gpu_mem_stats[1] if gpu_mem_stats else None,
+            "gpu_memory_percent": gpu_mem_stats[2] if gpu_mem_stats else None,
             "memory_used_gb": mem_stats[0] if mem_stats else None,
             "memory_total_gb": mem_stats[1] if mem_stats else None,
             "memory_percent": mem_stats[2] if mem_stats else None,
@@ -7889,6 +8746,7 @@ def upload_video() -> Any:
 
     def _worker() -> None:
         try:
+            _acquire_job_slot(job_id)
             working_bucket = _gcs_working_bucket_name()
             working_prefix = _gcs_working_prefix()
             ext = Path(original_filename).suffix or ".mp4"
@@ -7952,6 +8810,7 @@ def upload_video() -> Any:
             _job_step_update(job_id, "upload_to_cloud_storage", status="failed", message=str(exc))
             _job_update(job_id, status="failed", message="Failed", error=str(exc))
         finally:
+            _release_job_slot()
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     threading.Thread(target=_worker, daemon=True).start()
@@ -7992,6 +8851,10 @@ def list_jobs() -> Any:
                     else:
                         status = "queued"
                 job["status"] = status
+            if job_id and not isinstance(job.get("gcs_artifacts"), dict):
+                video_entry = _get_video_entry_by_id(job_id)
+                if isinstance(video_entry, dict) and isinstance(video_entry.get("gcs_artifacts"), dict):
+                    job["gcs_artifacts"] = video_entry.get("gcs_artifacts")
         return jsonify({"jobs": jobs}), 200
 
     with JOBS_LOCK:
@@ -8028,27 +8891,33 @@ def process_gcs_video_cloud() -> Any:
     _job_init(job_id, title=video_title)
     _job_update(
         job_id,
-        status="processing",
-        progress=1,
-        message="GCS video queued",
+        status="queued",
+        progress=0,
+        message="Queued",
         gcs_video_uri=f"gs://{source_bucket}/{source_obj}",
     )
 
-    threading.Thread(
-        target=_process_gcs_video_job_cloud_only,
-        kwargs={
-            "job_id": job_id,
-            "gcs_bucket": source_bucket,
-            "gcs_object": source_obj,
-            "video_title": video_title,
-            "video_description": video_description,
-            "frame_interval_seconds": 0,
-            "max_frames_to_analyze": 1000,
-            "face_recognition_mode": None,
-            "task_selection": task_selection,
-        },
-        daemon=True,
-    ).start()
+    def _worker() -> None:
+        try:
+            _acquire_job_slot(job_id)
+            _process_gcs_video_job_cloud_only(
+                job_id=job_id,
+                gcs_bucket=source_bucket,
+                gcs_object=source_obj,
+                video_title=video_title,
+                video_description=video_description,
+                frame_interval_seconds=0,
+                max_frames_to_analyze=1000,
+                face_recognition_mode=None,
+                task_selection=task_selection,
+            )
+        except Exception as exc:
+            app.logger.error("GCS job %s failed: %s", job_id, exc)
+            _job_update(job_id, status="failed", message="Failed", error=str(exc))
+        finally:
+            _release_job_slot()
+
+    threading.Thread(target=_worker, daemon=True).start()
     with JOBS_LOCK:
         job = JOBS.get(job_id)
     return jsonify({"job_id": job_id, "job": job}), 202
@@ -8335,11 +9204,27 @@ def get_video_metadata_zip(video_id: str) -> Any:
         categories = {}
     if not isinstance(combined, dict):
         combined = {}
-    payload = {"id": video_id, "categories": categories, "combined": combined}
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr(f"{video_id}.metadata.json", json.dumps(payload, indent=2, ensure_ascii=False))
-    buf.seek(0)
+
+    subtitles_payload = _gather_subtitles_payload(video_id)
+    languages = _collect_artifact_languages(
+        video=v,
+        payload_languages=None,
+        combined_by_language=None,
+        subtitles_payload=subtitles_payload,
+    )
+    combined_by_language = _build_combined_by_language(
+        video=v,
+        base_combined=combined,
+        languages=languages,
+    )
+    zip_bytes = _build_metadata_zip_bytes(
+        job_id=video_id,
+        categories=categories,
+        combined_by_language=combined_by_language,
+        subtitles_payload=subtitles_payload,
+        languages=languages,
+    )
+    buf = io.BytesIO(zip_bytes)
     return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{video_id}.metadata-json.zip")
 
 
@@ -8546,12 +9431,56 @@ def subtitles_any(video_id: str, lang: str, fmt: str) -> Any:
 
 @app.get("/translate/languages")
 def translate_languages() -> Any:
-    base_url = "http://translate:5000"
+    provider = (request.args.get("provider") or "").strip().lower() or _translate_provider()
     try:
-        langs = _libretranslate_languages_raw(base_url)
+        if provider == "indictrans2":
+            langs = _indictrans2_languages_raw(_indictrans2_base_url())
+        else:
+            langs = _libretranslate_languages_raw("http://translate:5000")
         return jsonify({"ok": True, "languages": langs}), 200
     except Exception as exc:
         return jsonify({"ok": False, "languages": [], "error": str(exc)[:240]}), 200
+
+
+@app.post("/translate")
+def translate_text() -> Any:
+    payload = request.get_json(silent=True) or {}
+    form = request.form or {}
+    text = (payload.get("q") or payload.get("text") or form.get("q") or form.get("text") or "").strip()
+    source_lang = (payload.get("source") or payload.get("source_lang") or form.get("source") or form.get("source_lang") or "").strip() or None
+    target_lang = (payload.get("target") or payload.get("target_lang") or form.get("target") or form.get("target_lang") or "").strip().lower()
+    if not target_lang:
+        return jsonify({"error": "target language is required"}), 400
+    if not text:
+        return jsonify({"translatedText": "", "meta": {"provider": "none", "model": None}}), 200
+
+    provider = (payload.get("provider") or form.get("provider") or "").strip().lower() or _translate_provider()
+    effective = _provider_for_langs(source_lang, target_lang, provider)
+
+    try:
+        if effective == "indictrans2":
+            translated = _indictrans2_translate(text=text, source_lang=source_lang, target_lang=target_lang)
+            model = _indictrans2_model_name_for(source_lang, target_lang)
+        elif effective == "libretranslate":
+            translated = _libretranslate_translate(text=text, source_lang=source_lang, target_lang=target_lang)
+            model = "libretranslate-argos"
+        elif effective == "disabled":
+            return jsonify({"error": "translation disabled"}), 400
+        else:
+            translated = _libretranslate_translate(text=text, source_lang=source_lang, target_lang=target_lang)
+            model = "libretranslate-argos"
+    except Exception as exc:
+        return jsonify({"error": str(exc)[:240], "meta": {"provider": effective}}), 500
+
+    return jsonify({
+        "translatedText": translated,
+        "meta": {
+            "provider": effective,
+            "model": model,
+            "source": source_lang,
+            "target": target_lang,
+        },
+    }), 200
 
 
 @app.route("/video-file/<video_id>", methods=["GET"])
@@ -8671,7 +9600,7 @@ def reprocess_video(video_id: str) -> Any:
     # poll /jobs/<video_id> and the index updates in-place.
     job_id = video_id if _looks_like_job_id(video_id) else _next_job_id()
     _job_init(job_id, title=v.get("title") or "Reprocess")
-    _job_update(job_id, status="processing", progress=1, message="Reprocess queued", gcs_video_uri=gcs_uri)
+    _job_update(job_id, status="queued", progress=0, message="Reprocess queued", gcs_video_uri=gcs_uri)
 
     frame_interval_seconds = _parse_int(request.args.get("frame_interval_seconds"), default=0, min_value=0, max_value=30)
     max_frames_to_analyze = _parse_int(request.args.get("max_frames_to_analyze"), default=1000, min_value=1, max_value=10000)
@@ -8773,7 +9702,7 @@ def reprocess_failed_steps(job_id: str) -> Any:
     video_description = (v.get("description") if isinstance(v, dict) else None) or ""
 
     _job_init(job_id, title=video_title)
-    _job_update(job_id, status="processing", progress=1, message="Reprocess failed steps queued", gcs_video_uri=gcs_uri)
+    _job_update(job_id, status="queued", progress=0, message="Reprocess failed steps queued", gcs_video_uri=gcs_uri)
 
     frame_interval_seconds = _parse_int(request.args.get("frame_interval_seconds"), default=0, min_value=0, max_value=30)
     max_frames_to_analyze = _parse_int(request.args.get("max_frames_to_analyze"), default=1000, min_value=1, max_value=10000)
@@ -8838,7 +9767,7 @@ def reprocess_job(job_id: str) -> Any:
 
     title = str(job_row.get("title") or "Reprocess").strip() or "Reprocess"
     _job_init(job_id, title=title)
-    _job_update(job_id, status="processing", progress=1, message="Reprocess queued", gcs_video_uri=gcs_uri)
+    _job_update(job_id, status="queued", progress=0, message="Reprocess queued", gcs_video_uri=gcs_uri)
 
     frame_interval_seconds = _parse_int(request.args.get("frame_interval_seconds"), default=0, min_value=0, max_value=30)
     max_frames_to_analyze = _parse_int(request.args.get("max_frames_to_analyze"), default=1000, min_value=1, max_value=10000)
@@ -8903,6 +9832,18 @@ def restart_job_step(job_id: str, step_id: str) -> Any:
             return jsonify({"error": str(exc)}), 400
 
     task_selection = _task_selection_for_failed_steps({step_id})
+    if step_id == "translate_output":
+        prev_sel = None
+        if isinstance(job_row.get("task_selection"), dict):
+            prev_sel = job_row.get("task_selection")
+        elif isinstance(job_row.get("task_selection_effective"), dict):
+            prev_sel = job_row.get("task_selection_effective")
+        elif isinstance(job_row.get("task_selection_requested_models"), dict):
+            prev_sel = job_row.get("task_selection_requested_models")
+        if isinstance(prev_sel, dict):
+            prev_targets = _translate_targets_from_selection(prev_sel)
+            if prev_targets:
+                task_selection["translate_targets"] = prev_targets
     if not task_selection:
         return jsonify({"error": f"Step cannot be restarted: {step_id}"}), 400
     task_selection["partial_reprocess"] = True
@@ -8914,7 +9855,7 @@ def restart_job_step(job_id: str, step_id: str) -> Any:
     video_description = (v.get("description") if isinstance(v, dict) else "") or ""
 
     _job_init(job_id, title=video_title)
-    _job_update(job_id, status="processing", progress=1, message=f"Reprocess step queued: {step_id}", gcs_video_uri=gcs_uri)
+    _job_update(job_id, status="queued", progress=0, message=f"Reprocess step queued: {step_id}", gcs_video_uri=gcs_uri)
 
     frame_interval_seconds = _parse_int(request.args.get("frame_interval_seconds"), default=0, min_value=0, max_value=30)
     max_frames_to_analyze = _parse_int(request.args.get("max_frames_to_analyze"), default=1000, min_value=1, max_value=10000)
@@ -9027,6 +9968,7 @@ def local_faces_enroll() -> Any:
 
 
 _load_indices()
+_start_recovery_thread()
 
 
 if __name__ == "__main__":

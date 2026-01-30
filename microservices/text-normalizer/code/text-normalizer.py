@@ -263,69 +263,6 @@ def _enhance_transcript_punctuation(text: str, language_code: str | None) -> str
     return out
 
 
-def _openrouter_llama_normalize_transcript(text: str, language_code: str | None) -> tuple[str | None, bool]:
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        return None, False
-
-    raw = _normalize_transcript_basic(text)
-    if not raw:
-        return None, False
-
-    base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
-    model = (
-        os.getenv("OPENROUTER_TRANSCRIPT_MODEL")
-        or os.getenv("OPENROUTER_MODEL")
-        or "meta-llama/llama-3.3-70b-instruct:free"
-    ).strip()
-    timeout_s = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS") or 15.0)
-
-    lang = (language_code or "").strip() or "unknown"
-    prompt = (
-        "You are a transcript normalizer.\n"
-        "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
-        "Hard rules:\n"
-        "- Do NOT add new words or remove words.\n"
-        "- Do NOT guess missing words.\n"
-        "- Do NOT rewrite, paraphrase, or summarize.\n"
-        "- Keep the language as-is.\n"
-        "- For Hindi, prefer the danda (।) for sentence endings.\n"
-        "- Output plain text only (no markdown, no quotes).\n\n"
-        f"Language hint: {lang}\n\n"
-        f"Transcript:\n{raw[:12000]}\n"
-    )
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Fix punctuation/casing/spacing only. Output plain text."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 1200,
-    }
-
-    try:
-        resp = requests.post(
-            f"{base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=timeout_s,
-        )
-        if resp.status_code >= 400:
-            return None, False
-        data = resp.json()
-        content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        return (content if content else None), bool(content)
-    except Exception:
-        return None, False
-
-
 def _gemini_api_key() -> str | None:
     api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
     return api_key or None
@@ -339,7 +276,7 @@ def _gemini_model() -> str:
     model = (
         os.getenv("GEMINI_MODEL")
         or os.getenv("GEMINI_DEFAULT_MODEL")
-        or "gemini-2.5-pro"
+        or "gemini-2.0-flash"
     ).strip()
     if model.startswith("models/"):
         return model
@@ -355,7 +292,11 @@ def _gemini_generate_text(*, prompt: str, system: str | None, timeout_s: float, 
     url = f"{base_url}/{model}:generateContent?key={api_key}"
     payload: dict[str, Any] = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": int(max_tokens)},
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": int(max_tokens),
+            "responseMimeType": "application/json",
+        },
     }
     if system:
         payload["systemInstruction"] = {"parts": [{"text": system}]}
@@ -383,7 +324,7 @@ def _gemini_normalize_transcript(text: str, language_code: str | None) -> tuple[
     if not raw:
         return None, False
 
-    timeout_s = float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("OPENROUTER_TIMEOUT_SECONDS") or 15.0)
+    timeout_s = float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
     lang = (language_code or "").strip() or "unknown"
     prompt = (
         "You are a transcript normalizer.\n"
@@ -406,6 +347,61 @@ def _gemini_normalize_transcript(text: str, language_code: str | None) -> tuple[
         max_tokens=1200,
     )
     return (content if content else None), bool(content)
+
+
+def _verify_prompt(text: str, language_code: str | None) -> str:
+    lang = (language_code or "").strip() or "unknown"
+    return (
+        "Provide only the cleaned transcript text.\n"
+        "Do not summarize. Do not add new content.\n"
+        "Keep the same language and original meaning.\n\n"
+        f"Language hint: {lang}\n\n"
+        f"Transcript:\n{text[:12000]}\n"
+    )
+
+
+def _gemini_verify_transcript(text: str, language_code: str | None) -> dict[str, Any] | None:
+    if not _gemini_api_key():
+        return None
+    raw = _normalize_transcript_basic(text)
+    if not raw:
+        return None
+    timeout_s = float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
+    prompt = _verify_prompt(raw, language_code)
+    max_tokens = int(float(
+        os.getenv("ENVID_GEMINI_MAX_OUTPUT_TOKENS")
+        or os.getenv("ENVID_LLM_MAX_OUTPUT_TOKENS")
+        or 2048
+    ))
+    max_tokens = max(256, min(8192, max_tokens))
+    content = _gemini_generate_text(
+        prompt=prompt,
+        system=(
+            "You are a professional linguistic editor specializing in ASR (Automatic Speech Recognition) "
+            "post-processing. Your goal is to clean and validate Whisper transcriptions for high-quality "
+            "subtitle generation and summarization.\n\n"
+            "Your specific tasks:\n"
+            "Deduplication: Identify and remove 'repetition loops' (e.g., when Whisper repeats the same "
+            "sentence or phrase multiple times due to background noise).\n"
+            "Hallucination Cleaning: Remove nonsensical phrases often generated during silent periods "
+            "(e.g., 'Thank you for watching,' or 'Please subscribe' when it doesn't fit the context).\n"
+            "Grammar & Punctuation: Correct obvious transcription errors, fix sentence casing, and add proper "
+            "punctuation to ensure readability.\n"
+            "Logical Flow: If a word sounds phonetically similar but makes no sense in context, use the "
+            "surrounding narrative to correct it.\n"
+            "Preservation: Do not summarize at this stage. Keep the speaker's original meaning and vocabulary "
+            "intact. Provide only the cleaned text."
+        ),
+        timeout_s=timeout_s,
+        max_tokens=max_tokens,
+    )
+    if not content:
+        return None
+    return {
+        "text": content.strip(),
+        "provider": "gemini",
+        "model": _gemini_model(),
+    }
 
 
 def _local_llm_base_url() -> str:
@@ -439,7 +435,7 @@ def _local_llm_normalize_transcript(text: str, language_code: str | None) -> tup
         return None, False
 
     model = _local_llm_model()
-    timeout_s = float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or os.getenv("OPENROUTER_TIMEOUT_SECONDS") or 15.0)
+    timeout_s = float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
 
     lang = (language_code or "").strip() or "unknown"
     prompt = (
@@ -482,6 +478,75 @@ def _local_llm_normalize_transcript(text: str, language_code: str | None) -> tup
         return None, False
 
 
+def _local_llm_verify_transcript(text: str, language_code: str | None) -> dict[str, Any] | None:
+    raw = _normalize_transcript_basic(text)
+    if not raw:
+        return None
+    base_url = _local_llm_base_url()
+    if not base_url:
+        return None
+    model = _local_llm_model()
+    timeout_s = float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
+    prompt = _verify_prompt(raw, language_code)
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a professional linguistic editor specializing in ASR (Automatic Speech Recognition) "
+                    "post-processing. Your goal is to clean and validate Whisper transcriptions for high-quality "
+                    "subtitle generation and summarization.\n\n"
+                    "Your specific tasks:\n"
+                    "Deduplication: Identify and remove 'repetition loops' (e.g., when Whisper repeats the same "
+                    "sentence or phrase multiple times due to background noise).\n"
+                    "Hallucination Cleaning: Remove nonsensical phrases often generated during silent periods "
+                    "(e.g., 'Thank you for watching,' or 'Please subscribe' when it doesn't fit the context).\n"
+                    "Grammar & Punctuation: Correct obvious transcription errors, fix sentence casing, and add proper "
+                    "punctuation to ensure readability.\n"
+                    "Logical Flow: If a word sounds phonetically similar but makes no sense in context, use the "
+                    "surrounding narrative to correct it.\n"
+                    "Preservation: Do not summarize at this stage. Keep the speaker's original meaning and vocabulary "
+                    "intact. Provide only the cleaned text."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+        "max_tokens": 600,
+    }
+    try:
+        resp = requests.post(
+            f"{base_url}/chat/completions",
+            headers=_local_llm_headers(),
+            json=payload,
+            timeout=timeout_s,
+        )
+        if resp.status_code >= 400:
+            return None
+        data = resp.json()
+        content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+        if content:
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
+                    if isinstance(parsed.get("text"), str):
+                        content = parsed["text"].strip()
+                    elif isinstance(parsed.get("parameters"), dict) and isinstance(parsed["parameters"].get("text"), str):
+                        content = parsed["parameters"]["text"].strip()
+            except Exception:
+                pass
+        if not content:
+            return None
+        return {
+            "text": content.strip(),
+            "provider": "local",
+            "model": model,
+        }
+    except Exception:
+        return None
+
+
 @app.get("/health")
 def health() -> Any:
     return jsonify({"ok": True}), 200
@@ -506,24 +571,7 @@ def normalize_segment() -> Any:
         "punctuation_applied": False,
     }
 
-    if nlp_mode in {"gemini", "gemini_primary", "openrouter_llama", "llama", "openrouter", "local_llama", "local"}:
-        normalized, applied = _gemini_normalize_transcript(out, language_code)
-        if normalized and applied:
-            out = normalized
-            meta["nlp_applied"] = True
-            meta["nlp_provider"] = "gemini"
-        else:
-            normalized, applied = _local_llm_normalize_transcript(out, language_code)
-            if normalized and applied:
-                out = normalized
-                meta["nlp_applied"] = True
-                meta["nlp_provider"] = "local"
-            elif nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
-                normalized, applied = _openrouter_llama_normalize_transcript(out, language_code)
-                if normalized and applied:
-                    out = normalized
-                    meta["nlp_applied"] = True
-                    meta["nlp_provider"] = "openrouter"
+    # LLM normalization disabled; keep normalization to non-LLM steps only.
 
     if grammar_enabled:
         corrected, applied = _grammar_correct_text(text=out, language=language_code)
@@ -546,6 +594,30 @@ def normalize_segment() -> Any:
             meta["punctuation_applied"] = True
 
     return jsonify({"text": out, "meta": meta}), 200
+
+
+@app.post("/verify/segment")
+def verify_segment() -> Any:
+    payload = request.get_json(force=True, silent=True) or {}
+    text = str(payload.get("text") or "")
+    language_code = payload.get("language_code")
+    nlp_mode = str(payload.get("nlp_mode") or "").strip().lower()
+
+    result: dict[str, Any] | None = None
+    if nlp_mode in {"gemini", "gemini_primary", "local_llama", "local"}:
+        result = _gemini_verify_transcript(text, language_code)
+        if not result:
+            result = _local_llm_verify_transcript(text, language_code)
+
+    if not isinstance(result, dict):
+        return jsonify({"text": None, "meta": {"error": "unavailable"}}), 200
+
+    text_out = str(result.get("text") or "").strip()
+    meta = {
+        "provider": result.get("provider"),
+        "model": result.get("model"),
+    }
+    return jsonify({"text": text_out, "meta": meta}), 200
 
 
 if __name__ == "__main__":

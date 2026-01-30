@@ -30,314 +30,6 @@ import urllib.parse
 import requests
 
 from flask import Flask, Response, jsonify, redirect, request, send_file
-from flask_cors import CORS
-from werkzeug.exceptions import RequestEntityTooLarge
-
-from shared.env_loader import load_environment
-
-from envidMetadataGCP.orchestrator import OrchestratorInputs, orchestrate_preflight
-
-try:
-    from PIL import Image  # type: ignore
-except Exception:  # pragma: no cover
-    Image = None  # type: ignore
-
-try:
-    import pytesseract  # type: ignore
-except Exception:  # pragma: no cover
-    pytesseract = None  # type: ignore
-
-try:
-    import numpy as np  # type: ignore
-except Exception:  # pragma: no cover
-    np = None  # type: ignore
-
-try:
-    from google.cloud import storage as gcs_storage  # type: ignore
-except Exception:  # pragma: no cover
-    gcs_storage = None  # type: ignore
-
-try:
-    from google.cloud import speech_v1 as gcp_speech  # type: ignore
-except Exception:  # pragma: no cover
-    gcp_speech = None  # type: ignore
-
-try:
-    from google.cloud import translate_v3 as gcp_translate  # type: ignore
-except Exception:  # pragma: no cover
-    gcp_translate = None  # type: ignore
-
-try:
-    from google.cloud import language_v1 as gcp_language  # type: ignore
-except Exception:  # pragma: no cover
-    gcp_language = None  # type: ignore
-
-try:
-    from google.cloud import videointelligence_v1 as gcp_video_intelligence  # type: ignore
-except Exception:  # pragma: no cover
-    gcp_video_intelligence = None  # type: ignore
-
-
-_NUDENET_IMPORT_ERROR: str | None = None
-try:
-    # NudeNet is optional and may require tensorflow.
-    from nudenet import NudeClassifier  # type: ignore
-except Exception as exc:  # pragma: no cover
-    NudeClassifier = None  # type: ignore
-    _NUDENET_IMPORT_ERROR = str(exc)
-
-try:
-    from PyPDF2 import PdfReader
-except Exception:  # pragma: no cover
-    try:
-        from pypdf import PdfReader  # type: ignore
-    except Exception:  # pragma: no cover
-        PdfReader = None  # type: ignore
-
-try:
-    from docx import Document as DocxDocument  # type: ignore
-except Exception:  # pragma: no cover
-    DocxDocument = None  # type: ignore
-
-
-
-try:
-    import language_tool_python  # type: ignore
-except Exception:  # pragma: no cover
-    language_tool_python = None  # type: ignore
-
-try:
-    from wordfreq import zipf_frequency, top_n_list  # type: ignore
-except Exception:  # pragma: no cover
-    zipf_frequency = None  # type: ignore
-    top_n_list = None  # type: ignore
-
-try:
-    from rapidfuzz import process as rapid_process  # type: ignore
-    from rapidfuzz import fuzz as rapid_fuzz  # type: ignore
-except Exception:  # pragma: no cover
-    rapid_process = None  # type: ignore
-    rapid_fuzz = None  # type: ignore
-
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    try:
-        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            raw = line.strip()
-            if not raw or raw.startswith("#") or "=" not in raw:
-                continue
-            key, value = raw.split("=", 1)
-            key = key.strip()
-            value = value.strip().strip("\"'")
-            if key:
-                os.environ[key] = value
-    except Exception:
-        return
-
-
-def _bootstrap_env() -> None:
-    try:
-        project_root = Path(__file__).resolve().parents[2]
-    except Exception:
-        return
-    target = (os.getenv("ENVID_ENV_TARGET") or "").strip()
-    if not target:
-        target = "laptop" if platform.system().lower() == "darwin" else "vm"
-    env_files = [
-        project_root / ".env",
-        project_root / ".env.local",
-        project_root / ".env.multimodal.local",
-        project_root / f".env.multimodal.{target}.local",
-        project_root / ".env.multimodal.secrets.local",
-        project_root / f".env.multimodal.{target}.secrets.local",
-    ]
-    for env_path in env_files:
-        _load_env_file(env_path)
-
-
-_bootstrap_env()
-
-
-load_environment()
-
-# Ensure GOOGLE_APPLICATION_CREDENTIALS points to an existing file.
-_gac = (os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
-if _gac and not Path(_gac).expanduser().exists():
-    fallback_gac = Path.home() / "gcpAccess" / "gcp.json"
-    if fallback_gac.exists():
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(fallback_gac)
-
-# Only Google Video Intelligence is allowed; disable other GCP services by default.
-_DISABLE_GCP_NON_VI = (os.getenv("ENVID_METADATA_ONLY_GCP_VIDEO_INTELLIGENCE") or "true").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-if _DISABLE_GCP_NON_VI:
-    gcp_speech = None  # type: ignore
-    gcp_translate = None  # type: ignore
-    gcp_language = None  # type: ignore
-
-app = Flask(__name__)
-CORS(app)
-
-
-class TranscriptVerificationError(RuntimeError):
-    pass
-
-
-def _gcp_project_id() -> str | None:
-    return (os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT") or "").strip() or None
-
-
-def _gcp_location() -> str:
-    return (os.getenv("GCP_LOCATION") or os.getenv("GOOGLE_CLOUD_LOCATION") or "us-central1").strip() or "us-central1"
-
-
-def _gcp_translate_location() -> str:
-    # Translate v3 commonly supports "global" (and sometimes a limited set of regions).
-    # Our stack uses GCP_LOCATION for other regional services, so keep
-    # Translate separate to avoid invalid-location errors.
-    return (os.getenv("GCP_TRANSLATE_LOCATION") or "global").strip() or "global"
-
-
-def _translate_provider() -> str:
-    pref = (os.getenv("ENVID_METADATA_TRANSLATE_PROVIDER") or "auto").strip().lower()
-    libre_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
-    has_libre = bool(libre_url)
-    # Google Translate is explicitly disabled (GCP is reserved for label detection only).
-    # Keep the env flag for legacy compatibility, but never allow it to enable translation.
-    allow_gcp = False
-    has_gcp = False
-
-    if pref in {"libretranslate", "libre", "opus", "marian"}:
-        return "libretranslate" if has_libre else "disabled"
-    if pref in {"gcp", "google", "google_translate"}:
-        return "disabled"
-
-    if has_libre:
-        return "libretranslate"
-    return "disabled"
-
-
-_LIBRE_LANG_CACHE: tuple[set[str], float] = (set(), 0.0)
-
-
-def _libretranslate_supported_langs(base_url: str) -> set[str]:
-    global _LIBRE_LANG_CACHE
-    endpoint = base_url.rstrip("/") + "/languages"
-    cached, ts = _LIBRE_LANG_CACHE
-    if cached and (time.time() - ts) < 600:
-        return cached
-    try:
-        resp = requests.get(endpoint, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        langs: set[str] = set()
-        if isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    code = str(item.get("code") or "").strip().lower()
-                    if code:
-                        langs.add(code)
-        if langs:
-            _LIBRE_LANG_CACHE = (langs, time.time())
-            return langs
-    except Exception:
-        pass
-    return cached
-
-
-def _libretranslate_languages_raw(base_url: str) -> list[dict[str, Any]]:
-    endpoint = base_url.rstrip("/") + "/languages"
-    resp = requests.get(endpoint, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    if isinstance(data, list):
-        return [x for x in data if isinstance(x, dict)]
-    return []
-
-
-def _libretranslate_translate(*, text: str, source_lang: str | None, target_lang: str) -> str:
-    base_url = (os.getenv("ENVID_LIBRETRANSLATE_URL") or os.getenv("LIBRETRANSLATE_URL") or "").strip()
-    if not base_url:
-        raise RuntimeError("LibreTranslate URL is not configured")
-
-    endpoint = base_url.rstrip("/")
-    if not endpoint.endswith("/translate"):
-        endpoint = f"{endpoint}/translate"
-
-    api_key = (os.getenv("ENVID_LIBRETRANSLATE_API_KEY") or os.getenv("LIBRETRANSLATE_API_KEY") or "").strip()
-    timeout_s = _safe_float(os.getenv("ENVID_LIBRETRANSLATE_TIMEOUT_SECONDS"), 20.0)
-
-    supported = _libretranslate_supported_langs(base_url)
-    src = (source_lang or "auto").strip().lower() or "auto"
-    tgt = (target_lang or "en").strip().lower() or "en"
-    if supported:
-        if tgt not in supported:
-            return ""
-        if src != "auto" and src not in supported:
-            src = "auto"
-
-    payload: Dict[str, Any] = {
-        "q": text,
-        "source": src or "auto",
-        "target": tgt or "en",
-        "format": "text",
-    }
-    if api_key:
-        payload["api_key"] = api_key
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        endpoint,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=float(timeout_s)) as r:
-        resp = json.loads(r.read().decode("utf-8"))
-    translated = resp.get("translatedText") or resp.get("translated_text") or ""
-    return str(translated or "").strip()
-
-
-def _openai_whisper_service_url() -> str:
-    return (os.getenv("ENVID_TRANSCRIBE_SERVICE_URL") or "http://audio-transcription:5088").strip()
-
-
-def _openai_whisper_available() -> bool:
-    base = _openai_whisper_service_url().rstrip("/")
-    if not base:
-        return False
-    try:
-        resp = requests.get(f"{base}/health", timeout=5)
-        if resp.status_code >= 400:
-            return False
-        data: Any = {}
-        try:
-            data = resp.json()
-        except Exception:
-            data = {}
-        if isinstance(data, dict):
-            status = str(data.get("status") or "").lower()
-            return status == "healthy" or bool(data.get("ok"))
-        return True
-    except Exception:
-        return False
-
-
-def _openai_whisper_transcribe(
-    *,
-    audio_path: Path,
-    language: str | None,
-    model_size: str | None,
-    chunk_seconds: int | None,
-) -> dict[str, Any]:
-    base = _openai_whisper_service_url().rstrip("/")
-    if not base:
         raise RuntimeError("OpenAI Whisper service URL is not configured (ENVID_TRANSCRIBE_SERVICE_URL)")
     payload: Dict[str, Any] = {}
     if language:
@@ -621,12 +313,6 @@ def _apply_segment_corrections(
         "punctuation_applied": False,
     }
 
-    if nlp_mode in {"openrouter_llama", "llama", "openrouter"}:
-        normalized, _ = _openrouter_llama_normalize_transcript(text=out, language_code=language_code)
-        if normalized and normalized != out:
-            out = normalized
-            meta["nlp_applied"] = True
-
     if grammar_enabled:
         corrected, _ = _languagetool_correct_text(text=out, language=language_code)
         if corrected and corrected != out:
@@ -735,314 +421,6 @@ def _fallback_scene_segments(*, duration_seconds: float | None) -> list[dict[str
             index += 1
         cur = end
     return scenes
-
-
-def _openrouter_llama_normalize_transcript(*, text: str, language_code: str | None) -> tuple[str | None, dict[str, Any]]:
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        return None, {"available": False}
-
-    raw = _normalize_transcript_basic(text)
-    if not raw:
-        return None, {"available": True, "applied": False}
-
-    base_url = "https://openrouter.ai/api/v1"
-    model = "meta-llama/llama-3.3-70b-instruct:free"
-    timeout_s = 15.0
-
-    lang = (language_code or "").strip() or "unknown"
-    strict = False
-    extra = ""
-    if strict:
-        extra = (
-            "CRITICAL: Use only facts from the transcript. If information is unclear or missing, say so briefly.\n"
-            "Avoid generic filler. Be specific to transcript details.\n"
-        )
-    prompt = (
-        "You are a transcript normalizer.\n"
-        "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
-        "Hard rules:\n"
-        "- Do NOT add new words or remove words.\n"
-        "- Do NOT guess missing words.\n"
-        "- Do NOT rewrite, paraphrase, or summarize.\n"
-        "- Keep the language as-is.\n"
-        "- For Hindi, prefer the danda (।) for sentence endings.\n"
-        "- Output plain text only (no markdown, no quotes).\n\n"
-        f"{extra}"
-        f"Language hint: {lang}\n\n"
-        f"Transcript:\n{raw[:12000]}\n"
-    )
-
-    headers: Dict[str, str] = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    http_referer = ""
-    x_title = ""
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Fix punctuation/casing/spacing only. Output plain text."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 1200,
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=data,
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=float(timeout_s)) as r:
-            resp = json.loads(r.read().decode("utf-8"))
-        content = (((resp.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        if content:
-            return content, {"available": True, "applied": True, "provider": "openrouter", "model": model}
-        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
-    except Exception:
-        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
-
-
-def _openrouter_llama_generate_synopses(*, text: str, language_code: str | None) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-    """Generate age-group synopses using OpenRouter (Meta Llama).
-
-    Returns (synopses_or_none, meta).
-    """
-
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        return None, {"available": False}
-
-    raw = _normalize_transcript_basic(text)
-    if not raw:
-        return None, {"available": True, "applied": False}
-
-    base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
-    model = (
-        os.getenv("OPENROUTER_SYNOPSIS_MODEL")
-        or os.getenv("OPENROUTER_TRANSCRIPT_MODEL")
-        or os.getenv("OPENROUTER_MODEL")
-        or "meta-llama/llama-3.3-70b-instruct:free"
-    ).strip()
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 20.0)
-
-    lang = (language_code or "").strip() or "unknown"
-    prompt = (
-        "You are a synopsis generator.\n"
-        "Create short and long synopses for three age groups.\n"
-        "Return STRICT JSON only with keys: kids, teens, adults.\n"
-        "Each value must be an object with keys: short, long.\n"
-        "Do not add any extra keys or commentary.\n"
-        "Write in the SAME LANGUAGE as the transcript. Do NOT translate.\n\n"
-        f"Language hint: {lang}\n\n"
-        f"Transcript:\n{raw[:12000]}\n"
-    )
-
-    headers: Dict[str, str] = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
-    x_title = (os.getenv("OPENROUTER_X_TITLE") or "").strip()
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Return only JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 900,
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=data,
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=float(timeout_s)) as r:
-            resp = json.loads(r.read().decode("utf-8"))
-        content = (((resp.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        m = re.search(r"\{.*\}", content, flags=re.DOTALL)
-        payload_json = json.loads(m.group(0) if m else content)
-        if isinstance(payload_json, dict):
-            return payload_json, {"available": True, "applied": True, "provider": "openrouter", "model": model}
-        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
-    except Exception:
-        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
-
-
-def _openrouter_llama_scene_summaries(
-    *,
-    scenes: list[dict[str, Any]],
-    transcript_segments: list[dict[str, Any]],
-    labels_src: list[dict[str, Any]] | None,
-    language_code: str | None,
-) -> tuple[dict[int, str] | None, dict[str, Any]]:
-    """Generate scene-by-scene summaries using OpenRouter (Meta Llama).
-
-    Returns (scene_index_to_summary_or_none, meta).
-    """
-
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        return None, {"available": False}
-
-    if not scenes:
-        return None, {"available": True, "applied": False}
-
-    base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
-    model = (
-        os.getenv("OPENROUTER_SCENE_MODEL")
-        or os.getenv("OPENROUTER_SYNOPSIS_MODEL")
-        or os.getenv("OPENROUTER_MODEL")
-        or "meta-llama/llama-3.3-70b-instruct:free"
-    ).strip()
-    timeout_s = _safe_float(os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 25.0)
-
-    max_scenes = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_SCENES"), default=30, min_value=1, max_value=200)
-    max_chars = _parse_int(os.getenv("ENVID_SCENE_LLM_MAX_CHARS_PER_SCENE"), default=600, min_value=120, max_value=4000)
-
-    lang = (language_code or "").strip() or "unknown"
-
-    def _scene_context_text(sc: dict[str, Any]) -> tuple[int, str]:
-        try:
-            st = float(sc.get("start") or sc.get("start_seconds") or 0.0)
-            en = float(sc.get("end") or sc.get("end_seconds") or st)
-        except Exception:
-            st, en = 0.0, 0.0
-        if en < st:
-            st, en = en, st
-
-        idx = int(sc.get("index") or 0)
-        segs: list[str] = []
-        for seg in transcript_segments:
-            if not isinstance(seg, dict):
-                continue
-            ss = _safe_float(seg.get("start"), 0.0)
-            se = _safe_float(seg.get("end"), ss)
-            if se <= ss:
-                continue
-            if _overlap_seconds(ss, se, st, en) <= 0:
-                continue
-            text = str(seg.get("text") or "").strip()
-            if text:
-                segs.append(text)
-
-        label_names: list[str] = []
-        if labels_src:
-            for lab in labels_src:
-                if not isinstance(lab, dict):
-                    continue
-                if _count_overlapping_segments([lab], st, en) <= 0:
-                    continue
-                name = str(lab.get("name") or lab.get("label") or "").strip()
-                if name:
-                    label_names.append(name)
-        label_names = list(dict.fromkeys(label_names))
-
-        transcript_text = " ".join(segs).strip()
-        if len(transcript_text) > max_chars:
-            transcript_text = transcript_text[:max_chars].rsplit(" ", 1)[0].strip()
-
-        labels_text = ", ".join(label_names[:20])
-        if labels_text:
-            context = f"Transcript: {transcript_text}\nLabels: {labels_text}".strip()
-        else:
-            context = f"Transcript: {transcript_text}".strip()
-        return idx, context
-
-    scene_inputs: list[dict[str, Any]] = []
-    for sc in scenes[:max_scenes]:
-        if not isinstance(sc, dict):
-            continue
-        idx, context = _scene_context_text(sc)
-        if not context.replace("Transcript:", "").strip() and "Labels:" not in context:
-            continue
-        scene_inputs.append({"index": idx, "context": context})
-
-    if not scene_inputs:
-        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
-
-    prompt = (
-        "You are a scene-by-scene summarizer.\n"
-        "Summarize each scene in 1-2 short sentences.\n"
-        "Use ONLY the provided scene context.\n"
-        "Return STRICT JSON only: {\"scenes\": [{\"index\": <int>, \"summary\": <string>}]}\n"
-        "Do not add any extra keys or commentary.\n"
-        "Write in the SAME LANGUAGE as the transcript. Do NOT translate.\n\n"
-        f"Language hint: {lang}\n\n"
-        f"Scenes:\n{json.dumps(scene_inputs, ensure_ascii=False)[:20000]}\n"
-    )
-
-    headers: Dict[str, str] = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
-    x_title = (os.getenv("OPENROUTER_X_TITLE") or "").strip()
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Return only JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 1400,
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=data,
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=float(timeout_s)) as r:
-            resp = json.loads(r.read().decode("utf-8"))
-        content = (((resp.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        m = re.search(r"\{.*\}", content, flags=re.DOTALL)
-        payload_json = json.loads(m.group(0) if m else content)
-        scene_items = payload_json.get("scenes") if isinstance(payload_json, dict) else None
-        if isinstance(scene_items, list):
-            out: dict[int, str] = {}
-            for item in scene_items:
-                if not isinstance(item, dict):
-                    continue
-                try:
-                    idx = int(item.get("index"))
-                except Exception:
-                    continue
-                summary = str(item.get("summary") or "").strip()
-                if summary:
-                    out[idx] = summary
-            if out:
-                return out, {"available": True, "applied": True, "provider": "openrouter", "model": model}
-        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
-    except Exception:
-        return None, {"available": True, "applied": False, "provider": "openrouter", "model": model}
 
 
 def _synopsis_is_reasonable(text: str, language_code: str | None, *, min_words: int, max_words: int) -> bool:
@@ -1949,21 +1327,7 @@ def _precheck_models(
             "openai_whisper",
             "OpenAI Whisper service is not available (set ENVID_TRANSCRIBE_SERVICE_URL or run audio-transcription)",
         )
-        nlp_mode = "openrouter_llama"
-        if nlp_mode in {"openrouter_llama", "openrouter", "llama"}:
-            api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-            _require(bool(api_key), "openrouter", "OPENROUTER_API_KEY is not set (transcript correction)")
-
-    # OpenRouter for synopses
-    if enable_synopsis_generation:
-        api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-        _require(bool(api_key), "openrouter", "OPENROUTER_API_KEY is not set")
-
-    # OpenRouter for scene-by-scene summaries
-    if enable_scene_by_scene and _env_truthy(os.getenv("ENVID_SCENE_BY_SCENE_LLM"), default=False):
-        api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-        _require(bool(api_key), "openrouter", "OPENROUTER_API_KEY is not set (scene-by-scene)")
-
+        pass
     # Local moderation service (NudeNet only)
     if enable_moderation and use_local_moderation:
         service_url_default = (os.getenv("ENVID_METADATA_LOCAL_MODERATION_URL") or "").strip()
@@ -4410,7 +3774,7 @@ def _process_gcs_video_job_cloud_only(
                 grammar_url = (os.getenv("ENVID_GRAMMAR_CORRECTION_URL") or "").strip()
                 grammar_local = False
                 dictionary_enabled = True
-                nlp_mode = "openrouter_llama"
+                nlp_mode = "gemini"
                 punctuation_enabled = True
 
                 # Apply full correction pipeline to the full transcript (for metadata/visibility).
@@ -4440,7 +3804,7 @@ def _process_gcs_video_job_cloud_only(
                         "applied": bool(corr_meta.get("hindi_applied")),
                     }
                     transcript_meta["nlp_correction"] = {
-                        "enabled": nlp_mode in {"openrouter_llama", "llama", "openrouter"},
+                        "enabled": nlp_mode in {"gemini", "local_llama", "local"},
                         "mode": nlp_mode,
                         "applied": bool(corr_meta.get("nlp_applied")),
                     }
@@ -5378,16 +4742,14 @@ def _process_gcs_video_job_cloud_only(
             if enable_synopsis_generation and (transcript or video_description):
                 _job_update(job_id, progress=70, message="Synopses")
                 _job_step_update(job_id, "synopsis_generation", status="running", percent=0, message="Running")
-                data, meta = _openrouter_llama_generate_synopses(
-                    text=(transcript or video_description or ""),
-                    language_code=(transcript_language_code or "hi"),
+                synopses_by_age = _fallback_synopses_from_text(
+                    transcript or video_description or "",
+                    transcript_language_code or "hi",
                 )
-                if isinstance(data, dict):
-                    if _validate_synopses_payload(data, transcript_language_code or "hi"):
-                        synopses_by_age = data
-                        effective_models["synopsis_generation"] = meta.get("model") or "openrouter"
-                    else:
-                        effective_models["synopsis_generation"] = "validation_failed"
+                if isinstance(synopses_by_age, dict):
+                    effective_models["synopsis_generation"] = "fallback"
+                else:
+                    effective_models["synopsis_generation"] = "validation_failed"
                 if not synopses_by_age:
                     fallback = _fallback_synopses_from_text(
                         transcript or video_description or "",
@@ -5466,9 +4828,9 @@ def _process_gcs_video_job_cloud_only(
                     scenes = fallback
                     scenes_source = "fallback_uniform"
 
-            # Optional: OpenRouter (Meta Llama) scene-by-scene summaries.
+            # Optional: LLM scene-by-scene summaries.
             scene_llm_mode = (requested_models.get("scene_by_scene_metadata_model") or "").strip().lower()
-            use_scene_llm = scene_llm_mode in {"openrouter_llama", "openrouter", "llama"} or _env_truthy(
+            use_scene_llm = scene_llm_mode in {"gemini", "local"} or _env_truthy(
                 os.getenv("ENVID_SCENE_BY_SCENE_LLM"),
                 default=False,
             )
@@ -5479,12 +4841,8 @@ def _process_gcs_video_job_cloud_only(
                         labels_src = video_intelligence.get("labels")
                         if not isinstance(labels_src, list):
                             labels_src = None
-                    summaries, meta = _openrouter_llama_scene_summaries(
-                        scenes=scenes,
-                        transcript_segments=transcript_segments,
-                        labels_src=labels_src,
-                        language_code=transcript_language_code or "",
-                    )
+                    summaries = None
+                    meta = {"applied": False}
                     if summaries:
                         for sc in scenes:
                             if not isinstance(sc, dict):
@@ -5497,9 +4855,9 @@ def _process_gcs_video_job_cloud_only(
                             if summary:
                                 sc["summary_llm"] = summary
                     if meta.get("applied"):
-                        effective_models["scene_by_scene_metadata"] = meta.get("model") or "openrouter"
+                        effective_models["scene_by_scene_metadata"] = meta.get("model") or meta.get("provider") or "llm"
                     else:
-                        effective_models["scene_by_scene_metadata"] = "openrouter_unavailable"
+                        effective_models["scene_by_scene_metadata"] = "llm_unavailable"
                 except Exception as exc:
                     app.logger.warning("Scene-by-scene LLM summary failed: %s", exc)
 

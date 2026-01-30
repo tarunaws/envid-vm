@@ -350,7 +350,7 @@ def _refresh_celebrity_bios_in_payload(payload: Any, *, include_frames: bool = T
     """Best-effort: ensure any celebrity bios present are >= 30 words.
 
     - If a bio/bio_short is missing or < 30 words, attempt to fill it from the local cache;
-      if still missing/short, regenerate via OpenRouter/Wikipedia (via `_celebrity_bios_for_names`).
+    if still missing/short, regenerate via Wikipedia (via `_celebrity_bios_for_names`).
     - If we cannot get a >=30-word bio, we clear any too-short `bio_short` so the UI won't
       prefer it over a longer `bio`.
 
@@ -689,7 +689,7 @@ def _wikidata_commons_portrait(name: str) -> dict[str, Any] | None:
         "portrait_attribution": "..." (best-effort)
       }
 
-    Note: Meta Llama (OpenRouter) can generate text, but it cannot reliably provide image
+    Note: LLMs can generate text, but they cannot reliably provide image
     assets; Wikidata/Commons is the stable source for public, licensed portraits.
     """
 
@@ -801,89 +801,6 @@ def _wikidata_commons_portrait(name: str) -> dict[str, Any] | None:
         return None
 
 
-def _openrouter_llama_short_bio(name: str) -> dict[str, Any] | None:
-    """Best-effort: fetch a short bio using OpenRouter (Meta Llama).
-
-    Requires `OPENROUTER_API_KEY`.
-    Returns {"bio": str, "source": str} or None.
-    """
-
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        return None
-
-    n = (name or "").strip()
-    if not n:
-        return None
-
-    base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
-    model = (os.getenv("OPENROUTER_MODEL") or "meta-llama/llama-3.3-70b-instruct:free").strip()
-    timeout_s = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS") or 6.0)
-    timeout_s = max(2.0, min(20.0, timeout_s))
-
-    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
-    x_title = (os.getenv("OPENROUTER_X_TITLE") or "").strip()
-
-    prompt = (
-        "You are a factual assistant. Provide a short bio for the person named below. "
-        "If you are not confident the person is a public figure or you lack reliable knowledge, return an empty bio. "
-        "Return STRICT JSON: {'bio': string, 'source': string}. "
-        "Constraints: bio must be at least 30 words, 1-4 sentences, and no more than 90 words. "
-        "Do not include markdown, bullet points, or citations. source should be 'openrouter:' + model.\n\n"
-        f"NAME: {n}"
-    )
-
-    body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Return JSON only."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 260,
-    }
-
-    url = f"{base_url}/chat/completions"
-    try:
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        if http_referer:
-            headers["HTTP-Referer"] = http_referer
-        if x_title:
-            headers["X-Title"] = x_title
-
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(body).encode("utf-8"),
-            headers=headers,
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-        payload = json.loads(raw or "{}")
-        choices = payload.get("choices") or []
-        msg = (choices[0].get("message") or {}) if choices else {}
-        content = (msg.get("content") or "").strip()
-        if not content:
-            return None
-        data = json.loads(content)
-        if not isinstance(data, dict):
-            return None
-        bio = (data.get("bio") or "").strip()
-        if not bio:
-            return None
-        # Enforce word count and sane length.
-        if _word_count(bio) < 30:
-            return None
-        bio = _truncate_to_word_count(bio, max_words=90)
-        return {"bio": bio, "source": f"openrouter:{model}"}
-    except Exception:
-        return None
-
-
 def _celebrity_bios_for_names(names: List[str]) -> dict[str, Any]:
     cache = _bio_cache_load()
     out: dict[str, Any] = {}
@@ -902,7 +819,7 @@ def _celebrity_bios_for_names(names: List[str]) -> dict[str, Any]:
 
         bio_obj = None
         if not cached_bio:
-            bio_obj = _openrouter_llama_short_bio(name) or _wikipedia_short_bio(name) or _wikidata_short_bio(name)
+            bio_obj = _wikipedia_short_bio(name) or _wikidata_short_bio(name)
 
         portrait_obj = None
         if not cached_portrait and _env_truthy(os.getenv("ENVID_METADATA_ENABLE_WIKIDATA_PORTRAITS"), default=True):
@@ -4106,14 +4023,9 @@ def _process_video_job(
             transcript_segments = transcribe_rich.get("segments") or []
             transcript_language_code = (transcribe_rich.get("language_code") or "").strip() or None
 
-            # Clean up spacing/punctuation for readability. Optional Llama normalization is best-effort
+            # Clean up spacing/punctuation for readability. Optional normalization is best-effort
             # and MUST NOT invent missing words.
             transcript = _normalize_transcript_basic(transcript)
-            normalize_mode = (os.getenv("ENVID_METADATA_TRANSCRIPT_NORMALIZE") or "").strip().lower()
-            if normalize_mode in {"openrouter", "llama"}:
-                normalized = _openrouter_llama_normalize_transcript(transcript, language_code=transcript_language_code)
-                if normalized:
-                    transcript = normalized
 
             # Optional deterministic user patches (e.g., fix recurring ASR misses like a missing word).
             transcript = _apply_transcript_patches(transcript, language_code=transcript_language_code)
@@ -7243,11 +7155,6 @@ def _process_s3_object_job_cloud_only(
             transcript_s3 = transcribe_result.get("transcript_s3")
 
             transcript = _normalize_transcript_basic(transcript)
-            normalize_mode = (os.getenv("ENVID_METADATA_TRANSCRIPT_NORMALIZE") or "").strip().lower()
-            if normalize_mode in {"openrouter", "llama"}:
-                normalized = _openrouter_llama_normalize_transcript(transcript, language_code=language_code)
-                if normalized:
-                    transcript = normalized
 
             transcript = _apply_transcript_patches(transcript, language_code=language_code)
             transcript = _apply_language_spelling_fixes(transcript, language_code=language_code)
@@ -9600,83 +9507,6 @@ def _apply_language_spelling_fixes(text: str, *, language_code: str | None) -> s
         # Normalize common vocab-friendly spellings back to preferred Hindi orthography.
         out = out.replace("जकडा", "जकड़ा")
     return out
-
-
-def _openrouter_llama_normalize_transcript(
-    text: str,
-    *,
-    language_code: str | None,
-) -> str | None:
-    """Best-effort transcript normalization using OpenRouter (Meta Llama).
-
-    Important: this is NOT transcription; it should not invent missing words.
-    It only cleans up casing/punctuation/spacing for readability.
-    Requires `OPENROUTER_API_KEY`.
-    """
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        return None
-    raw = (text or "").strip()
-    if not raw:
-        return None
-
-    base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
-    model = (os.getenv("OPENROUTER_TRANSCRIPT_MODEL") or os.getenv("OPENROUTER_MODEL") or "meta-llama/llama-3.3-70b-instruct:free").strip()
-    try:
-        timeout_s = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS") or 10.0)
-    except (TypeError, ValueError):
-        timeout_s = 10.0
-
-    lang = (language_code or "").strip() or "unknown"
-    prompt = (
-        "You are a transcript normalizer.\n"
-        "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
-        "Hard rules:\n"
-        "- Do NOT add new words or remove words.\n"
-        "- Do NOT guess missing words.\n"
-        "- Do NOT rewrite, paraphrase, or summarize.\n"
-        "- Keep the language as-is.\n"
-        "- Output plain text only (no markdown, no quotes).\n\n"
-        f"Language hint: {lang}\n\n"
-        f"Transcript:\n{raw[:12000]}\n"
-    )
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
-    x_title = (os.getenv("OPENROUTER_X_TITLE") or "").strip()
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Follow the hard rules exactly."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.0,
-        "max_tokens": 2000,
-    }
-
-    try:
-        import requests
-
-        resp = requests.post(f"{base_url}/chat/completions", headers=headers, data=json.dumps(payload), timeout=timeout_s)
-        if resp.status_code >= 400:
-            return None
-        data = resp.json()
-        content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        content = _normalize_transcript_basic(content)
-        # Guardrail: if the model returns something empty or wildly short, ignore it.
-        if not content or len(content) < max(20, int(0.2 * len(raw))):
-            return None
-        return content
-    except Exception:
-        return None
 
 
 def _transcript_segments_from_words(
@@ -12062,7 +11892,7 @@ def get_video_details(video_id: str) -> Any:
     except Exception as exc:
         app.logger.warning("Portrait backfill failed for %s: %s", video_id, exc)
 
-    # Ensure celebrity bios meet minimum length (>= 30 words), regenerating via cache/OpenRouter/Wikipedia if needed.
+    # Ensure celebrity bios meet minimum length (>= 30 words), regenerating via cache/Wikipedia if needed.
     try:
         _refresh_celebrity_bios_in_payload(response, include_frames=include_frames)
     except Exception as exc:

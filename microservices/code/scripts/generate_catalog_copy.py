@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Generate Meta Llama copy for each catalog product.
 
-This script loops through the Interactive & Shoppable catalog and prompts Meta
-Llama via OpenRouter for richer product storytelling, then stores the structured
-response under a configurable field (default: `aiCopy`).
+This script loops through the Interactive & Shoppable catalog and prompts a
+local OpenAI-compatible LLM for richer product storytelling, then stores the
+structured response under a configurable field (default: `aiCopy`).
 
 Environment:
-    OPENROUTER_API_KEY            -> required
-    OPENROUTER_BASE_URL           -> optional (default: https://openrouter.ai/api/v1)
-    CATALOG_COPY_OPENROUTER_MODEL -> optional (defaults to OPENROUTER_MODEL)
-    OPENROUTER_MODEL              -> optional (default: meta-llama/llama-3.3-70b-instruct:free)
-    CATALOG_COPY_TEMPERATURE      -> optional float for creativity
-    CATALOG_COPY_TOP_P            -> optional float for nucleus sampling
-    CATALOG_COPY_MAX_TOKENS       -> optional int
+    ENVID_LLM_BASE_URL       -> optional (default: http://localhost:8000/v1)
+    ENVID_LLM_API_KEY        -> optional
+    CATALOG_COPY_MODEL       -> optional (defaults to ENVID_LLM_MODEL)
+    ENVID_LLM_MODEL          -> optional (default: meta-llama/llama-3.3-70b-instruct)
+    CATALOG_COPY_TEMPERATURE -> optional float for creativity
+    CATALOG_COPY_TOP_P       -> optional float for nucleus sampling
+    CATALOG_COPY_MAX_TOKENS  -> optional int
 
 Usage examples:
     python scripts/generate_catalog_copy.py
@@ -31,9 +31,9 @@ from typing import Any, Dict, List
 import requests
 
 DEFAULT_MODEL_ID = (
-    os.getenv("CATALOG_COPY_OPENROUTER_MODEL")
-    or os.getenv("OPENROUTER_MODEL")
-    or "meta-llama/llama-3.3-70b-instruct:free"
+    os.getenv("CATALOG_COPY_MODEL")
+    or os.getenv("ENVID_LLM_MODEL")
+    or "meta-llama/llama-3.3-70b-instruct"
 )
 DEFAULT_TEMPERATURE = float(os.getenv("CATALOG_COPY_TEMPERATURE", "0.45"))
 DEFAULT_TOP_P = float(os.getenv("CATALOG_COPY_TOP_P", "0.9"))
@@ -68,7 +68,7 @@ PROMPT_TEMPLATE = textwrap.dedent(
 
 
 def _extract_text(response_body: Dict[str, Any]) -> str:
-    """Best-effort helper to unwrap OpenRouter (chat-completions) responses."""
+    """Best-effort helper to unwrap chat-completions responses."""
 
     def _from_content(value: Any) -> str:
         if isinstance(value, list):
@@ -161,24 +161,16 @@ def _build_fallback_prompt(entry: Dict[str, Any]) -> str:
     )
 
 
-def _invoke_llama_openrouter(*, prompt: str, temperature: float, top_p: float, max_tokens: int) -> Dict[str, Any]:
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is required")
-
-    base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
+def _invoke_llm_chat(*, prompt: str, temperature: float, top_p: float, max_tokens: int) -> Dict[str, Any]:
+    api_key = (os.getenv("ENVID_LLM_API_KEY") or "").strip()
+    base_url = (os.getenv("ENVID_LLM_BASE_URL") or "http://localhost:8000/v1").strip().rstrip("/")
     model = DEFAULT_MODEL_ID
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-    http_referer = (os.getenv("OPENROUTER_HTTP_REFERER") or "").strip()
-    x_title = (os.getenv("OPENROUTER_X_TITLE") or "").strip()
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     payload = {
         "model": model,
@@ -229,14 +221,14 @@ def enrich_catalog(
         for prompt_builder in (_build_prompt, _build_fallback_prompt):
             prompt = prompt_builder(entry)
             try:
-                response_payload = _invoke_llama_openrouter(
+                response_payload = _invoke_llm_chat(
                     prompt=prompt,
                     temperature=temperature,
                     top_p=top_p,
                     max_tokens=max_tokens,
                 )
             except Exception as exc:
-                print(f"[WARN] OpenRouter request failed for {entry.get('id')}: {exc}", file=sys.stderr)
+                print(f"[WARN] LLM request failed for {entry.get('id')}: {exc}", file=sys.stderr)
                 response_payload = None
 
             assistant_text = _extract_text(response_payload or {})

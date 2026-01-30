@@ -8,6 +8,7 @@ RUN apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngrad
     && apt-get install -y --allow-unauthenticated --no-install-recommends \
         python3 \
         python3-pip \
+        ffmpeg \
         tesseract-ocr \
         tesseract-ocr-eng \
         libgl1 \

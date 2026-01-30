@@ -9,7 +9,6 @@
 172.28.0.8   keyscene
 172.28.0.9   transcoder
 172.28.0.21  scene-detect
-172.28.0.22  genai
 172.28.0.23  metadata-export
 172.28.0.14  translate translategrammer
 172.28.0.17  text-on-video textonvideo

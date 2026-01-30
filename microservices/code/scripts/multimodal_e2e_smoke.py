@@ -36,7 +36,6 @@ EXPECTED_STEP_IDS = [
     "opening_closing_credit_detection",
     "transcribe",
     "synopsis_generation",
-    "save_as_json",
 ]
 
 

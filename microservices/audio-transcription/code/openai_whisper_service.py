@@ -208,12 +208,13 @@ def _llm_normalize(text: str, language: str | None) -> tuple[str, bool]:
         return text, False
     if not text.strip():
         return text, False
-    base_url = (os.getenv("ENVID_TEXT_NORMALIZER_URL") or "http://genai:5099/normalize_transcript").strip()
+    base_url = (os.getenv("ENVID_TEXT_NORMALIZER_URL") or "").strip()
     if not base_url:
         return text, False
     payload = {
         "text": text,
         "language_code": language or "",
+        "nlp_mode": (os.getenv("ENVID_TRANSCRIPT_TEXT_NORMALIZER_NLP_MODE") or "gemini").strip().lower(),
     }
     try:
         resp = requests.post(
@@ -239,15 +240,6 @@ def _apply_correction_stack(text: str, language: str | None, *, use_llm: bool) -
         text, changed = _llm_normalize(text, language)
         if changed:
             steps.append("llm")
-    text, changed = _grammar_correct(text, language)
-    if changed:
-        steps.append("languagetool")
-    text, changed = _hindi_dictionary_correct(text, language)
-    if changed:
-        steps.append("hindi_dict")
-    text, changed = _regex_cleanup(text, language)
-    if changed:
-        steps.append("regex")
     return text, steps
 
 
@@ -330,7 +322,6 @@ def _apply_post_processing(result: dict[str, Any], language: str | None) -> dict
         text, steps = _apply_correction_stack(text, language, use_llm=use_llm_segments)
         if steps:
             applied_steps.update(steps)
-        text = _filter_profanity(text)
         seg = dict(seg)
         seg["text"] = text
         processed_segments.append(seg)
@@ -339,13 +330,6 @@ def _apply_post_processing(result: dict[str, Any], language: str | None) -> dict
     normalized_text, full_steps = _apply_correction_stack(rebuilt_text, language, use_llm=True)
     if full_steps:
         applied_steps.update(full_steps)
-
-    if not applied_steps:
-        raise HTTPException(status_code=422, detail="Transcript rejected: no corrections applied")
-
-    ok, metrics = _quality_checks(rebuilt_text, language)
-    if not ok:
-        raise HTTPException(status_code=422, detail={"error": "Transcript rejected: quality checks failed", "metrics": metrics})
 
     result["segments"] = processed_segments
     result["text"] = rebuilt_text

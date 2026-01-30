@@ -1,1 +1,7 @@
 argostranslate
+fastapi
+uvicorn
+transformers
+sentencepiece
+sacremoses
+torch>=2.2.0

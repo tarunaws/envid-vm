@@ -229,7 +229,6 @@ const Button = styled.button`
     box-shadow: none;
   }
 `;
-
 const SecondaryButton = styled.button`
   background: rgba(59, 130, 246, 0.08);
   color: #cfe0ff;
@@ -1242,12 +1241,11 @@ const DEFAULT_PIPELINE_STEPS = [
   { id: 'transcribe', label: 'Audio Transcription', status: 'not_started', percent: 0, message: null },
   { id: 'synopsis_generation', label: 'Synopsis Generation', status: 'not_started', percent: 0, message: null },
   { id: 'scene_by_scene_metadata', label: 'Scene by scene metadata', status: 'not_started', percent: 0, message: null },
-  { id: 'famous_location_detection', label: 'Famous location detection', status: 'not_started', percent: 0, message: null },
+  { id: 'famous_location_detection', label: 'Famous location detection', status: 'not_started', percent: 0, message: null }, // disabled by default
   { id: 'translate_output', label: 'Translate output', status: 'not_started', percent: 0, message: null },
-  { id: 'opening_closing_credit_detection', label: 'Opening/Closing credit detection', status: 'not_started', percent: 0, message: null },
-  { id: 'celebrity_detection', label: 'Celebrity detection', status: 'not_started', percent: 0, message: null },
-  { id: 'celebrity_bio_image', label: 'Celebrity bio & Image', status: 'not_started', percent: 0, message: null },
-  { id: 'save_as_json', label: 'Save as Json', status: 'not_started', percent: 0, message: null },
+  { id: 'opening_closing_credit_detection', label: 'Opening/Closing credit detection', status: 'not_started', percent: 0, message: null }, // disabled by default
+  { id: 'celebrity_detection', label: 'Celebrity detection', status: 'not_started', percent: 0, message: null }, // not implemented
+  { id: 'celebrity_bio_image', label: 'Celebrity bio & Image', status: 'not_started', percent: 0, message: null }, // not implemented
 ];
 
 function formatBytes(bytes) {
@@ -1370,61 +1368,6 @@ function formatTimecode(seconds, fps) {
   const padFrames = (n) => String(n).padStart(framePad, '0');
   return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}:${padFrames(frame)}`;
 }
-
-function buildParagraphsFromTranscriptSegments(segments) {
-  const segs = Array.isArray(segments) ? segments : [];
-  const out = [];
-
-  let cur = null;
-  const flush = () => {
-    if (!cur) return;
-    const text = String(cur.text || '').replace(/\s+/g, ' ').trim();
-    if (text) out.push({ start: cur.start, end: cur.end, text });
-    cur = null;
-  };
-
-  for (const raw of segs) {
-    if (!raw || typeof raw !== 'object') continue;
-    const st = Number(raw.start);
-    const en = Number(raw.end);
-    const txt = String(raw.text || '').replace(/\s+/g, ' ').trim();
-    if (!txt) continue;
-
-    const safeSt = Number.isFinite(st) && st >= 0 ? st : null;
-    const safeEn = Number.isFinite(en) && en >= 0 ? en : safeSt;
-
-    if (!cur) {
-      cur = {
-        start: safeSt ?? 0,
-        end: safeEn ?? (safeSt ?? 0),
-        text: txt,
-      };
-      continue;
-    }
-
-    const gap = safeSt != null ? Math.max(0, safeSt - Number(cur.end || 0)) : 0;
-    const nextText = `${cur.text} ${txt}`.trim();
-
-    // Start a new paragraph on larger pauses or if the paragraph becomes too long.
-    const tooLong = nextText.length > 700;
-    const bigGap = gap >= 1.25;
-    if (bigGap || tooLong) {
-      flush();
-      cur = {
-        start: safeSt ?? 0,
-        end: safeEn ?? (safeSt ?? 0),
-        text: txt,
-      };
-      continue;
-    }
-
-    cur.text = nextText;
-    if (safeEn != null) cur.end = Math.max(Number(cur.end || 0), safeEn);
-  }
-  flush();
-  return out;
-}
-
 
 export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   const fileInputRef = useRef(null);
@@ -1550,7 +1493,8 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const [translateLanguageOptions, setTranslateLanguageOptions] = useState([]);
+  const [internationalLanguageOptions, setInternationalLanguageOptions] = useState([]);
+  const [indianLanguageOptions, setIndianLanguageOptions] = useState([]);
   const [translateLanguagesLoading, setTranslateLanguagesLoading] = useState(false);
   const [translateLanguagesError, setTranslateLanguagesError] = useState('');
 
@@ -1596,13 +1540,25 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
     return String(job?.title || job?.name || job?.id || job?.job_id || 'Unknown').trim();
   };
 
-  const subtitleDownloadUrl = (jobId, lang, fmt) => {
-    const code = String(lang || '').toLowerCase();
-    if (!jobId) return '#';
-    if (code === 'orig' || code === 'original') {
-      return `${BACKEND_URL}/video/${jobId}/subtitles.${fmt}`;
-    }
-    return `${BACKEND_URL}/video/${jobId}/subtitles.${code}.${fmt}`;
+  const gcsBaseUriFromArtifacts = (artifacts) => {
+    const bucket = String(artifacts?.bucket || '').trim();
+    const basePrefix = String(artifacts?.base_prefix || '').trim();
+    if (bucket && basePrefix) return `gs://${bucket}/${basePrefix}`;
+    return '';
+  };
+
+  const gcsConsoleUrlFromUri = (gsUri) => {
+    const raw = String(gsUri || '').trim();
+    if (!raw.startsWith('gs://')) return '';
+    const parts = raw.replace('gs://', '').split('/').filter(Boolean);
+    if (!parts.length) return '';
+    const bucket = parts.shift();
+    const prefix = parts.join('/');
+    const encodedPrefix = prefix
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    return `https://console.cloud.google.com/storage/browser/${bucket}/${encodedPrefix}`;
   };
 
   useEffect(() => {
@@ -1956,22 +1912,56 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       setTranslateLanguagesLoading(true);
       setTranslateLanguagesError('');
       try {
-        const resp = await axios.get(`${BACKEND_URL}/translate/languages`);
+        const [intlResp, indicResp] = await Promise.all([
+          axios.get(`${BACKEND_URL}/translate/languages`, { params: { provider: 'libretranslate' } }),
+          axios.get(`${BACKEND_URL}/translate/languages`, { params: { provider: 'indictrans2' } }),
+        ]);
         if (cancelled) return;
-        const langs = Array.isArray(resp.data?.languages) ? resp.data.languages : [];
-        const normalized = langs
-          .map((lang) => {
-            const code = String(lang?.code || '').trim();
-            const name = String(lang?.name || '').trim();
-            if (!code) return null;
-            return { code, name: name || code };
-          })
-          .filter(Boolean);
-        setTranslateLanguageOptions(normalized);
+        const normalize = (payload) => {
+          const langs = Array.isArray(payload?.languages) ? payload.languages : [];
+          return langs
+            .map((lang) => {
+              const code = String(lang?.code || '').trim();
+              const name = String(lang?.name || '').trim();
+              if (!code) return null;
+              return { code, name: name || code };
+            })
+            .filter(Boolean);
+        };
+        const intlList = normalize(intlResp?.data);
+        const indicList = normalize(indicResp?.data);
+        const indicCodes = new Set(indicList.map((lang) => String(lang.code).toLowerCase()));
+        const indicNames = new Set(indicList.map((lang) => String(lang.name).toLowerCase()).filter(Boolean));
+        const commonCodes = new Set(['en', 'hi', 'bn', 'ur']);
+        const commonNames = new Set(['hindi']);
+        const isIndicMatch = (code, name) => {
+          if (indicCodes.has(code)) return true;
+          for (const indicCode of indicCodes) {
+            if (!indicCode) continue;
+            if (code === indicCode || code.startsWith(`${indicCode}-`) || code.startsWith(`${indicCode}_`)) {
+              return true;
+            }
+          }
+          if (indicNames.has(name)) return true;
+          return false;
+        };
+        const filteredIntl = intlList.filter((lang) => {
+          const code = String(lang.code).toLowerCase();
+          const name = String(lang.name || '').toLowerCase();
+          if (commonCodes.has(code)) return false;
+          for (const commonCode of commonCodes) {
+            if (code.startsWith(`${commonCode}-`) || code.startsWith(`${commonCode}_`)) return false;
+          }
+          if (commonNames.has(name) || name.includes('hindi')) return false;
+          return !isIndicMatch(code, name);
+        });
+        setInternationalLanguageOptions(filteredIntl);
+        setIndianLanguageOptions(indicList);
       } catch (e) {
         if (!cancelled) {
-          setTranslateLanguagesError('Failed to load LibreTranslate languages.');
-          setTranslateLanguageOptions([]);
+          setTranslateLanguagesError('Failed to load translation languages.');
+          setInternationalLanguageOptions([]);
+          setIndianLanguageOptions([]);
         }
       } finally {
         if (!cancelled) setTranslateLanguagesLoading(false);
@@ -2032,9 +2022,24 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   );
   const detectedContent = useMemo(() => selectedCategories?.detected_content || {}, [selectedCategories]);
   const locations = useMemo(() => selectedCategories?.famous_locations || {}, [selectedCategories]);
-  const moderationDownloadUrl = useMemo(
-    () => (selectedVideoId ? `${BACKEND_URL}/jobs/${selectedVideoId}/outputs/moderation_output/download` : ''),
-    [selectedVideoId]
+  const selectedJobForDownloads = useMemo(() => {
+    if (!selectedVideoId) return null;
+    const id = String(selectedVideoId || '').trim();
+    if (!id) return null;
+    return (
+      completedJobs.find((j) => String(j?.id || j?.job_id || '').trim() === id) ||
+      runningJobs.find((j) => String(j?.id || j?.job_id || '').trim() === id) ||
+      failedJobs.find((j) => String(j?.id || j?.job_id || '').trim() === id) ||
+      null
+    );
+  }, [selectedVideoId, completedJobs, runningJobs, failedJobs]);
+  const selectedGcsBaseUri = useMemo(
+    () => gcsBaseUriFromArtifacts(selectedJobForDownloads?.gcs_artifacts),
+    [selectedJobForDownloads]
+  );
+  const selectedGcsConsoleUrl = useMemo(
+    () => gcsConsoleUrlFromUri(selectedGcsBaseUri),
+    [selectedGcsBaseUri]
   );
   const outputTaskSelection = useMemo(
     () => selectedMeta?.task_selection_effective || selectedMeta?.task_selection || selectedMeta?.task_selection_requested || null,
@@ -2102,6 +2107,14 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   const highPoints = useMemo(() => selectedCategories?.high_points || [], [selectedCategories]);
 
   const transcriptCategory = useMemo(() => (selectedCategories?.transcript && typeof selectedCategories.transcript === 'object' ? selectedCategories.transcript : {}), [selectedCategories]);
+  const transcriptRawText = useMemo(() => {
+    const raw = (transcriptCategory?.raw_text || '').toString();
+    return raw;
+  }, [transcriptCategory]);
+  const transcriptRawSegments = useMemo(() => {
+    const rawSegments = Array.isArray(transcriptCategory?.raw_segments) ? transcriptCategory.raw_segments : [];
+    return rawSegments;
+  }, [transcriptCategory]);
   const transcriptText = useMemo(() => {
     const fromCategory = (transcriptCategory?.text || '').toString();
     const fromLegacy = (selectedMeta?.transcript || '').toString();
@@ -2112,19 +2125,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
     const fromLegacy = Array.isArray(selectedMeta?.transcript_segments) ? selectedMeta.transcript_segments : [];
     return fromCategory.length ? fromCategory : fromLegacy;
   }, [transcriptCategory, selectedMeta]);
-  const transcriptParagraphs = useMemo(() => buildParagraphsFromTranscriptSegments(transcriptSegments), [transcriptSegments]);
-  const rawTranscriptText = useMemo(() => {
-    const t = (transcriptText || '').toString();
-    if (t.trim()) return t;
-    if (Array.isArray(transcriptSegments) && transcriptSegments.length) {
-      return transcriptSegments
-        .map((s) => (s?.text || '').toString().trim())
-        .filter(Boolean)
-        .join(' ');
-    }
-    return '';
-  }, [transcriptText, transcriptSegments]);
-
   const [locationSourceFilter, setLocationSourceFilter] = useState('all'); // all | transcript | landmarks
 
   const overlayCelebItems = useMemo(() => {
@@ -2540,7 +2540,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
     const allCoreSelected = taskSelectionOptions
       .filter((t) => !t.disabled)
       .every((t) => selection?.[t.enableKey] === true);
-    if (id === 'save_as_json') return allCoreSelected;
     if (id === 'label_detection') return Boolean(selection.enable_label_detection);
     if (id === 'moderation') return Boolean(selection.enable_moderation);
     if (id === 'text_on_screen') return Boolean(selection.enable_text_on_screen);
@@ -2600,17 +2599,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       const id = String(step.id || step.step_id || '').trim();
       if (id) map.set(id, step);
     });
-    if (String(jobStatus || '').toLowerCase() === 'completed') {
-      const step = map.get('save_as_json');
-      if (step && String(step.status || '').toLowerCase() !== 'completed') {
-        map.set('save_as_json', {
-          ...step,
-          status: 'completed',
-          percent: 100,
-          message: step.message || 'Completed',
-        });
-      }
-    }
     return map;
   };
 
@@ -2711,10 +2699,12 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
               const stepObj = stepsMap.get(id);
               const statusRaw = String(stepObj?.status || '').toLowerCase();
               const statusInfo = tableStatusFor(stepObj?.status);
-              if (statusRaw === 'failed' || statusRaw === 'skipped') buckets.skipped.push({ id, label });
-              else if (statusInfo.tone === 'completed') buckets.completed.push({ id, label });
-              else if (statusInfo.tone === 'in_progress') buckets.in_progress.push({ id, label });
-              else buckets.not_started.push({ id, label });
+              const percentRaw = Number(stepObj?.percent);
+              const percent = Number.isFinite(percentRaw) ? Math.max(0, Math.min(100, percentRaw)) : 0;
+              if (statusRaw === 'failed' || statusRaw === 'skipped') buckets.skipped.push({ id, label, percent });
+              else if (statusInfo.tone === 'completed') buckets.completed.push({ id, label, percent });
+              else if (statusInfo.tone === 'in_progress') buckets.in_progress.push({ id, label, percent });
+              else buckets.not_started.push({ id, label, percent });
             });
 
             return (
@@ -2732,6 +2722,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                           onClick={() => restartJobStep(jobId, item.id)}
                         >
                           {item.label}
+                          <span style={{ opacity: 0.85 }}>{item.percent}%</span>
                         </StepChip>
                       ))
                     ) : (
@@ -2753,6 +2744,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                           onClick={() => restartJobStep(jobId, item.id)}
                         >
                           {item.label}
+                          <span style={{ opacity: 0.9 }}>{item.percent}%</span>
                         </StepChip>
                       ))
                     ) : (
@@ -2774,6 +2766,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                           onClick={() => restartJobStep(jobId, item.id)}
                         >
                           {item.label}
+                          <span style={{ opacity: 0.9 }}>{item.percent}%</span>
                         </StepChip>
                       ))
                     ) : (
@@ -2795,6 +2788,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                           onClick={() => restartJobStep(jobId, item.id)}
                         >
                           {item.label}
+                          <span style={{ opacity: 0.8 }}>{item.percent}%</span>
                         </StepChip>
                       ))
                     ) : (
@@ -2857,16 +2851,8 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
     const startedAt = job?.started_at || job?.created_at || job?.job_started_at || null;
     const completedAt = job?.completed_at || job?.job_completed_at || job?.updated_at || null;
     const durationLabel = formatDurationMs(startedAt, completedAt);
-    const jobTargets =
-      job?.task_selection_effective?.translate_targets ||
-      job?.task_selection?.translate_targets ||
-      job?.task_selection_requested?.translate_targets ||
-      job?.task_selection_requested_models?.translate_targets ||
-      [];
-    const targetLangs = (Array.isArray(jobTargets) && jobTargets.length ? jobTargets : [])
-      .map((l) => String(l || '').toLowerCase())
-      .filter(Boolean);
-    const downloadLangs = Array.from(new Set(['orig', ...targetLangs.filter((l) => l !== 'orig')]));
+    const artifactsBaseUri = gcsBaseUriFromArtifacts(job?.gcs_artifacts);
+    const artifactsConsoleUrl = gcsConsoleUrlFromUri(artifactsBaseUri);
 
     return (
       <div key={jobId || fileName}>
@@ -2899,39 +2885,31 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
               <CompletedDownloadTable>
                 <CompletedDownloadCell>
                   <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(230, 232, 242, 0.7)', marginBottom: 6 }}>
-                    Subtitle
+                    Complete metadata
                   </div>
                   <RunningJobSteps>
-                    {downloadLangs.map((lang) => (
-                      <StepChip key={`${jobId}-${lang}`} $status="completed" title={`Subtitles ${lang.toUpperCase()}`}>
-                        <LinkA
-                          href={subtitleDownloadUrl(jobId, lang, 'srt')}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {lang.toUpperCase()} SRT
-                        </LinkA>
-                      </StepChip>
-                    ))}
+                    <StepChip $status="completed" title="Download complete metadata zip">
+                      <LinkA href={`${BACKEND_URL}/video/${jobId}/metadata-json.zip`} target="_blank" rel="noreferrer">
+                        Download
+                      </LinkA>
+                    </StepChip>
                   </RunningJobSteps>
                 </CompletedDownloadCell>
                 <CompletedDownloadCell>
                   <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(230, 232, 242, 0.7)', marginBottom: 6 }}>
-                    Complete Metadata
+                    GCS location
                   </div>
-                  <RunningJobSteps>
-                    {downloadLangs.map((lang) => (
-                      <StepChip key={`${jobId}-${lang}-json`} $status="completed" title={`Metadata ${lang.toUpperCase()}`}>
-                        <LinkA
-                          href={`${BACKEND_URL}/video/${jobId}/metadata-json?lang=${lang}&download=1`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {lang.toUpperCase()} JSON
-                        </LinkA>
-                      </StepChip>
-                    ))}
-                  </RunningJobSteps>
+                  {artifactsBaseUri ? (
+                    artifactsConsoleUrl ? (
+                      <LinkA href={artifactsConsoleUrl} target="_blank" rel="noreferrer">
+                        {artifactsBaseUri}
+                      </LinkA>
+                    ) : (
+                      <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontSize: 12 }}>{artifactsBaseUri}</div>
+                    )
+                  ) : (
+                    <div style={{ color: 'rgba(230, 232, 242, 0.6)', fontSize: 12 }}>Not available</div>
+                  )}
                 </CompletedDownloadCell>
               </CompletedDownloadTable>
             </div>
@@ -3077,70 +3055,24 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   const gpuPercentLabel = Number.isFinite(systemStats?.gpu_percent)
     ? `${Math.round(systemStats.gpu_percent)}%`
     : '—';
+  const vramLabel = Number.isFinite(systemStats?.gpu_memory_percent)
+    ? `${Math.round(systemStats.gpu_memory_percent)}%`
+    : '—';
   const memPercentLabel = Number.isFinite(systemStats?.memory_percent)
     ? `${Math.round(systemStats.memory_percent)}%`
     : '—';
+  const ramLabel = memPercentLabel;
 
-  const subtitleLanguageLabels = useMemo(() => {
+  const combinedTranslateLanguageOptions = useMemo(() => {
     const map = new Map();
-    translateLanguageOptions.forEach((lang) => {
-      if (lang?.code) map.set(String(lang.code).toLowerCase(), lang.name || lang.code);
+    internationalLanguageOptions.forEach((lang) => {
+      if (lang?.code) map.set(String(lang.code).toLowerCase(), lang);
     });
-    map.set('orig', 'Original');
-    map.set('en', 'English');
-    return map;
-  }, [translateLanguageOptions]);
-
-  const subtitleLanguages = useMemo(() => {
-    const langs = new Set();
-    langs.add('orig');
-    const translationBlock =
-      selectedMeta?.combined?.translations || selectedMeta?.translations || selectedMeta?.categories?.translations || null;
-    if (translationBlock?.languages && Array.isArray(translationBlock.languages)) {
-      translationBlock.languages.forEach((lang) => {
-        if (lang) langs.add(String(lang).toLowerCase());
-      });
-    }
-    const lc = String(selectedMeta?.combined?.transcript?.language_code || selectedMeta?.language_code || '').toLowerCase();
-    if (lc) {
-      langs.add(lc);
-    }
-    langs.add('en');
-    return Array.from(langs);
-  }, [selectedMeta]);
-
-  const metadataLanguages = useMemo(() => {
-    const ordered = [];
-    const add = (lang) => {
-      const code = String(lang || '').trim().toLowerCase();
-      if (!code) return;
-      const normalized = code === 'original' ? 'orig' : code;
-      if (!ordered.includes(normalized)) ordered.push(normalized);
-    };
-
-    add('orig');
-    add('en');
-
-    const taskTargets =
-      selectedMeta?.task_selection_effective?.translate_targets ||
-      selectedMeta?.task_selection?.translate_targets ||
-      selectedMeta?.task_selection_requested?.translate_targets ||
-      [];
-    if (Array.isArray(taskTargets)) {
-      taskTargets.forEach((lang) => add(lang));
-    }
-
-    const translationBlock =
-      selectedMeta?.combined?.translations || selectedMeta?.translations || selectedMeta?.categories?.translations || null;
-    if (translationBlock?.languages && Array.isArray(translationBlock.languages)) {
-      translationBlock.languages.forEach((lang) => add(lang));
-    }
-
-    const lc = String(selectedMeta?.combined?.transcript?.language_code || selectedMeta?.language_code || '').toLowerCase();
-    if (lc) add(lc);
-
-    return ordered;
-  }, [selectedMeta]);
+    indianLanguageOptions.forEach((lang) => {
+      if (lang?.code) map.set(String(lang.code).toLowerCase(), lang);
+    });
+    return Array.from(map.values());
+  }, [internationalLanguageOptions, indianLanguageOptions]);
 
   const serverUploadStatus = (() => {
     if (videoSource !== 'local') return null;
@@ -3335,19 +3267,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
             </SecondaryButton>
             <SecondaryButton
               type="button"
-              onClick={() =>
-                window.open(
-                  `${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=orig&download=1`,
-                  '_blank',
-                  'noopener,noreferrer'
-                )
-              }
-              disabled={selectedMetaLoading}
-            >
-              Download Full Metadata (Original)
-            </SecondaryButton>
-            <SecondaryButton
-              type="button"
               onClick={() => {
                 setSelectedVideoId(null);
                 setSelectedVideoTitle(null);
@@ -3368,91 +3287,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
             <div style={{ color: '#ffd1d1', fontWeight: 900 }}>{selectedMetaError}</div>
           ) : (
             <>
-              <Card>
-                <CardHeader>
-                  <CardHeaderTitle>Downloads</CardHeaderTitle>
-                </CardHeader>
-                <CardBody>
-                  <DownloadGrid>
-                    <DownloadGroup>
-                      <div>
-                        <DownloadGroupTitle>Subtitles</DownloadGroupTitle>
-                        <DownloadGroupHint>Download SRT or VTT for each available language.</DownloadGroupHint>
-                      </div>
-                      <DownloadList>
-                        {subtitleLanguages.map((lang) => {
-                          const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
-                          const isOrig = lang === 'orig';
-                          const srtLabel = isOrig ? '.srt' : `.${lang}.srt`;
-                          const vttLabel = isOrig ? '.vtt' : `.${lang}.vtt`;
-                          return (
-                            <DownloadRow key={lang}>
-                              <DownloadLabel>{label}</DownloadLabel>
-                              <LinkA
-                                href={subtitleDownloadUrl(selectedVideoId, lang, 'srt')}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Download {srtLabel}
-                              </LinkA>
-                              <LinkA
-                                href={subtitleDownloadUrl(selectedVideoId, lang, 'vtt')}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Download {vttLabel}
-                              </LinkA>
-                            </DownloadRow>
-                          );
-                        })}
-                      </DownloadList>
-                    </DownloadGroup>
-
-                    <DownloadGroup>
-                      <div>
-                        <DownloadGroupTitle>Complete Metadata</DownloadGroupTitle>
-                        <DownloadGroupHint>JSON files per language, including all pipeline outputs.</DownloadGroupHint>
-                      </div>
-                      <DownloadList>
-                        {metadataLanguages.map((lang) => {
-                          const label = subtitleLanguageLabels.get(lang) || lang.toUpperCase();
-                          const suffix = lang === 'orig' ? '' : ` (${lang.toUpperCase()})`;
-                          return (
-                            <DownloadRow key={lang}>
-                              <DownloadLabel>{label}</DownloadLabel>
-                              <LinkA
-                                href={`${BACKEND_URL}/video/${selectedVideoId}/metadata-json?lang=${lang}&download=1`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Download Full Metadata JSON{suffix}
-                              </LinkA>
-                            </DownloadRow>
-                          );
-                        })}
-                      </DownloadList>
-                    </DownloadGroup>
-
-                    {isOutputTaskEnabled('enable_moderation') ? (
-                      <DownloadGroup>
-                        <div>
-                          <DownloadGroupTitle>Moderation Output</DownloadGroupTitle>
-                          <DownloadGroupHint>Full moderation JSON (all analyzed frames).</DownloadGroupHint>
-                        </div>
-                        <DownloadList>
-                          <DownloadRow>
-                            <DownloadLabel>Full report</DownloadLabel>
-                            <LinkA href={moderationDownloadUrl} target="_blank" rel="noreferrer">
-                              Download moderation JSON
-                            </LinkA>
-                          </DownloadRow>
-                        </DownloadList>
-                      </DownloadGroup>
-                    ) : null}
-                  </DownloadGrid>
-                </CardBody>
-              </Card>
-
               <Grid2>
                 {isOutputTaskEnabled('enable_celebrity_detection') ? (
                   <div>
@@ -3873,11 +3707,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                         {Array.isArray(detectedContent?.moderation) && detectedContent.moderation.length > 60 ? (
                           <SubtleNote>Showing first 60 moderation items.</SubtleNote>
                         ) : null}
-                        {moderationDownloadUrl ? (
-                          <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(203, 213, 255, 0.85)' }}>
-                            Full results: <LinkA href={moderationDownloadUrl} target="_blank" rel="noreferrer">Download moderation JSON</LinkA>
-                          </div>
-                        ) : null}
                       </CardBody>
                     </Card>
                   ) : null}
@@ -4045,6 +3874,30 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                     <div style={{ display: 'grid', gap: 18 }}>
                       <div>
                         <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
+                          Raw transcript (before LLM correction)
+                        </div>
+                        {Array.isArray(transcriptRawSegments) && transcriptRawSegments.length ? (
+                          <div style={{ display: 'grid', gap: 8 }}>
+                            {transcriptRawSegments.slice(0, 2000).map((seg, idx) => (
+                              <div key={`trs-${idx}`} style={{ color: 'rgba(230,232,242,0.88)', fontSize: 13, lineHeight: 1.45 }}>
+                                <SegmentChip type="button" onClick={() => seekTo(seg?.start)}>
+                                  {formatTimecode(seg?.start, playerFps)}–{formatTimecode(seg?.end, playerFps)}
+                                </SegmentChip>{' '}
+                                {(seg?.text || '').toString().trim() || '—'}
+                              </div>
+                            ))}
+                            {transcriptRawSegments.length > 2000 ? (
+                              <SubtleNote>Showing first 2000 raw transcript segments.</SubtleNote>
+                            ) : null}
+                          </div>
+                        ) : transcriptRawText.trim() ? (
+                          <div style={{ color: 'rgba(230,232,242,0.75)', fontSize: 13 }}>{transcriptRawText}</div>
+                        ) : (
+                          <div style={{ color: 'rgba(230, 232, 242, 0.7)' }}>—</div>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
                           Time-banded audio script
                         </div>
                         {Array.isArray(transcriptSegments) && transcriptSegments.length ? (
@@ -4073,66 +3926,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                         )}
                       </div>
 
-                      <div>
-                        <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
-                          Paragraph-wise script
-                        </div>
-                        {transcriptParagraphs.length ? (
-                          <div style={{ display: 'grid', gap: 10 }}>
-                            {transcriptParagraphs.slice(0, 400).map((p, idx) => (
-                              <div
-                                key={`tp-${idx}`}
-                                style={{
-                                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                                  background: 'rgba(255, 255, 255, 0.03)',
-                                  borderRadius: 12,
-                                  padding: 12,
-                                }}
-                              >
-                                <Row style={{ justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                                  <div style={{ color: 'rgba(230,232,242,0.65)', fontSize: 12, fontWeight: 900 }}>
-                                    {formatTimecode(p.start, playerFps)}–{formatTimecode(p.end, playerFps)}
-                                  </div>
-                                  <SecondaryButton type="button" onClick={() => seekTo(p.start)}>
-                                    Seek
-                                  </SecondaryButton>
-                                </Row>
-                                <div style={{ marginTop: 8, color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.5 }}>
-                                  {p.text}
-                                </div>
-                              </div>
-                            ))}
-                            {transcriptParagraphs.length > 400 ? <SubtleNote>Showing first 400 paragraphs.</SubtleNote> : null}
-                          </div>
-                        ) : transcriptText.trim() ? (
-                          <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.5 }}>
-                            {transcriptText}
-                          </div>
-                        ) : (
-                          <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
-                            <div>No transcript found for this video.</div>
-                            <SubtleNote>
-                              If this was processed before Audio Transcription existed (or transcription was disabled), click Reprocess and enable Audio Transcription.
-                            </SubtleNote>
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <div style={{ fontWeight: 900, color: 'rgba(230,232,242,0.8)', marginBottom: 6 }}>
-                          Raw transcript (no timestamps)
-                        </div>
-                        {rawTranscriptText.trim() ? (
-                          <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(230,232,242,0.9)', fontSize: 13, lineHeight: 1.55 }}>
-                            {rawTranscriptText}
-                          </div>
-                        ) : (
-                          <div style={{ display: 'grid', gap: 8, color: 'rgba(230, 232, 242, 0.7)' }}>
-                            <div>No transcript found for this video.</div>
-                            <SubtleNote>Click Reprocess and enable Audio Transcription to generate a transcript.</SubtleNote>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </CardBody>
                 </Card>
@@ -4152,8 +3945,9 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
           {systemStats ? (
             <TopStatsBar>
               <TopStatsItem>CPU {cpuPercentLabel}</TopStatsItem>
-              <TopStatsItem>RAM {memPercentLabel}</TopStatsItem>
+              <TopStatsItem>RAM {ramLabel}</TopStatsItem>
               <TopStatsItem>GPU {gpuPercentLabel}</TopStatsItem>
+              <TopStatsItem>VRAM {vramLabel}</TopStatsItem>
             </TopStatsBar>
           ) : null}
           <TabsRow>
@@ -4464,133 +4258,250 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                   );
                 })}
 
-                {Boolean(taskSelection?.enable_transcribe) && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)',
+                    gap: 12,
+                  }}
+                >
                   <div
                     style={{
-                      marginTop: 6,
+                      padding: 10,
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 10,
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      minHeight: 120,
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 8 }}>
+                      Source Language
+                    </div>
+                    {Boolean(taskSelection?.enable_transcribe) ? (
+                      <>
+                        <select
+                          value={transcribeLanguage}
+                          onChange={(e) => setTranscribeLanguage(String(e.target.value || 'auto'))}
+                          disabled={uploading}
+                          style={{
+                            padding: '10px 12px',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            borderRadius: 8,
+                            fontSize: '0.95rem',
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            color: '#e6e8f2',
+                          }}
+                        >
+                          {WHISPER_LANGUAGE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)', marginTop: 6 }}>
+                          Choose auto-detect or a specific source language for transcription accuracy.
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.7)' }}>
+                        Enable transcription to select source language.
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
                       padding: 10,
                       border: '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: 10,
                       background: 'rgba(255, 255, 255, 0.04)',
                     }}
                   >
-                    <div style={{ fontWeight: 800, color: 'rgba(230, 232, 242, 0.9)', marginBottom: 6 }}>
-                      Source Language
+                    <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 8 }}>
+                      Destination Languages
                     </div>
-                    <select
-                      value={transcribeLanguage}
-                      onChange={(e) => setTranscribeLanguage(String(e.target.value || 'auto'))}
-                      disabled={uploading}
-                      style={{
-                        padding: '10px 12px',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
-                        borderRadius: 8,
-                        fontSize: '0.95rem',
-                        width: '100%',
-                        background: 'rgba(255, 255, 255, 0.04)',
-                        color: '#e6e8f2',
-                      }}
-                    >
-                      {WHISPER_LANGUAGE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)', marginTop: 6 }}>
-                      Choose auto-detect or a specific source language for transcription accuracy.
-                    </div>
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    marginTop: 14,
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    borderRadius: 14,
-                    padding: 14,
-                  }}
-                >
-                  <div style={{ fontWeight: 900, color: 'rgba(240, 242, 255, 0.95)', marginBottom: 10 }}>Target Language</div>
-                  <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-                    <details
-                      style={{
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
-                        borderRadius: 10,
-                        padding: 10,
-                        background: 'rgba(255, 255, 255, 0.04)',
-                      }}
-                    >
-                      <summary
+                    <div style={{ display: 'grid', gap: 8, marginBottom: 8 }}>
+                      <details
                         style={{
-                          cursor: 'pointer',
-                          fontWeight: 700,
-                          color: '#e6e8f2',
-                          listStyle: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '10px 12px',
                           border: '1px solid rgba(255, 255, 255, 0.12)',
                           borderRadius: 10,
-                          fontSize: 14,
-                          width: '100%',
+                          padding: 10,
                           background: 'rgba(255, 255, 255, 0.04)',
                         }}
                       >
-                        <span>Select target languages ({targetTranslateLanguages.length} selected)</span>
-                        <span style={{ opacity: 0.7 }}>▾</span>
-                      </summary>
-                      <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-                        <Row style={{ gap: 8 }}>
-                          <SecondaryButton
-                            type="button"
-                            onClick={() => {
-                              const all = translateLanguageOptions.map((lang) => String(lang.code).toLowerCase());
-                              setTargetTranslateLanguages(all);
-                            }}
-                            disabled={uploading || translateLanguagesLoading}
-                          >
-                            Select All
-                          </SecondaryButton>
-                          <SecondaryButton
-                            type="button"
-                            onClick={() => setTargetTranslateLanguages([])}
-                            disabled={uploading || translateLanguagesLoading}
-                          >
-                            Clear
-                          </SecondaryButton>
-                        </Row>
-                        <div style={{ display: 'grid', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
-                          {translateLanguageOptions.map((lang) => {
-                            const code = String(lang.code || '').toLowerCase();
-                            const checked = targetTranslateLanguages.includes(code);
-                            return (
-                              <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={uploading || translateLanguagesLoading}
-                                  onChange={() => {
-                                    setTargetTranslateLanguages((prev) => {
-                                      const current = Array.isArray(prev) ? prev : [];
-                                      if (current.includes(code)) return current.filter((c) => c !== code);
-                                      return [...current, code];
-                                    });
-                                  }}
-                                />
-                                <span>
-                                  {lang.name} ({code})
-                                </span>
-                              </label>
-                            );
-                          })}
+                        <summary
+                          style={{
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            color: '#e6e8f2',
+                            listStyle: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 12px',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            borderRadius: 10,
+                            fontSize: 14,
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                          }}
+                        >
+                          <span>Indian Languages</span>
+                          <span style={{ opacity: 0.7 }}>▾</span>
+                        </summary>
+                        <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                          <Row style={{ gap: 8 }}>
+                            <SecondaryButton
+                              type="button"
+                              onClick={() => {
+                                const all = indianLanguageOptions.map((lang) => String(lang.code).toLowerCase());
+                                setTargetTranslateLanguages((prev) => {
+                                  const current = Array.isArray(prev) ? prev : [];
+                                  const merged = new Set(current);
+                                  all.forEach((c) => merged.add(c));
+                                  return Array.from(merged);
+                                });
+                              }}
+                              disabled={uploading || translateLanguagesLoading}
+                            >
+                              Select All
+                            </SecondaryButton>
+                            <SecondaryButton
+                              type="button"
+                              onClick={() =>
+                                setTargetTranslateLanguages((prev) => {
+                                  const current = Array.isArray(prev) ? prev : [];
+                                  const remove = new Set(
+                                    indianLanguageOptions.map((lang) => String(lang.code).toLowerCase())
+                                  );
+                                  return current.filter((c) => !remove.has(c));
+                                })
+                              }
+                              disabled={uploading || translateLanguagesLoading}
+                            >
+                              Clear
+                            </SecondaryButton>
+                          </Row>
+                          <div style={{ display: 'grid', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                            {indianLanguageOptions.map((lang) => {
+                              const code = String(lang.code || '').toLowerCase();
+                              const checked = targetTranslateLanguages.includes(code);
+                              return (
+                                <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={uploading || translateLanguagesLoading}
+                                    onChange={() => {
+                                      setTargetTranslateLanguages((prev) => {
+                                        const current = Array.isArray(prev) ? prev : [];
+                                        if (current.includes(code)) return current.filter((c) => c !== code);
+                                        return [...current, code];
+                                      });
+                                    }}
+                                  />
+                                  <span>
+                                    {lang.name} ({code})
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    </details>
+                      </details>
+                      <details
+                        style={{
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: 10,
+                          padding: 10,
+                          background: 'rgba(255, 255, 255, 0.04)',
+                        }}
+                      >
+                        <summary
+                          style={{
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            color: '#e6e8f2',
+                            listStyle: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 12px',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            borderRadius: 10,
+                            fontSize: 14,
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                          }}
+                        >
+                          <span>International Languages</span>
+                          <span style={{ opacity: 0.7 }}>▾</span>
+                        </summary>
+                        <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                          <Row style={{ gap: 8 }}>
+                            <SecondaryButton
+                              type="button"
+                              onClick={() => {
+                                const all = internationalLanguageOptions.map((lang) => String(lang.code).toLowerCase());
+                                setTargetTranslateLanguages((prev) => {
+                                  const current = Array.isArray(prev) ? prev : [];
+                                  const merged = new Set(current);
+                                  all.forEach((c) => merged.add(c));
+                                  return Array.from(merged);
+                                });
+                              }}
+                              disabled={uploading || translateLanguagesLoading}
+                            >
+                              Select All
+                            </SecondaryButton>
+                            <SecondaryButton
+                              type="button"
+                              onClick={() =>
+                                setTargetTranslateLanguages((prev) => {
+                                  const current = Array.isArray(prev) ? prev : [];
+                                  const remove = new Set(
+                                    internationalLanguageOptions.map((lang) => String(lang.code).toLowerCase())
+                                  );
+                                  return current.filter((c) => !remove.has(c));
+                                })
+                              }
+                              disabled={uploading || translateLanguagesLoading}
+                            >
+                              Clear
+                            </SecondaryButton>
+                          </Row>
+                          <div style={{ display: 'grid', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                            {internationalLanguageOptions.map((lang) => {
+                              const code = String(lang.code || '').toLowerCase();
+                              const checked = targetTranslateLanguages.includes(code);
+                              return (
+                                <label key={code} style={{ display: 'flex', gap: 10, alignItems: 'center', color: '#e6e8f2' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={uploading || translateLanguagesLoading}
+                                    onChange={() => {
+                                      setTargetTranslateLanguages((prev) => {
+                                        const current = Array.isArray(prev) ? prev : [];
+                                        if (current.includes(code)) return current.filter((c) => c !== code);
+                                        return [...current, code];
+                                      });
+                                    }}
+                                  />
+                                  <span>
+                                    {lang.name} ({code})
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </details>
+                    </div>
                     <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>
-                      Original and English are included by default. Choose one or more target languages for translation.
+                      Original is included by default. Choose one or more target languages for translation.
                     </div>
                     {translateLanguagesError ? (
                       <div style={{ fontSize: 12, color: '#ff6b6b' }}>{translateLanguagesError}</div>

@@ -1,0 +1,12 @@
+.env
+.env.*
+**/.env
+**/.env.*
+__pycache__/
+**/__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+microservices/keyscene/transnetv2-weights/
+microservices/keyscene/TransNetV2/
+microservices/genai/

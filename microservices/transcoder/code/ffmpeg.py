@@ -21,6 +21,14 @@ def _run_ffmpeg(cmd: list[str]) -> None:
         raise RuntimeError((res.stderr or res.stdout or "ffmpeg failed").strip())
 
 
+def _ensure_allowed_path(raw: str) -> Path:
+    p = Path(raw).resolve()
+    allowed = ("/tmp/", "/mnt/gcs/")
+    if not str(p).startswith(allowed):
+        raise RuntimeError("path must be under /tmp or /mnt/gcs")
+    return p
+
+
 def _run_ffprobe(video_path: Path) -> dict[str, Any]:
     res = subprocess.run(
         ["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(video_path)],
@@ -30,6 +38,13 @@ def _run_ffprobe(video_path: Path) -> dict[str, Any]:
     if res.returncode != 0:
         raise RuntimeError((res.stderr or res.stdout or "ffprobe failed").strip())
     return json.loads(res.stdout or "{}")
+
+
+def _env_truthy(value: str | None, default: bool = False) -> bool:
+    raw = (value or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "y", "on"}
 
 
 def _primary_video_codec(probe: dict[str, Any]) -> str:
@@ -163,6 +178,9 @@ def _ffmpeg_supports_nvenc() -> bool:
 
 
 def _use_gpu_transcode() -> bool:
+    use_gpu = _env_truthy(os.getenv("ENVID_FFMPEG_USE_GPU"), default=True)
+    if not use_gpu:
+        return False
     if not _ffmpeg_supports_nvenc():
         return False
     if not _gpu_device_available():
@@ -226,11 +244,11 @@ def normalize() -> Any:
             _ffmpeg_supports_nvenc(),
             gpu_codec_ok,
         )
-        if use_gpu and not _ffmpeg_supports_nvenc():
-            raise RuntimeError("NVENC not available; GPU transcoding required")
         if use_gpu and not gpu_codec_ok:
-            app.logger.warning("GPU decode unsupported for codec %s; using CPU", input_codec or "unknown")
-            use_gpu = False
+            app.logger.warning(
+                "GPU decode may be unsupported for codec %s; attempting GPU encode anyway",
+                input_codec or "unknown",
+            )
         app.logger.info("normalize: selected %s", "GPU (NVENC)" if use_gpu else "CPU")
 
         def _build_cmd(gpu: bool) -> list[str]:
@@ -364,6 +382,107 @@ def extract_audio() -> Any:
                 output_path.unlink()
             except Exception:
                 pass
+
+
+@app.route("/segment", methods=["POST"])
+def segment() -> Any:
+    payload = request.get_json(silent=True) or {}
+    video_path_raw = str(payload.get("video_path") or "").strip()
+    start_seconds = float(payload.get("start_seconds") or 0.0)
+    duration_seconds = float(payload.get("duration_seconds") or 0.0)
+    output_path_raw = str(payload.get("output_path") or "").strip()
+
+    if not video_path_raw:
+        return jsonify({"error": "video_path is required"}), 400
+    if duration_seconds <= 0:
+        return jsonify({"error": "duration_seconds must be > 0"}), 400
+
+    try:
+        input_path = _ensure_allowed_path(video_path_raw)
+        if not input_path.exists():
+            return jsonify({"error": "input video not found"}), 404
+
+        if output_path_raw:
+            output_path = _ensure_allowed_path(output_path_raw)
+        else:
+            output_path = Path(tempfile.mkstemp(suffix=input_path.suffix or ".mp4")[1])
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        cmd_copy = [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            f"{max(0.0, start_seconds):.3f}",
+            "-t",
+            f"{max(0.0, duration_seconds):.3f}",
+            "-i",
+            str(input_path),
+            "-c",
+            "copy",
+            "-reset_timestamps",
+            "1",
+            str(output_path),
+        ]
+        try:
+            _run_ffmpeg(cmd_copy)
+        except Exception:
+            use_gpu = _use_gpu_transcode()
+            cmd_gpu = [
+                "ffmpeg",
+                "-y",
+                "-hwaccel",
+                "cuda",
+                "-hwaccel_output_format",
+                "cuda",
+                "-ss",
+                f"{max(0.0, start_seconds):.3f}",
+                "-t",
+                f"{max(0.0, duration_seconds):.3f}",
+                "-i",
+                str(input_path),
+                "-c:v",
+                "h264_nvenc",
+                "-preset",
+                (os.getenv("ENVID_FFMPEG_GPU_PRESET") or "fast").strip(),
+                "-c:a",
+                "aac",
+                "-movflags",
+                "+faststart",
+                str(output_path),
+            ]
+            cmd_cpu = [
+                "ffmpeg",
+                "-y",
+                "-ss",
+                f"{max(0.0, start_seconds):.3f}",
+                "-t",
+                f"{max(0.0, duration_seconds):.3f}",
+                "-i",
+                str(input_path),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-c:a",
+                "aac",
+                "-movflags",
+                "+faststart",
+                str(output_path),
+            ]
+            if use_gpu:
+                try:
+                    _run_ffmpeg(cmd_gpu)
+                except Exception:
+                    _run_ffmpeg(cmd_cpu)
+            else:
+                _run_ffmpeg(cmd_cpu)
+
+        if not output_path.exists() or output_path.stat().st_size == 0:
+            raise RuntimeError("ffmpeg produced empty segment")
+        return jsonify({"ok": True, "output_path": str(output_path)}), 200
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/extract-frame", methods=["POST"])

@@ -14,31 +14,6 @@ services:
       envid-net:
         ipv4_address: 172.28.0.2
 
-  gateway:
-    container_name: gateway
-    build:
-      context: ..
-      dockerfile: microservices/gateway/Dockerfile
-    image: tarunaws/ai:gateway
-    restart: always
-    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
-    ports:
-      - "5016:5016"
-    env_file:
-      - ./gateway/.env
-    volumes:
-      - ./gateway/code/envoy.yaml:/etc/envoy/envoy.yaml:ro
-    depends_on:
-      - backend
-      - keycloak
-      - otel-collector
-    dns:
-      - 172.28.0.2
-    networks:
-      envid-net:
-        ipv4_address: 172.28.0.3
-        aliases:
-          - backend
 
   backend:
     container_name: backend
@@ -64,6 +39,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/gcs:/mnt/gcs
       - /mnt/processing:/tmp
+      - /home/tarun-envid/envid-local:/tmp/envid-metadata-local
       - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
     depends_on:
       - db
@@ -72,6 +48,25 @@ services:
     networks:
       envid-net:
         ipv4_address: 172.28.0.4
+
+  genai:
+    container_name: genai
+    build:
+      context: ..
+      dockerfile: microservices/llama-cpp/Dockerfile
+    image: tarunaws/ai:llama-cpp
+    restart: always
+    environment:
+      - MODEL=/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
+      - HOST=0.0.0.0
+      - PORT=8000
+      - N_CTX=4096
+      - N_THREADS=8
+    volumes:
+      - /mnt/data/llama_models:/models:ro
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.19
 
   ingest:
     container_name: ingest
@@ -262,6 +257,17 @@ services:
     env_file:
       - ./.env
       - ./translate/.env
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - HUGGINGFACE_HUB_TOKEN=${HF_TOKEN}
+      - INDIC_TRANS_CACHE_DIR=/tmp/indictrans-cache
+      - HF_HOME=/tmp/indictrans-cache
+      - HF_HUB_CACHE=/tmp/indictrans-cache
+      - TRANSFORMERS_CACHE=/tmp/indictrans-cache
+      - TMPDIR=/mnt/gcs/translate/tmp
+      - TEMP=/mnt/gcs/translate/tmp
+      - TMP=/mnt/gcs/translate/tmp
+      - TORCHINDUCTOR_CACHE_DIR=/mnt/gcs/translate/torchinductor
     ports:
       - "5000:5000"
       - "8010:8010"
@@ -270,6 +276,8 @@ services:
       - /mnt/gcs/translate/models:/home/libretranslate/.local/share/argos-translate
       - /mnt/gcs/translate/cache:/home/libretranslate/.local/cache
       - /mnt/gcs:/mnt/gcs
+    tmpfs:
+      - /tmp
     dns:
       - 172.28.0.2
     networks:
@@ -311,80 +319,6 @@ services:
         aliases:
           - textonvideo
 
-  frame-extractor:
-    container_name: frame-extractor
-    build:
-      context: ..
-      dockerfile: microservices/frame-extractor/Dockerfile
-    image: tarunaws/ai:frame-extractor
-    restart: always
-    volumes:
-      - /mnt/processing:/tmp
-      - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
-    ports:
-      - "5093:5093"
-    dns:
-      - 172.28.0.2
-    networks:
-      envid-net:
-        ipv4_address: 172.28.0.26
-
-  keycloak:
-    container_name: keycloak
-    build:
-      context: ..
-      dockerfile: microservices/keycloak/Dockerfile
-    image: tarunaws/ai:keycloak
-    restart: always
-    command:
-      - start-dev
-      - --import-realm
-    volumes:
-      - ./keycloak/code/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
-      - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
-    ports:
-      - "8081:8080"
-    networks:
-      envid-net:
-        ipv4_address: 172.28.0.10
-    dns:
-      - 172.28.0.2
-
-  tracing:
-    container_name: tracing
-    build:
-      context: ..
-      dockerfile: microservices/tracing/Dockerfile
-    image: tarunaws/ai:tracing
-    restart: always
-    ports:
-      - "16686:16686"
-    networks:
-      envid-net:
-        ipv4_address: 172.28.0.11
-    dns:
-      - 172.28.0.2
-
-  otel-collector:
-    container_name: otel-collector
-    build:
-      context: ..
-      dockerfile: microservices/otel-collector/Dockerfile
-    image: tarunaws/ai:otel-collector
-    restart: always
-    command: ["--config=/etc/otel-collector.yaml"]
-    volumes:
-      - ./otel-collector/code/otel-collector.yaml:/etc/otel-collector.yaml:ro
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-    depends_on:
-      - tracing
-    networks:
-      envid-net:
-        ipv4_address: 172.28.0.12
 
   db:
     container_name: db
@@ -431,7 +365,7 @@ services:
     restart: always
     depends_on:
       - frontend
-      - gateway
+      - backend
       - mongo-express
     ports:
       - "80:80"
