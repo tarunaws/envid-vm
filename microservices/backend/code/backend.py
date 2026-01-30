@@ -9134,6 +9134,12 @@ def get_video_metadata_json(video_id: str) -> Any:
             categories = categorized.get("categories") if isinstance(categorized.get("categories"), dict) else {}
         if combined_base is None:
             combined_base = categorized.get("combined") if isinstance(categorized.get("combined"), dict) else {}
+    if isinstance(categories, dict) and "scene_by_scene_metadata" not in categories:
+        categorized = categorized or _build_categorized_metadata_json(v)
+        categories = categorized.get("categories") if isinstance(categorized.get("categories"), dict) else categories
+        combined_from_categories = categorized.get("combined") if isinstance(categorized.get("combined"), dict) else None
+        if combined_base is None and isinstance(combined_from_categories, dict):
+            combined_base = combined_from_categories
     if not isinstance(categories, dict):
         categories = {}
     if not isinstance(combined_base, dict):

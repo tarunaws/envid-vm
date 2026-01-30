@@ -2565,6 +2565,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
         if (id === 'overall' || label === 'overall') return false;
         if (id === 'precheck_models' || label === 'precheck models') return false;
         if (id === 'preflight' || label.includes('preflight') || label.includes('precheck')) return false;
+        if (id === 'save_as_json' || label.includes('save as json')) return false;
         return isPipelineStepEnabled(id);
       });
     }
