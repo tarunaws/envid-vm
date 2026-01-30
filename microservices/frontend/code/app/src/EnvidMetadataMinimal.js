@@ -2888,9 +2888,9 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                     Complete metadata
                   </div>
                   <RunningJobSteps>
-                    <StepChip $status="completed" title="Download complete metadata zip">
+                    <StepChip $status="completed" title="Download complete metadata folder (.zip)">
                       <LinkA href={`${BACKEND_URL}/video/${jobId}/metadata-json.zip`} target="_blank" rel="noreferrer">
-                        Download
+                        Download folder
                       </LinkA>
                     </StepChip>
                   </RunningJobSteps>
@@ -2900,13 +2900,23 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                     GCS location
                   </div>
                   {artifactsBaseUri ? (
-                    artifactsConsoleUrl ? (
-                      <LinkA href={artifactsConsoleUrl} target="_blank" rel="noreferrer">
+                    <Row style={{ gap: 8, alignItems: 'center' }}>
+                      <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontSize: 12, wordBreak: 'break-all' }}>
                         {artifactsBaseUri}
-                      </LinkA>
-                    ) : (
-                      <div style={{ color: 'rgba(230, 232, 242, 0.75)', fontSize: 12 }}>{artifactsBaseUri}</div>
-                    )
+                      </div>
+                      <SecondaryButton
+                        type="button"
+                        onClick={async () => {
+                          const ok = await copyToClipboard(artifactsBaseUri);
+                          setMessage({
+                            type: ok ? 'success' : 'error',
+                            text: ok ? 'GCS path copied.' : 'Failed to copy GCS path.',
+                          });
+                        }}
+                      >
+                        Copy
+                      </SecondaryButton>
+                    </Row>
                   ) : (
                     <div style={{ color: 'rgba(230, 232, 242, 0.6)', fontSize: 12 }}>Not available</div>
                   )}
