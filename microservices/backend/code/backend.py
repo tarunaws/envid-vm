@@ -8293,7 +8293,7 @@ def _process_gcs_video_job_cloud_only(
                     "device": whisper_device or "auto",
                 }
 
-                fallback_auto = _env_truthy(os.getenv("ENVID_OPENAI_WHISPER_LANGUAGE_FALLBACK_AUTO"), default=False)
+                fallback_auto = _env_truthy(os.getenv("ENVID_OPENAI_WHISPER_LANGUAGE_FALLBACK_AUTO"), default=True)
 
                 selection_language_hint = _selection_language_hint(sel)
                 if not selection_language_hint or selection_language_hint in {"auto", "detect", "none"}:
@@ -8428,6 +8428,11 @@ def _process_gcs_video_job_cloud_only(
                             app.logger.warning("Segmented transcription failed: %s", exc)
                             segmented_used = False
 
+                if segmented_used and fallback_auto and whisper_language and not transcript.strip():
+                    app.logger.info("Segmented transcription empty; retrying with auto language")
+                    whisper_language = None
+                    segmented_used = False
+
                 if not segmented_used:
                     data = _call_transcribe_service_for_path(local_path, whisper_language)
                     segments_probe = data.get("segments") if isinstance(data, dict) else None
@@ -8546,6 +8551,9 @@ def _process_gcs_video_job_cloud_only(
                     )
                 except Exception:
                     pass
+
+                if not transcript.strip():
+                    raise RuntimeError("Empty transcription result from whisper")
 
                 effective_models["transcribe"] = f"{'whisperx' if transcribe_engine == 'whisperx' else 'openai-whisper'}/{model_name}"
                 _job_step_update(job_id, "transcribe", status="completed", percent=100, message=f"Completed ({provider_label}/{model_name})")

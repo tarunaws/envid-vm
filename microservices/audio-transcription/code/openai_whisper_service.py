@@ -380,6 +380,10 @@ def _rtfx_and_memory(start_t: float, audio_seconds: float) -> dict[str, Any]:
     return {"elapsed_sec": elapsed, "audio_sec": audio_seconds, "rtfx": rtfx, "max_rss_kb": mem}
 
 
+def _retry_on_empty_enabled() -> bool:
+    return _bool_param(os.getenv("ENVID_OPENAI_WHISPER_RETRY_ON_EMPTY"), default=True)
+
+
 @app.get("/health")
 def health() -> JSONResponse:
     return JSONResponse({"status": "healthy"})
@@ -418,6 +422,18 @@ async def transcribe_endpoint(
             language=language_hint or None,
             chunk_seconds=chunk_seconds or default_chunk_seconds,
         )
+        if _retry_on_empty_enabled():
+            segments_probe = result.get("segments") if isinstance(result, dict) else None
+            if language_hint and (not isinstance(segments_probe, list) or not segments_probe):
+                LOGGER.info("retrying whisper with auto language due to empty segments")
+                result = whisper_transcribe(
+                    input_path=str(input_path),
+                    device=transcribe_device,
+                    compute_type=transcribe_compute_type,
+                    model_size=transcribe_model,
+                    language=None,
+                    chunk_seconds=chunk_seconds or default_chunk_seconds,
+                )
         result = _apply_post_processing(result, language_hint or result.get("language"))
         segments = result.get("segments") or []
         audio_seconds = 0.0
