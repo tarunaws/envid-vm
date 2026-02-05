@@ -101,8 +101,12 @@ else
   echo "Using specified images: $*"
 fi
 
-echo "Pruning dangling images..."
-docker image prune -f >/dev/null
+if [[ "${ENVID_DOCKER_PRUNE_DANGLING:-}" == "1" ]]; then
+  echo "Pruning dangling images..."
+  docker image prune -f >/dev/null
+else
+  echo "Skipping dangling image prune (set ENVID_DOCKER_PRUNE_DANGLING=1 to enable)"
+fi
 
 for image in "$@"; do
   if [[ "${image}" == ${REPO}:* ]]; then

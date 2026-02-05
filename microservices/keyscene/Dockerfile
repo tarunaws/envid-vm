@@ -14,10 +14,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir --upgrade pip
-
 COPY microservices/keyscene/code/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --no-cache-dir --ignore-installed -r /app/requirements.txt
 
 COPY microservices/keyscene/code/localKeySceneBest.py /app/localKeySceneBest.py
 COPY microservices/keyscene/code/transnetv2_local.py /app/transnetv2_local.py

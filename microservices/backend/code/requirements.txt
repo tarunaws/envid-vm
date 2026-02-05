@@ -16,3 +16,4 @@ grpcio-status==1.76.0
 proto-plus==1.27.0
 protobuf==6.33.4
 nvidia-ml-py3==7.352.0
+indic-transliteration==2.3.59

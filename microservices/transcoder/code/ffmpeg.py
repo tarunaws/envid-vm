@@ -177,13 +177,13 @@ def _ffmpeg_supports_nvenc() -> bool:
         return False
 
 
-def _use_gpu_transcode() -> bool:
-    use_gpu = _env_truthy(os.getenv("ENVID_FFMPEG_USE_GPU"), default=True)
+def _use_gpu_transcode(input_codec: str = "") -> bool:
+    use_gpu = True
     if not use_gpu:
         return False
-    if not _ffmpeg_supports_nvenc():
+    if not _ffmpeg_supports_nvenc() or not _gpu_device_available():
         return False
-    if not _gpu_device_available():
+    if input_codec and not _gpu_codec_supported(input_codec):
         return False
     return True
 
@@ -235,7 +235,7 @@ def normalize() -> Any:
         probe = _run_ffprobe(input_path)
         input_codec = _primary_video_codec(probe)
 
-        use_gpu = _use_gpu_transcode()
+        use_gpu = _use_gpu_transcode(input_codec)
         gpu_codec_ok = _gpu_codec_supported(input_codec)
         app.logger.info(
             "normalize: codec=%s gpu_available=%s nvenc=%s gpu_codec_ok=%s",
@@ -244,9 +244,9 @@ def normalize() -> Any:
             _ffmpeg_supports_nvenc(),
             gpu_codec_ok,
         )
-        if use_gpu and not gpu_codec_ok:
-            app.logger.warning(
-                "GPU decode may be unsupported for codec %s; attempting GPU encode anyway",
+        if not gpu_codec_ok:
+            app.logger.info(
+                "GPU decode unsupported for codec %s; selecting CPU",
                 input_codec or "unknown",
             )
         app.logger.info("normalize: selected %s", "GPU (NVENC)" if use_gpu else "CPU")
@@ -427,7 +427,12 @@ def segment() -> Any:
         try:
             _run_ffmpeg(cmd_copy)
         except Exception:
-            use_gpu = _use_gpu_transcode()
+            try:
+                probe = _run_ffprobe(input_path)
+                input_codec = _primary_video_codec(probe)
+            except Exception:
+                input_codec = ""
+            use_gpu = _use_gpu_transcode(input_codec)
             cmd_gpu = [
                 "ffmpeg",
                 "-y",

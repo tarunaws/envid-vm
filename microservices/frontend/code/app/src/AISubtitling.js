@@ -22,7 +22,7 @@ const resolveSubtitleApiBase = () => {
 };
 
 const TRANSCRIBE_LANGUAGE_OPTIONS = [
-  { value: 'auto', label: 'Auto Detect' },
+  { value: 'other', label: 'Other language' },
   { value: 'af', label: 'Afrikaans' },
   { value: 'am', label: 'Amharic' },
   { value: 'ar', label: 'Arabic' },
@@ -675,7 +675,7 @@ export default function AISubtitling() {
   const [phase, setPhase] = useState('');
   const [hasRequestedTranscription, setHasRequestedTranscription] = useState(false);
   const [hasAttemptedSubtitleFetch, setHasAttemptedSubtitleFetch] = useState(false);
-  const [sourceLanguage, setSourceLanguage] = useState('auto');
+  const [sourceLanguage, setSourceLanguage] = useState('');
   const [languageDetectionError, setLanguageDetectionError] = useState('');
   const [detectedLanguage, setDetectedLanguage] = useState('');
   const [availableSubtitles, setAvailableSubtitles] = useState([]);
@@ -1092,6 +1092,10 @@ export default function AISubtitling() {
 
   const startProcessing = async () => {
     if (!selectedFile || processing) return;
+    if (!sourceLanguage) {
+      setError('Select a source language before starting.');
+      return;
+    }
 
     const reuseExisting = Boolean(currentFileId && phase === 'complete');
 
@@ -1278,6 +1282,9 @@ export default function AISubtitling() {
                 onChange={(event) => setSourceLanguage(event.target.value)}
                 disabled={processing}
               >
+                <option value="" disabled>
+                  Select source language
+                </option>
                 {TRANSCRIBE_LANGUAGE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -1285,9 +1292,7 @@ export default function AISubtitling() {
                 ))}
               </Select>
               <HelperText>
-                {sourceLanguage === 'auto'
-                  ? 'Let auto-detect choose the spoken language automatically.'
-                  : 'For best accuracy, choose the exact dialect that matches your audio.'}
+                For best accuracy, choose the exact dialect that matches your audio. Use “Other language” if unsure.
               </HelperText>
             </ControlGroup>
 
@@ -1366,8 +1371,8 @@ export default function AISubtitling() {
             </LanguageStatus>
           )}
 
-          {!detectedLanguage && !languageDetectionError && sourceLanguage === 'auto' && (
-            <HelperText style={{ color: '#ffc107' }}>Detecting spoken language automatically…</HelperText>
+          {!detectedLanguage && !languageDetectionError && (
+            <HelperText style={{ color: '#ffc107' }}>Waiting for transcription to start…</HelperText>
           )}
 
           {languageDetectionError && (

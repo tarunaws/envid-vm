@@ -7,7 +7,7 @@ import styled from 'styled-components';
 const BACKEND_URL = process.env.REACT_APP_ENVID_METADATA_BACKEND_URL || '/backend';
 const POLL_INTERVAL_MS = 2000;
 const WHISPER_LANGUAGE_OPTIONS = [
-  { value: 'auto', label: 'Auto Detect' },
+  { value: 'other', label: 'Other language' },
   { value: 'af', label: 'Afrikaans' },
   { value: 'am', label: 'Amharic' },
   { value: 'ar', label: 'Arabic' },
@@ -108,6 +108,10 @@ const WHISPER_LANGUAGE_OPTIONS = [
   { value: 'yo', label: 'Yoruba' },
   { value: 'zh', label: 'Chinese' }
 ];
+
+const FALLBACK_TRANSLATE_LANGUAGE_OPTIONS = WHISPER_LANGUAGE_OPTIONS.filter((lang) => lang.value !== 'auto').map(
+  (lang) => ({ code: lang.value, name: lang.label })
+);
 
 const PageWrapper = styled.div`
   min-height: 100vh;
@@ -1070,6 +1074,7 @@ const TopStatsItem = styled.div`
   color: #cfe0ff;
 `;
 
+
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
@@ -1243,6 +1248,7 @@ const DEFAULT_PIPELINE_STEPS = [
   { id: 'scene_by_scene_metadata', label: 'Scene by scene metadata', status: 'not_started', percent: 0, message: null },
   { id: 'famous_location_detection', label: 'Famous location detection', status: 'not_started', percent: 0, message: null }, // disabled by default
   { id: 'translate_output', label: 'Translate output', status: 'not_started', percent: 0, message: null },
+  { id: 'upload_artifacts', label: 'Upload artifacts', status: 'not_started', percent: 0, message: null },
   { id: 'opening_closing_credit_detection', label: 'Opening/Closing credit detection', status: 'not_started', percent: 0, message: null }, // disabled by default
   { id: 'celebrity_detection', label: 'Celebrity detection', status: 'not_started', percent: 0, message: null }, // not implemented
   { id: 'celebrity_bio_image', label: 'Celebrity bio & Image', status: 'not_started', percent: 0, message: null }, // not implemented
@@ -1369,6 +1375,32 @@ function formatTimecode(seconds, fps) {
   return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}:${padFrames(frame)}`;
 }
 
+const QUEUED_STATUSES = new Set(['queued']);
+
+function parseTimestampMs(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.getTime();
+}
+
+function sortRunningJobsList(list) {
+  return [...list].sort((a, b) => {
+    const statusA = String(a?.status || '').toLowerCase();
+    const statusB = String(b?.status || '').toLowerCase();
+    const queuedA = QUEUED_STATUSES.has(statusA);
+    const queuedB = QUEUED_STATUSES.has(statusB);
+    if (queuedA !== queuedB) return queuedA ? 1 : -1;
+
+    const timeA = queuedA ? parseTimestampMs(a?.created_at) : parseTimestampMs(a?.updated_at);
+    const timeB = queuedB ? parseTimestampMs(b?.created_at) : parseTimestampMs(b?.updated_at);
+    if (queuedA) {
+      return (timeA ?? 0) - (timeB ?? 0);
+    }
+    return (timeB ?? 0) - (timeA ?? 0);
+  });
+}
+
 export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   const fileInputRef = useRef(null);
   const pollRef = useRef(null);
@@ -1401,22 +1433,22 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   const [expandedJobLoading, setExpandedJobLoading] = useState(false);
 
   // Multimodal task selection.
-  // Defaults: core tasks ON, future/disabled tasks OFF.
+  // Defaults: only selected tasks are user-restricted in the UI.
   const [taskSelection, setTaskSelection] = useState(() => ({
-    enable_label_detection: true,
+    enable_label_detection: false,
     label_detection_model: 'gcp_video_intelligence',
 
-    enable_text_on_screen: true,
+    enable_text_on_screen: false,
     text_model: 'tesseract',
 
-    enable_moderation: true,
+    enable_moderation: false,
     moderation_model: 'nudenet',
 
-    enable_key_scene: true,
+    enable_key_scene: false,
     key_scene_detection_model: 'transnetv2_clip_cluster',
 
-    enable_scene_by_scene: true,
-    enable_high_point: true,
+    enable_scene_by_scene: false,
+    enable_high_point: false,
 
     enable_transcribe: true,
     transcribe_model: 'openai-whisper',
@@ -1438,33 +1470,33 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   }));
 
   const [targetTranslateLanguages, setTargetTranslateLanguages] = useState([]);
-  const [transcribeLanguage, setTranscribeLanguage] = useState('auto');
+  const [transcribeLanguage, setTranscribeLanguage] = useState('');
 
   const taskSelectionPayload = useMemo(() => {
     const sel = taskSelection || {};
     return {
-      enable_scene_by_scene_metadata: true,
-      enable_scene_by_scene: true,
+      enable_scene_by_scene_metadata: Boolean(sel.enable_key_scene),
+      enable_scene_by_scene: Boolean(sel.enable_key_scene),
 
       enable_label_detection: Boolean(sel.enable_label_detection),
       label_detection_model: String(sel.label_detection_model || '').trim() || 'gcp_video_intelligence',
 
-      enable_moderation: true,
+      enable_moderation: Boolean(sel.enable_moderation),
       moderation_model: String(sel.moderation_model || '').trim() || 'nudenet',
 
-      enable_text: true,
-      enable_text_on_screen: true,
+      enable_text: Boolean(sel.enable_text_on_screen),
+      enable_text_on_screen: Boolean(sel.enable_text_on_screen),
       text_model: String(sel.text_model || '').trim() || 'tesseract',
 
-      enable_key_scene_detection: true,
-      enable_key_scene: true,
+      enable_key_scene_detection: Boolean(sel.enable_key_scene),
+      enable_key_scene: Boolean(sel.enable_key_scene),
       key_scene_detection_model: String(sel.key_scene_detection_model || '').trim() || 'transnetv2_clip_cluster',
 
-      enable_high_point: true,
+      enable_high_point: Boolean(sel.enable_key_scene),
 
       enable_transcribe: true,
       transcribe_model: String(sel.transcribe_model || '').trim() || 'openai-whisper',
-      transcribe_language: String(transcribeLanguage || '').trim() || 'auto',
+      transcribe_language: String(transcribeLanguage || '').trim(),
 
       enable_synopsis_generation: true,
       synopsis_generation_model: 'auto',
@@ -1605,7 +1637,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       });
       const list = Array.isArray(resp.data?.jobs) ? resp.data.jobs : [];
       const filtered = list.filter((j) => !deletedJobIds.has(String(j?.id || j?.job_id || '').trim()));
-      setRunningJobs(filtered);
+      setRunningJobs(sortRunningJobsList(filtered));
       setRunningJobsError('');
     } catch (err) {
       setRunningJobsError(err?.response?.data?.error || 'Failed to load running jobs');
@@ -1613,7 +1645,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       setRunningJobsLoading(false);
     }
   };
-
 
   const requestDeleteJob = (jobId) => {
     const id = String(jobId || '').trim();
@@ -1707,14 +1738,14 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       try {
         const resp = await axios.get(`${BACKEND_URL}/jobs`, {
           params: {
-            status: 'processing,preflight,queued,running,stopping,stopped',
+            status: 'processing,preflight,queued,running',
             limit: 50,
           },
         });
         const list = Array.isArray(resp.data?.jobs) ? resp.data.jobs : [];
         const filtered = list.filter((j) => !deletedJobIds.has(String(j?.id || j?.job_id || '').trim()));
         if (!cancelled) {
-          setRunningJobs(filtered);
+          setRunningJobs(sortRunningJobsList(filtered));
           setRunningJobsError('');
         }
       } catch (err) {
@@ -1815,17 +1846,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   }, [activeTab, deletedJobIds]);
 
   useEffect(() => {
-    const showStats =
-      Boolean(activeJob?.jobId) ||
-      uploading ||
-      (videoSource === 'local'
-        ? Boolean(selectedFile)
-        : Boolean(String(gcsRawVideoObject || '').trim()));
-    if (!showStats) {
-      setSystemStats(null);
-      return undefined;
-    }
-
     let cancelled = false;
     const fetchStats = async () => {
       try {
@@ -1844,7 +1864,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [activeJob?.jobId, uploading]);
+  }, []);
 
   const togglePlayerFullscreen = async () => {
     const el = playerContainerRef.current;
@@ -1912,7 +1932,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       setTranslateLanguagesLoading(true);
       setTranslateLanguagesError('');
       try {
-        const [intlResp, indicResp] = await Promise.all([
+        const [intlResult, indicResult] = await Promise.allSettled([
           axios.get(`${BACKEND_URL}/translate/languages`, { params: { provider: 'libretranslate' } }),
           axios.get(`${BACKEND_URL}/translate/languages`, { params: { provider: 'indictrans2' } }),
         ]);
@@ -1928,12 +1948,21 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
             })
             .filter(Boolean);
         };
+        const intlResp = intlResult.status === 'fulfilled' ? intlResult.value : null;
+        const indicResp = indicResult.status === 'fulfilled' ? indicResult.value : null;
         const intlList = normalize(intlResp?.data);
         const indicList = normalize(indicResp?.data);
+        const mergedIntl = new Map(
+          FALLBACK_TRANSLATE_LANGUAGE_OPTIONS.map((lang) => [String(lang.code).toLowerCase(), lang])
+        );
+        intlList.forEach((lang) => {
+          const code = String(lang.code || '').toLowerCase();
+          if (!code) return;
+          mergedIntl.set(code, lang);
+        });
+        const resolvedIntlList = Array.from(mergedIntl.values());
         const indicCodes = new Set(indicList.map((lang) => String(lang.code).toLowerCase()));
         const indicNames = new Set(indicList.map((lang) => String(lang.name).toLowerCase()).filter(Boolean));
-        const commonCodes = new Set(['en', 'hi', 'bn', 'ur']);
-        const commonNames = new Set(['hindi']);
         const isIndicMatch = (code, name) => {
           if (indicCodes.has(code)) return true;
           for (const indicCode of indicCodes) {
@@ -1945,18 +1974,19 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
           if (indicNames.has(name)) return true;
           return false;
         };
-        const filteredIntl = intlList.filter((lang) => {
+        const filteredIntl = resolvedIntlList.filter((lang) => {
           const code = String(lang.code).toLowerCase();
           const name = String(lang.name || '').toLowerCase();
-          if (commonCodes.has(code)) return false;
-          for (const commonCode of commonCodes) {
-            if (code.startsWith(`${commonCode}-`) || code.startsWith(`${commonCode}_`)) return false;
-          }
-          if (commonNames.has(name) || name.includes('hindi')) return false;
           return !isIndicMatch(code, name);
         });
         setInternationalLanguageOptions(filteredIntl);
         setIndianLanguageOptions(indicList);
+        if (intlResult.status === 'rejected' || indicResult.status === 'rejected') {
+          const errors = [];
+          if (intlResult.status === 'rejected') errors.push('international');
+          if (indicResult.status === 'rejected') errors.push('indic');
+          setTranslateLanguagesError(`Some language providers failed (${errors.join(', ')}).`);
+        }
       } catch (e) {
         if (!cancelled) {
           setTranslateLanguagesError('Failed to load translation languages.');
@@ -1985,7 +2015,9 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       setSelectedMetaLoading(true);
       setSelectedMetaError(null);
       try {
-        const resp = await axios.get(`${BACKEND_URL}/video/${selectedVideoId}/metadata-json`);
+        const resp = await axios.get(`${BACKEND_URL}/video/${selectedVideoId}/metadata-json`, {
+          params: { lang: 'orig' },
+        });
         if (cancelled) return;
         setSelectedMeta(resp.data || {});
       } catch (e) {
@@ -2099,9 +2131,12 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
   }, [uploadJob]);
   const sceneByScene = useMemo(() => {
     const raw = selectedCategories?.scene_by_scene_metadata;
-    if (Array.isArray(raw)) return raw;
-    if (raw && typeof raw === 'object' && Array.isArray(raw.scenes)) return raw.scenes;
-    return [];
+    if (Array.isArray(raw)) return { scenes: raw };
+    if (raw && typeof raw === 'object') {
+      if (Array.isArray(raw.scenes)) return raw;
+      if (Array.isArray(raw.items)) return { scenes: raw.items };
+    }
+    return { scenes: [] };
   }, [selectedCategories]);
   const keyScenes = useMemo(() => selectedCategories?.key_scenes || [], [selectedCategories]);
   const highPoints = useMemo(() => selectedCategories?.high_points || [], [selectedCategories]);
@@ -2364,9 +2399,8 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
 
   const handleUpload = async () => {
     setMessage(null);
-
-    if (!Array.isArray(targetTranslateLanguages) || targetTranslateLanguages.length === 0) {
-      setMessage({ type: 'error', text: 'Select at least one target translation language before analyzing.' });
+    if (taskSelectionPayload?.enable_transcribe && !String(transcribeLanguage || '').trim()) {
+      setMessage({ type: 'error', text: 'Select a source language before starting.' });
       return;
     }
 
@@ -2491,6 +2525,24 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
         ],
       },
       {
+        enableKey: 'enable_text_on_screen',
+        label: 'Text on Screen',
+        modelKey: 'text_model',
+        models: [{ value: 'tesseract', label: 'Tesseract OCR' }],
+      },
+      {
+        enableKey: 'enable_moderation',
+        label: 'Moderation',
+        modelKey: 'moderation_model',
+        models: [{ value: 'nudenet', label: 'NudeNet' }],
+      },
+      {
+        enableKey: 'enable_key_scene',
+        label: 'Key scene detection',
+        modelKey: 'key_scene_detection_model',
+        models: [{ value: 'transnetv2_clip_cluster', label: 'TransNetV2 + CLIP clustering' }],
+      },
+      {
         enableKey: 'enable_famous_locations',
         label: 'Famous location detection (future)',
         disabled: true,
@@ -2549,6 +2601,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
     if (id === 'scene_by_scene_metadata') return Boolean(selection.enable_scene_by_scene);
     if (id === 'famous_location_detection') return Boolean(selection.enable_famous_locations);
     if (id === 'translate_output') return Boolean(selection.enable_translate_output);
+    if (id === 'upload_artifacts') return Boolean(selection.enable_translate_output);
     if (id === 'opening_closing_credit_detection') return Boolean(selection.enable_opening_closing);
     if (id === 'celebrity_detection') return Boolean(selection.enable_celebrity_detection);
     if (id === 'celebrity_bio_image') return Boolean(selection.enable_celebrity_bio_image);
@@ -2557,23 +2610,44 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
 
   const pipelineSteps = useMemo(() => {
     const steps = Array.isArray(uploadJob?.steps) ? uploadJob.steps : [];
-    if (steps.length) {
-      return steps.filter((s) => {
-        if (!s || typeof s !== 'object') return false;
-        const id = String(s.id || '').toLowerCase();
-        const label = String(s.label || '').toLowerCase();
-        if (id === 'overall' || label === 'overall') return false;
-        if (id === 'precheck_models' || label === 'precheck models') return false;
-        if (id === 'preflight' || label.includes('preflight') || label.includes('precheck')) return false;
-        if (id === 'save_as_json' || label.includes('save as json')) return false;
-        return isPipelineStepEnabled(id);
-      });
-    }
-
+    const jobMessage = String(uploadJob?.message || '').trim();
+    const viMessageActive = jobMessage.toLowerCase().includes('video intelligence');
     const hasSelectedInput =
       videoSource === 'local' ? Boolean(selectedFile) : Boolean(String(gcsRawVideoObject || '').trim());
+    const enabledDefaults = DEFAULT_PIPELINE_STEPS.filter((step) => isPipelineStepEnabled(step?.id));
+    if (!steps.length) {
+      return hasSelectedInput ? enabledDefaults : [];
+    }
 
-    return hasSelectedInput ? DEFAULT_PIPELINE_STEPS.filter((step) => isPipelineStepEnabled(step?.id)) : [];
+    const stepsMap = new Map();
+    steps.forEach((step) => {
+      if (!step || typeof step !== 'object') return;
+      const rawId = String(step.id || step.step_id || '').trim();
+      const rawLabel = String(step.label || step.step_id || '').trim();
+      if (!rawId && !rawLabel) return;
+      const id = rawId || rawLabel;
+      const label = rawLabel || rawId;
+      if (['overall', 'precheck_models', 'preflight', 'save_as_json'].includes(id.toLowerCase())) return;
+      if (label.toLowerCase().includes('preflight') || label.toLowerCase().includes('precheck')) return;
+      if (label.toLowerCase().includes('save as json')) return;
+      stepsMap.set(id, { ...step, id, label });
+    });
+
+    return enabledDefaults.map((step) => {
+      const id = String(step?.id || '').trim();
+      const match = id ? stepsMap.get(id) : null;
+      if (!match) return step;
+      const needsViOverride = viMessageActive && id === 'label_detection' && String(match?.status || '').toLowerCase() !== 'running';
+      return {
+        ...step,
+        ...match,
+        id: id || match.id || match.step_id,
+        label: step.label || match.label || match.step_id || id,
+        status: needsViOverride ? 'running' : match.status,
+        message: needsViOverride ? jobMessage || match.message : match.message,
+        percent: needsViOverride ? (Number.isFinite(Number(match?.percent)) ? match.percent : 5) : match.percent,
+      };
+    });
   }, [uploadJob, videoSource, selectedFile, gcsRawVideoObject, taskSelection, stepSelection]);
 
   const statusBadgeFor = (rawStatus) => {
@@ -2615,7 +2689,17 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       } catch {
         metadata = null;
       }
-      setExpandedJobDetail({ job: jobResp?.data || null, metadata });
+      const jobPayload = jobResp?.data || null;
+      if (jobPayload) {
+        const status = String(jobPayload?.status || '').toLowerCase();
+        if (QUEUED_STATUSES.has(status)) {
+          jobPayload.steps = [];
+          jobPayload.task_selection = null;
+          jobPayload.task_selection_effective = null;
+          jobPayload.task_selection_requested_models = null;
+        }
+      }
+      setExpandedJobDetail({ job: jobPayload, metadata });
     } catch (err) {
       setExpandedJobDetail({ error: err?.response?.data?.error || 'Failed to load job detail' });
     } finally {
@@ -2627,6 +2711,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
     const jobId = String(job?.id || job?.job_id || '').trim();
     const title = String(job?.title || job?.name || '').trim();
     const status = String(job?.status || '').toLowerCase();
+    const isQueued = QUEUED_STATUSES.has(status);
     const stopRequested = Boolean(job?.stop_requested);
     const stepsMap = buildStepMap(job?.steps, status);
     const displaySteps = DEFAULT_PIPELINE_STEPS;
@@ -2651,7 +2736,9 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       const stepObj = stepsMap.get(String(step?.id || ''));
       return String(stepObj?.status || '').toLowerCase() === 'running';
     });
-    const currentStepLabel = currentStep?.label || '';
+    const jobMessage = String(job?.message || '').trim();
+    const viMessageActive = jobMessage.toLowerCase().includes('video intelligence');
+    const currentStepLabel = isQueued ? '' : currentStep?.label || jobMessage || '';
 
     return (
       <div key={jobId || title}>
@@ -2688,6 +2775,16 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
             </div>
           </RunningJobMeta>
           {(() => {
+            if (isQueued) {
+              return (
+                <StatusBucketsGrid>
+                  <StatusBucket>
+                    <StatusBucketTitle>Queued</StatusBucketTitle>
+                    <SubtleNote>Waiting in queue. Tasks will appear when processing starts.</SubtleNote>
+                  </StatusBucket>
+                </StatusBucketsGrid>
+              );
+            }
             const buckets = {
               not_started: [],
               in_progress: [],
@@ -2698,8 +2795,9 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
               const id = String(step?.id || '');
               const label = String(step?.label || id || 'Step');
               const stepObj = stepsMap.get(id);
-              const statusRaw = String(stepObj?.status || '').toLowerCase();
-              const statusInfo = tableStatusFor(stepObj?.status);
+              const statusRawBase = String(stepObj?.status || '').toLowerCase();
+              const statusRaw = viMessageActive && id === 'label_detection' && statusRawBase !== 'running' ? 'running' : statusRawBase;
+              const statusInfo = tableStatusFor(statusRaw);
               const percentRaw = Number(stepObj?.percent);
               const percent = Number.isFinite(percentRaw) ? Math.max(0, Math.min(100, percentRaw)) : 0;
               if (statusRaw === 'failed' || statusRaw === 'skipped') buckets.skipped.push({ id, label, percent });
@@ -2886,18 +2984,6 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
               <CompletedDownloadTable>
                 <CompletedDownloadCell>
                   <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(230, 232, 242, 0.7)', marginBottom: 6 }}>
-                    Complete metadata
-                  </div>
-                  <RunningJobSteps>
-                    <StepChip $status="completed" title="Download complete metadata folder (.zip)">
-                      <LinkA href={`${BACKEND_URL}/video/${jobId}/metadata-json.zip`} target="_blank" rel="noreferrer">
-                        Download folder
-                      </LinkA>
-                    </StepChip>
-                  </RunningJobSteps>
-                </CompletedDownloadCell>
-                <CompletedDownloadCell>
-                  <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(230, 232, 242, 0.7)', marginBottom: 6 }}>
                     GCS location
                   </div>
                   {artifactsBaseUri ? (
@@ -2975,6 +3061,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
       failedStep?.label ||
       failedStepId ||
       '';
+    const failedAt = failedStep?.completed_at || job?.completed_at || job?.updated_at || job?.created_at || null;
     const stepReason = String(failedStep?.message || failedStep?.error || '').trim();
     const remarks =
       String(
@@ -2999,6 +3086,9 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                 <RunningJobId>{jobId || 'Unknown job'}</RunningJobId>
                 <RunningJobTitle>{fileName || 'Untitled file'}</RunningJobTitle>
                 <div style={{ marginTop: 6, fontSize: 12, color: 'rgba(255, 187, 187, 0.9)' }}>{failedAtText}</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(230, 232, 242, 0.65)' }}>
+                  Failed: {formatTimestamp(failedAt)}
+                </div>
                 <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(255, 187, 187, 0.9)' }}>
                   Remarks: {remarksText}
                 </div>
@@ -3953,14 +4043,12 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
         <Header>
           <Title>Envid Metadata (Multimodal)</Title>
           <Subtitle>Upload videos or analyze a GCS object (any folder)</Subtitle>
-          {systemStats ? (
-            <TopStatsBar>
-              <TopStatsItem>CPU {cpuPercentLabel}</TopStatsItem>
-              <TopStatsItem>RAM {ramLabel}</TopStatsItem>
-              <TopStatsItem>GPU {gpuPercentLabel}</TopStatsItem>
-              <TopStatsItem>VRAM {vramLabel}</TopStatsItem>
-            </TopStatsBar>
-          ) : null}
+          <TopStatsBar>
+            <TopStatsItem>CPU {cpuPercentLabel}</TopStatsItem>
+            <TopStatsItem>RAM {ramLabel}</TopStatsItem>
+            <TopStatsItem>GPU {gpuPercentLabel}</TopStatsItem>
+            <TopStatsItem>VRAM {vramLabel}</TopStatsItem>
+          </TopStatsBar>
           <TabsRow>
             <TabButton
               type="button"
@@ -4293,7 +4381,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                       <>
                         <select
                           value={transcribeLanguage}
-                          onChange={(e) => setTranscribeLanguage(String(e.target.value || 'auto'))}
+                          onChange={(e) => setTranscribeLanguage(String(e.target.value || ''))}
                           disabled={uploading}
                           style={{
                             padding: '10px 12px',
@@ -4305,6 +4393,9 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                             color: '#e6e8f2',
                           }}
                         >
+                          <option value="" disabled>
+                            Select source language
+                          </option>
                           {WHISPER_LANGUAGE_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -4312,7 +4403,7 @@ export default function EnvidMetadataMinimal({ initialTab = 'workflow' } = {}) {
                           ))}
                         </select>
                         <div style={{ fontSize: 12, color: 'rgba(230, 232, 242, 0.65)', marginTop: 6 }}>
-                          Choose auto-detect or a specific source language for transcription accuracy.
+                          Select the source language used in the audio. Choose “Other language” if unsure.
                         </div>
                       </>
                     ) : (

@@ -2599,7 +2599,6 @@ def _local_keyscene_best_clip_cluster(
 
 
 def _repo_root() -> Path:
-    # app.py is in code/envidMetadataGCP/app.py
     return Path(__file__).resolve().parents[2]
 
 

@@ -510,7 +510,7 @@ def moderate_path() -> Any:
                     continue
 
         force_interval = bool(payload.get("force_interval"))
-        use_scene = _env_truthy(os.getenv("ENVID_METADATA_MODERATION_SCENE_SAMPLING"), default=True)
+        use_scene = False
         scene_threshold = float(os.getenv("ENVID_METADATA_MODERATION_SCENE_THRESHOLD") or 0.3)
 
         manifest: list[dict[str, Any]] = []

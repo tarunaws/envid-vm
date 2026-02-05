@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -36,14 +37,13 @@ def _require_whisper() -> None:
 
 
 def _resolve_device(device: str | None) -> str:
-    if device:
-        if device == "cuda" and not torch.cuda.is_available():
+    resolved = device or "cuda"
+    if resolved == "cuda" and not torch.cuda.is_available():
+        LOGGER.warning("CUDA requested but not available; retrying in 2 seconds.")
+        time.sleep(2)
+        if not torch.cuda.is_available():
             raise RuntimeError("CUDA requested but not available")
-        return device
-    if torch.cuda.is_available():
-        return "cuda"
-    LOGGER.warning("CUDA not available; falling back to CPU.")
-    return "cpu"
+    return resolved
 
 
 def _normalize_model_name(name: str) -> str:
@@ -51,6 +51,33 @@ def _normalize_model_name(name: str) -> str:
     if cleaned in {"large3", "large-3", "large_v3"}:
         return "large-v3"
     return name.strip()
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except Exception:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except Exception:
+        return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _load_audio(path: Path) -> np.ndarray:
@@ -127,10 +154,24 @@ def transcribe(*, input_path: str, **kwargs: Any) -> dict[str, Any]:
     detected_language = opts.language or ""
     offset = 0.0
     for chunk in chunks:
+        beam_size = _env_int("ENVID_WHISPER_BEAM_SIZE", 5)
+        best_of = _env_int("ENVID_WHISPER_BEST_OF", 5)
+        temperature = _env_float("ENVID_WHISPER_TEMPERATURE", 0.0)
+        condition_on_previous_text = _env_bool("ENVID_WHISPER_CONDITION_ON_PREVIOUS_TEXT", True)
+        no_speech_threshold = _env_float("ENVID_WHISPER_NO_SPEECH_THRESHOLD", 0.6)
+        logprob_threshold = _env_float("ENVID_WHISPER_LOGPROB_THRESHOLD", -1.0)
+        compression_ratio_threshold = _env_float("ENVID_WHISPER_COMPRESSION_RATIO_THRESHOLD", 2.4)
         result = model.transcribe(
             chunk,
             language=opts.language or None,
             fp16=fp16,
+            beam_size=beam_size,
+            best_of=best_of,
+            temperature=temperature,
+            condition_on_previous_text=condition_on_previous_text,
+            no_speech_threshold=no_speech_threshold,
+            logprob_threshold=logprob_threshold,
+            compression_ratio_threshold=compression_ratio_threshold,
         )
         language = result.get("language") or ""
         if language and not detected_language:

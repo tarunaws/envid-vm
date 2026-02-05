@@ -27,6 +27,22 @@ _LANG_DICTIONARY_SET: dict[str, set[str]] = {}
 _LANG_CONFUSION_MAP: dict[str, dict[str, str]] = {}
 
 
+def _llm_primary_choice() -> int:
+    value = (os.getenv("LLM_PRIMARY") or "").strip()
+    return 2 if value == "2" else 1
+
+
+def _llm_provider_order(nlp_mode: str) -> list[str]:
+    mode = (nlp_mode or "").strip().lower()
+    if mode in {"gemini", "gemini_primary"}:
+        return ["gemini", "local"]
+    if mode in {"local", "local_llama"}:
+        return ["local", "gemini"]
+    if mode in {"primary", "auto", "default"}:
+        return ["local", "gemini"] if _llm_primary_choice() == 1 else ["gemini", "local"]
+    return []
+
+
 def _normalize_language_code(language_code: str | None) -> str:
     if not language_code:
         return ""
@@ -196,7 +212,7 @@ def _normalize_transcript_basic(text: str) -> str:
 
 
 def _languagetool_remote_check(*, text: str, language: str) -> dict[str, Any] | None:
-    url = "http://translate:8010"
+    url = "http://translate-international:8010"
     if url.endswith("/"):
         url = url[:-1]
     if not url.endswith("/v2/check") and not url.endswith("/check"):
@@ -316,6 +332,19 @@ def _gemini_generate_text(*, prompt: str, system: str | None, timeout_s: float, 
         return None
 
 
+def _llm_plain_text_valid(content: str | None) -> bool:
+    if not content:
+        return False
+    raw = str(content).strip()
+    if not raw:
+        return False
+    if "```" in raw:
+        return False
+    if raw.startswith("{") or raw.startswith("["):
+        return False
+    return True
+
+
 def _gemini_normalize_transcript(text: str, language_code: str | None) -> tuple[str | None, bool]:
     if not _gemini_api_key():
         return None, False
@@ -326,27 +355,37 @@ def _gemini_normalize_transcript(text: str, language_code: str | None) -> tuple[
 
     timeout_s = float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
     lang = (language_code or "").strip() or "unknown"
-    prompt = (
-        "You are a transcript normalizer.\n"
-        "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
-        "Hard rules:\n"
-        "- Do NOT add new words or remove words.\n"
-        "- Do NOT guess missing words.\n"
-        "- Do NOT rewrite, paraphrase, or summarize.\n"
-        "- Keep the language as-is.\n"
-        "- For Hindi, prefer the danda (।) for sentence endings.\n"
-        "- Output plain text only (no markdown, no quotes).\n\n"
-        f"Language hint: {lang}\n\n"
-        f"Transcript:\n{raw[:12000]}\n"
-    )
+    working = raw
+    last_content: str | None = None
+    for attempt in range(1, 6):
+        prompt = (
+            "You are a transcript normalizer.\n"
+            "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
+            "Hard rules:\n"
+            "- Do NOT add new words or remove words.\n"
+            "- Do NOT guess missing words.\n"
+            "- Do NOT rewrite, paraphrase, or summarize.\n"
+            "- Keep the language as-is.\n"
+            "- For Hindi, prefer the danda (।) for sentence endings.\n"
+            "- Output plain text only (no markdown, no quotes).\n\n"
+            f"Language hint: {lang}\n\n"
+            f"Transcript:\n{working[:12000]}\n"
+        )
 
-    content = _gemini_generate_text(
-        prompt=prompt,
-        system="Fix punctuation/casing/spacing only. Output plain text.",
-        timeout_s=timeout_s,
-        max_tokens=1200,
-    )
-    return (content if content else None), bool(content)
+        content = _gemini_generate_text(
+            prompt=prompt,
+            system="Fix punctuation/casing/spacing only. Output plain text.",
+            timeout_s=timeout_s,
+            max_tokens=1200,
+        )
+        if content:
+            last_content = content.strip()
+            if _llm_plain_text_valid(last_content) and attempt < 5:
+                return last_content, True
+            working = last_content
+        if attempt >= 5:
+            return (last_content if last_content else None), bool(last_content)
+    return (last_content if last_content else None), bool(last_content)
 
 
 def _verify_prompt(text: str, language_code: str | None) -> str:
@@ -368,44 +407,82 @@ def _gemini_verify_transcript(text: str, language_code: str | None) -> dict[str,
         return None
     timeout_s = float(os.getenv("GEMINI_TIMEOUT_SECONDS") or os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
     prompt = _verify_prompt(raw, language_code)
-    max_tokens = int(float(
-        os.getenv("ENVID_GEMINI_MAX_OUTPUT_TOKENS")
-        or os.getenv("ENVID_LLM_MAX_OUTPUT_TOKENS")
-        or 2048
-    ))
-    max_tokens = max(256, min(8192, max_tokens))
-    content = _gemini_generate_text(
-        prompt=prompt,
-        system=(
-            "You are a professional linguistic editor specializing in ASR (Automatic Speech Recognition) "
-            "post-processing. Your goal is to clean and validate Whisper transcriptions for high-quality "
-            "subtitle generation and summarization.\n\n"
-            "Your specific tasks:\n"
-            "Deduplication: Identify and remove 'repetition loops' (e.g., when Whisper repeats the same "
-            "sentence or phrase multiple times due to background noise).\n"
-            "Hallucination Cleaning: Remove nonsensical phrases often generated during silent periods "
-            "(e.g., 'Thank you for watching,' or 'Please subscribe' when it doesn't fit the context).\n"
-            "Grammar & Punctuation: Correct obvious transcription errors, fix sentence casing, and add proper "
-            "punctuation to ensure readability.\n"
-            "Logical Flow: If a word sounds phonetically similar but makes no sense in context, use the "
-            "surrounding narrative to correct it.\n"
-            "Preservation: Do not summarize at this stage. Keep the speaker's original meaning and vocabulary "
-            "intact. Provide only the cleaned text."
-        ),
-        timeout_s=timeout_s,
-        max_tokens=max_tokens,
-    )
-    if not content:
-        return None
-    return {
-        "text": content.strip(),
-        "provider": "gemini",
-        "model": _gemini_model(),
-    }
+    max_tokens = 8000
+    working = raw
+    last_content: str | None = None
+    for attempt in range(1, 6):
+        prompt = _verify_prompt(working, language_code)
+        content = _gemini_generate_text(
+            prompt=prompt,
+            system=(
+                "### ROLE\n"
+                "You are a Professional Transcription Editor specializing in high-fidelity media archives and Indian Cinema content. "
+                "Your goal is to convert raw, noisy ASR output into a clean, \"Gold Standard\" readable transcript.\n\n"
+                "### TASK\n"
+                "Clean the provided raw transcription. Focus on linguistic accuracy, cultural nuance (Hinglish/Regional), and logical flow.\n\n"
+                "### INSTRUCTIONS\n"
+                "1. DENOISING: Remove verbal disfluencies (ums, ahs, stammers, false starts) and \"filler\" words that do not add value to the sentence.\n"
+                "2. HALLUCINATION CHECK: Delete nonsensical repetitions or gibberish that occur during silences or background music in the video.\n"
+                "3. HINGLISH & ENTITY MAPPING: \n"
+                "   - Correct spellings for Indian actors, directors, and film titles (e.g., \"Shah Rukh Khan\" instead of \"Sharukh\" or \"SRK\").\n"
+                "   - Standardize common Hinglish phrases (e.g., \"Kaise ho\" instead of \"Kay say ho\").\n"
+                "4. PUNCTUATION & SEGMENTATION: \n"
+                "   - Add proper sentence casing and punctuation. \n"
+                "   - Break massive walls of text into logical paragraphs based on the speaker's topic change.\n"
+                "5. SPEAKER ATTRIBUTION: If the raw text includes speaker tags (e.g., Speaker 1), ensure the flow between speakers is logically consistent and cleanly separated.\n\n"
+                "### CONTEXT\n"
+                "- Content Type: Indian Movie [Genre: Action/Drama/etc.]\n"
+                "- Target: High-quality archival and SEO indexing.\n\n"
+                "### OUTPUT FORMAT\n"
+                "Provide the cleaned, plain-text transcript only. Do not add intro/outro comments or meta-explanations."
+            ),
+            timeout_s=timeout_s,
+            max_tokens=max_tokens,
+        )
+        if content:
+            last_content = content.strip()
+            if _llm_plain_text_valid(last_content) and attempt < 5:
+                return {
+                    "text": last_content,
+                    "provider": "gemini",
+                    "model": _gemini_model(),
+                }
+            working = last_content
+        if attempt >= 5:
+            if last_content:
+                return {
+                    "text": last_content,
+                    "provider": "gemini",
+                    "model": _gemini_model(),
+                }
+            return None
+    if last_content:
+        return {"text": last_content, "provider": "gemini", "model": _gemini_model()}
+    return None
+
+
+def _running_in_docker() -> bool:
+    try:
+        return os.path.exists("/.dockerenv")
+    except Exception:
+        return False
+
+
+def _normalize_localhost_url(url: str) -> str:
+    if not url:
+        return url
+    if not _running_in_docker():
+        return url
+    if "://localhost" in url:
+        return url.replace("://localhost", "://host.docker.internal", 1)
+    if "://127.0.0.1" in url:
+        return url.replace("://127.0.0.1", "://host.docker.internal", 1)
+    return url
 
 
 def _local_llm_base_url() -> str:
-    return (os.getenv("ENVID_LLM_BASE_URL") or "http://localhost:8000/v1").strip().rstrip("/")
+    raw = "http://genai:5099/v1"
+    return _normalize_localhost_url(raw).strip().rstrip("/")
 
 
 def _local_llm_headers() -> dict[str, str]:
@@ -417,12 +494,7 @@ def _local_llm_headers() -> dict[str, str]:
 
 
 def _local_llm_model() -> str:
-    return (
-        os.getenv("ENVID_LLM_TRANSCRIPT_MODEL")
-        or os.getenv("ENVID_TEXT_NORMALIZE_MODEL")
-        or os.getenv("ENVID_LLM_MODEL")
-        or "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    ).strip()
+    return "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
 
 def _local_llm_normalize_transcript(text: str, language_code: str | None) -> tuple[str | None, bool]:
@@ -438,44 +510,57 @@ def _local_llm_normalize_transcript(text: str, language_code: str | None) -> tup
     timeout_s = float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
 
     lang = (language_code or "").strip() or "unknown"
-    prompt = (
-        "You are a transcript normalizer.\n"
-        "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
-        "Hard rules:\n"
-        "- Do NOT add new words or remove words.\n"
-        "- Do NOT guess missing words.\n"
-        "- Do NOT rewrite, paraphrase, or summarize.\n"
-        "- Keep the language as-is.\n"
-        "- For Hindi, prefer the danda (।) for sentence endings.\n"
-        "- Output plain text only (no markdown, no quotes).\n\n"
-        f"Language hint: {lang}\n\n"
-        f"Transcript:\n{raw[:12000]}\n"
-    )
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Fix punctuation/casing/spacing only. Output plain text."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 1200,
-    }
-
-    try:
-        resp = requests.post(
-            f"{base_url}/chat/completions",
-            headers=_local_llm_headers(),
-            json=payload,
-            timeout=timeout_s,
+    working = raw
+    last_content: str | None = None
+    for attempt in range(1, 6):
+        prompt = (
+            "You are a transcript normalizer.\n"
+            "Task: improve readability ONLY by fixing punctuation, casing, spacing, and obvious sentence boundaries.\n"
+            "Hard rules:\n"
+            "- Do NOT add new words or remove words.\n"
+            "- Do NOT guess missing words.\n"
+            "- Do NOT rewrite, paraphrase, or summarize.\n"
+            "- Keep the language as-is.\n"
+            "- For Hindi, prefer the danda (।) for sentence endings.\n"
+            "- Output plain text only (no markdown, no quotes).\n\n"
+            f"Language hint: {lang}\n\n"
+            f"Transcript:\n{working[:12000]}\n"
         )
-        if resp.status_code >= 400:
-            return None, False
-        data = resp.json()
-        content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        return (content if content else None), bool(content)
-    except Exception:
-        return None, False
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "Fix punctuation/casing/spacing only. Output plain text."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 1200,
+        }
+
+        try:
+            resp = requests.post(
+                f"{base_url}/chat/completions",
+                headers=_local_llm_headers(),
+                json=payload,
+                timeout=timeout_s,
+            )
+            if resp.status_code >= 400:
+                if attempt >= 5:
+                    return (last_content if last_content else None), bool(last_content)
+                continue
+            data = resp.json()
+            content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+            if content:
+                last_content = content
+                if _llm_plain_text_valid(last_content) and attempt < 5:
+                    return last_content, True
+                working = last_content
+            if attempt >= 5:
+                return (last_content if last_content else None), bool(last_content)
+        except Exception:
+            if attempt >= 5:
+                return (last_content if last_content else None), bool(last_content)
+    return (last_content if last_content else None), bool(last_content)
 
 
 def _local_llm_verify_transcript(text: str, language_code: str | None) -> dict[str, Any] | None:
@@ -487,64 +572,88 @@ def _local_llm_verify_transcript(text: str, language_code: str | None) -> dict[s
         return None
     model = _local_llm_model()
     timeout_s = float(os.getenv("ENVID_LLM_TIMEOUT_SECONDS") or 15.0)
-    prompt = _verify_prompt(raw, language_code)
-    payload = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a professional linguistic editor specializing in ASR (Automatic Speech Recognition) "
-                    "post-processing. Your goal is to clean and validate Whisper transcriptions for high-quality "
-                    "subtitle generation and summarization.\n\n"
-                    "Your specific tasks:\n"
-                    "Deduplication: Identify and remove 'repetition loops' (e.g., when Whisper repeats the same "
-                    "sentence or phrase multiple times due to background noise).\n"
-                    "Hallucination Cleaning: Remove nonsensical phrases often generated during silent periods "
-                    "(e.g., 'Thank you for watching,' or 'Please subscribe' when it doesn't fit the context).\n"
-                    "Grammar & Punctuation: Correct obvious transcription errors, fix sentence casing, and add proper "
-                    "punctuation to ensure readability.\n"
-                    "Logical Flow: If a word sounds phonetically similar but makes no sense in context, use the "
-                    "surrounding narrative to correct it.\n"
-                    "Preservation: Do not summarize at this stage. Keep the speaker's original meaning and vocabulary "
-                    "intact. Provide only the cleaned text."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 600,
-    }
-    try:
-        resp = requests.post(
-            f"{base_url}/chat/completions",
-            headers=_local_llm_headers(),
-            json=payload,
-            timeout=timeout_s,
-        )
-        if resp.status_code >= 400:
-            return None
-        data = resp.json()
-        content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        if content:
-            try:
-                parsed = json.loads(content)
-                if isinstance(parsed, dict):
-                    if isinstance(parsed.get("text"), str):
-                        content = parsed["text"].strip()
-                    elif isinstance(parsed.get("parameters"), dict) and isinstance(parsed["parameters"].get("text"), str):
-                        content = parsed["parameters"]["text"].strip()
-            except Exception:
-                pass
-        if not content:
-            return None
+    working = raw
+    last_content: str | None = None
+    for attempt in range(1, 6):
+        prompt = _verify_prompt(working, language_code)
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "### ROLE\n"
+                        "You are a Professional Transcription Editor specializing in high-fidelity media archives and Indian Cinema content. "
+                        "Your goal is to convert raw, noisy ASR output into a clean, \"Gold Standard\" readable transcript.\n\n"
+                        "### TASK\n"
+                        "Clean the provided raw transcription. Focus on linguistic accuracy, cultural nuance (Hinglish/Regional), and logical flow.\n\n"
+                        "### INSTRUCTIONS\n"
+                        "1. DENOISING: Remove verbal disfluencies (ums, ahs, stammers, false starts) and \"filler\" words that do not add value to the sentence.\n"
+                        "2. HALLUCINATION CHECK: Delete nonsensical repetitions or gibberish that occur during silences or background music in the video.\n"
+                        "3. HINGLISH & ENTITY MAPPING: \n"
+                        "   - Correct spellings for Indian actors, directors, and film titles (e.g., \"Shah Rukh Khan\" instead of \"Sharukh\" or \"SRK\").\n"
+                        "   - Standardize common Hinglish phrases (e.g., \"Kaise ho\" instead of \"Kay say ho\").\n"
+                        "4. PUNCTUATION & SEGMENTATION: \n"
+                        "   - Add proper sentence casing and punctuation. \n"
+                        "   - Break massive walls of text into logical paragraphs based on the speaker's topic change.\n"
+                        "5. SPEAKER ATTRIBUTION: If the raw text includes speaker tags (e.g., Speaker 1), ensure the flow between speakers is logically consistent and cleanly separated.\n\n"
+                        "### CONTEXT\n"
+                        "- Content Type: Indian Movie [Genre: Action/Drama/etc.]\n"
+                        "- Target: High-quality archival and SEO indexing.\n\n"
+                        "### OUTPUT FORMAT\n"
+                        "Provide the cleaned, plain-text transcript only. Do not add intro/outro comments or meta-explanations."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 600,
+        }
+        try:
+            resp = requests.post(
+                f"{base_url}/chat/completions",
+                headers=_local_llm_headers(),
+                json=payload,
+                timeout=timeout_s,
+            )
+            if resp.status_code >= 400:
+                if attempt >= 5:
+                    break
+                continue
+            data = resp.json()
+            content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+            if content:
+                try:
+                    parsed = json.loads(content)
+                    if isinstance(parsed, dict):
+                        if isinstance(parsed.get("text"), str):
+                            content = parsed["text"].strip()
+                        elif isinstance(parsed.get("parameters"), dict) and isinstance(parsed["parameters"].get("text"), str):
+                            content = parsed["parameters"]["text"].strip()
+                except Exception:
+                    pass
+            if content:
+                last_content = content.strip()
+                if _llm_plain_text_valid(last_content) and attempt < 5:
+                    return {
+                        "text": last_content,
+                        "provider": "local",
+                        "model": model,
+                    }
+                working = last_content
+            if attempt >= 5:
+                break
+        except Exception:
+            if attempt >= 5:
+                break
+            continue
+    if last_content:
         return {
-            "text": content.strip(),
+            "text": last_content,
             "provider": "local",
             "model": model,
         }
-    except Exception:
-        return None
+    return None
 
 
 @app.get("/health")
@@ -571,7 +680,16 @@ def normalize_segment() -> Any:
         "punctuation_applied": False,
     }
 
-    # LLM normalization disabled; keep normalization to non-LLM steps only.
+    # LLM normalization enabled when nlp_mode requests it; fallback to non-LLM steps only.
+    for provider in _llm_provider_order(nlp_mode):
+        if provider == "gemini":
+            normalized, applied = _gemini_normalize_transcript(out, language_code)
+        else:
+            normalized, applied = _local_llm_normalize_transcript(out, language_code)
+        if normalized:
+            out = normalized
+            meta["nlp_applied"] = bool(applied)
+            break
 
     if grammar_enabled:
         corrected, applied = _grammar_correct_text(text=out, language=language_code)
@@ -604,10 +722,13 @@ def verify_segment() -> Any:
     nlp_mode = str(payload.get("nlp_mode") or "").strip().lower()
 
     result: dict[str, Any] | None = None
-    if nlp_mode in {"gemini", "gemini_primary", "local_llama", "local"}:
-        result = _gemini_verify_transcript(text, language_code)
-        if not result:
+    for provider in _llm_provider_order(nlp_mode):
+        if provider == "gemini":
+            result = _gemini_verify_transcript(text, language_code)
+        else:
             result = _local_llm_verify_transcript(text, language_code)
+        if result:
+            break
 
     if not isinstance(result, dict):
         return jsonify({"text": None, "meta": {"error": "unavailable"}}), 200

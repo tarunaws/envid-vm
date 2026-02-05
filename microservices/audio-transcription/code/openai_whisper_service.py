@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 import requests
 import torch
 
-from openai_whisper_adapter import transcribe as openai_transcribe
+from openai_whisper_adapter import transcribe as whisper_transcribe
 from writers import _format_timestamp
 
 LOGGER = logging.getLogger("audio-transcription")
@@ -26,24 +26,30 @@ _PUNCTUATION_MODEL = None
 _PUNCTUATION_MODEL_NAME = None
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
 def _bool_param(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _openai_device() -> str:
+def _transcribe_device() -> str:
     device_env = (os.getenv("ENVID_OPENAI_WHISPER_DEVICE") or "auto").strip().lower()
     if device_env in {"", "auto"}:
         return "cuda" if torch.cuda.is_available() else "cpu"
     if device_env in {"cuda", "gpu"}:
         return "cuda"
     return "cpu"
+
+
+def _transcribe_compute_type() -> str | None:
+    raw = (os.getenv("ENVID_OPENAI_WHISPER_COMPUTE_TYPE") or "").strip()
+    return raw or None
+
+
+def _transcribe_model(override: str | None) -> str:
+    if override and override.strip():
+        return override.strip()
+    return (os.getenv("ENVID_OPENAI_WHISPER_MODEL") or "large-v3").strip() or "large-v3"
 
 
 def _ffmpeg_service_url() -> str:
@@ -113,7 +119,7 @@ def _language_tool(language: str) -> Any:
         import language_tool_python  # type: ignore
     except Exception:
         return None
-    url = (os.getenv("ENVID_LANGUAGETOOL_URL") or "").strip()
+    url = "http://translate-international:8010"
     try:
         if url:
             return language_tool_python.LanguageTool(language, url=url)
@@ -204,21 +210,24 @@ def _hindi_dictionary_correct(text: str, language: str | None) -> tuple[str, boo
 
 
 def _llm_normalize(text: str, language: str | None) -> tuple[str, bool]:
-    if not _bool_param(os.getenv("ENVID_TEXT_NORMALIZE_ENABLED"), default=True):
-        return text, False
     if not text.strip():
         return text, False
-    base_url = (os.getenv("ENVID_TEXT_NORMALIZER_URL") or "").strip()
+    base_url = (os.getenv("ENVID_TEXT_NORMALIZER_URL") or "http://translate:5098").strip()
     if not base_url:
-        return text, False
+        base_url = "http://translate:5098"
+    if base_url.rstrip("/").endswith("/normalize/segment"):
+        endpoint = base_url
+    else:
+        endpoint = base_url.rstrip("/") + "/normalize/segment"
+    nlp_mode = (os.getenv("ENVID_TEXT_NORMALIZER_NLP_MODE") or "primary").strip().lower()
     payload = {
         "text": text,
         "language_code": language or "",
-        "nlp_mode": (os.getenv("ENVID_TRANSCRIPT_TEXT_NORMALIZER_NLP_MODE") or "gemini").strip().lower(),
+        "nlp_mode": nlp_mode or "primary",
     }
     try:
         resp = requests.post(
-            base_url,
+            endpoint,
             json=payload,
             timeout=int(float(os.getenv("ENVID_TEXT_NORMALIZE_TIMEOUT") or 30)),
         )
@@ -314,7 +323,7 @@ def _apply_post_processing(result: dict[str, Any], language: str | None) -> dict
     if not isinstance(segments, list):
         return result
 
-    use_llm_segments = _bool_param(os.getenv("ENVID_TEXT_NORMALIZE_SEGMENTS"), default=True)
+    use_llm_segments = True
     processed_segments: list[dict[str, Any]] = []
     applied_steps: set[str] = set()
     for seg in segments:
@@ -374,19 +383,20 @@ async def transcribe_endpoint(
     if language_hint in {"", "auto", "detect", "none"}:
         language_hint = ""
 
-    openai_device = _openai_device()
-    openai_compute_type = (os.getenv("ENVID_OPENAI_WHISPER_COMPUTE_TYPE") or "").strip() or None
-    openai_model = "large-v3"
+    transcribe_device = _transcribe_device()
+    transcribe_compute_type = _transcribe_compute_type()
+    transcribe_model = _transcribe_model(model)
 
     try:
         start_t = time.perf_counter()
-        result = openai_transcribe(
+        default_chunk_seconds = int(os.getenv("ENVID_TRANSCRIBE_CHUNK_SECONDS") or 900)
+        result = whisper_transcribe(
             input_path=str(input_path),
-            device=openai_device,
-            compute_type=openai_compute_type,
-            model_size=openai_model,
+            device=transcribe_device,
+            compute_type=transcribe_compute_type,
+            model_size=transcribe_model,
             language=language_hint or None,
-            chunk_seconds=chunk_seconds or 3600,
+            chunk_seconds=chunk_seconds or default_chunk_seconds,
         )
         result = _apply_post_processing(result, language_hint or result.get("language"))
         segments = result.get("segments") or []

@@ -1,7 +1,7 @@
-# OpenAI Whisper Service
+# WhisperX Service
 
 ## Overview
-FastAPI wrapper for OpenAI Whisper with GPU-first defaults. Supports profanity filtering, punctuation/truecasing, and profiling logs.
+FastAPI wrapper for WhisperX with GPU-first defaults. Supports profanity filtering, punctuation/truecasing, and profiling logs.
 
 ## Endpoints
 - `GET /health`
@@ -18,9 +18,9 @@ Form fields:
 - `ENVID_PUNCTUATION_ENABLE` (true/false)
 - `ENVID_PUNCTUATION_MODEL` (default `kredor/punctuate-all`)
 - `ENVID_PROFANITY_WORDS` (comma-separated)
-- `ENVID_OPENAI_WHISPER_MODEL` (default `large-v3`)
-- `ENVID_OPENAI_WHISPER_DEVICE` (`auto`, `cuda`, or `cpu`; defaults to GPU if available)
-- `ENVID_OPENAI_WHISPER_COMPUTE_TYPE` (e.g. `float16` or `float32`)
+- `ENVID_WHISPERX_MODEL` (default `large-v3`)
+- `ENVID_WHISPERX_DEVICE` (`auto`, `cuda`, or `cpu`; defaults to GPU if available)
+- `ENVID_WHISPERX_COMPUTE_TYPE` (e.g. `float16` or `float32`)
 
 ## Docker
 Build:

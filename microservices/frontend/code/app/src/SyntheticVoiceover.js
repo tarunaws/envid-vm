@@ -635,7 +635,7 @@ export default function SyntheticVoiceover() {
   const [replacingAudio, setReplacingAudio] = useState(false);
   const [processedVideoUrl, setProcessedVideoUrl] = useState('');
   const [translateEnabled, setTranslateEnabled] = useState(false);
-  const [sourceLanguage, setSourceLanguage] = useState('auto');
+  const [sourceLanguage, setSourceLanguage] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [targetPollyLanguage, setTargetPollyLanguage] = useState('en-US');
   const [translationLanguages, setTranslationLanguages] = useState([]);
@@ -1041,7 +1041,13 @@ export default function SyntheticVoiceover() {
       try {
         const response = await axios.get(`${VOICE_API_BASE}/translation-languages`);
         if (!active) return;
-        setTranslationLanguages(response?.data?.languages || []);
+        const langs = Array.isArray(response?.data?.languages) ? response.data.languages : [];
+        const filtered = langs.filter((lang) => {
+          const code = String(lang?.code || '').trim().toLowerCase();
+          const name = String(lang?.name || '').trim().toLowerCase();
+          return code && !['auto', 'detect', 'none'].includes(code) && !name.includes('auto');
+        });
+        setTranslationLanguages(filtered);
       } catch (error) {
         console.error('Failed to fetch translation languages', error);
       }
@@ -1578,7 +1584,10 @@ export default function SyntheticVoiceover() {
                                 fontSize: '0.9rem',
                               }}
                             >
-                              <option value="auto">Auto-detect</option>
+                              <option value="" disabled>
+                                Select source language
+                              </option>
+                              <option value="other">Other language</option>
                               {translationLanguages.map((lang) => (
                                 <option key={lang.code} value={lang.code}>
                                   {lang.name}
@@ -1941,7 +1950,10 @@ export default function SyntheticVoiceover() {
                         value={sourceLanguage}
                         onChange={(e) => setSourceLanguage(e.target.value)}
                       >
-                        <option value="auto">Auto-detect</option>
+                        <option value="" disabled>
+                          Select source language
+                        </option>
+                        <option value="other">Other language</option>
                         {translationLanguages.map((lang) => (
                           <option key={lang.code} value={lang.code}>
                             {lang.name}

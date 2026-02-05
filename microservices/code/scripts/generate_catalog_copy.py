@@ -6,7 +6,6 @@ local OpenAI-compatible LLM for richer product storytelling, then stores the
 structured response under a configurable field (default: `aiCopy`).
 
 Environment:
-    ENVID_LLM_BASE_URL       -> optional (default: http://localhost:8000/v1)
     ENVID_LLM_API_KEY        -> optional
     CATALOG_COPY_MODEL       -> optional (defaults to ENVID_LLM_MODEL)
     ENVID_LLM_MODEL          -> optional (default: meta-llama/llama-3.3-70b-instruct)
@@ -163,7 +162,8 @@ def _build_fallback_prompt(entry: Dict[str, Any]) -> str:
 
 def _invoke_llm_chat(*, prompt: str, temperature: float, top_p: float, max_tokens: int) -> Dict[str, Any]:
     api_key = (os.getenv("ENVID_LLM_API_KEY") or "").strip()
-    base_url = (os.getenv("ENVID_LLM_BASE_URL") or "http://localhost:8000/v1").strip().rstrip("/")
+    base_url = "http://genai:5099/v1"
+    base_url = base_url.rstrip("/")
     model = DEFAULT_MODEL_ID
 
     headers = {

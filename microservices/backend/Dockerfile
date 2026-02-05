@@ -47,8 +47,7 @@ RUN apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngrad
 WORKDIR /app
 
 COPY microservices/backend/code/requirements.txt /app/requirements.txt
-RUN python -m pip install --upgrade pip \
-    && python -m pip install -r /app/requirements.txt
+RUN python -m pip install -r /app/requirements.txt
 
 COPY microservices/backend/code/backend.py /app/backend.py
 

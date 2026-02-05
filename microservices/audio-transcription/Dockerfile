@@ -2,9 +2,8 @@ FROM tarunaws/ai:audio-transcription
 
 WORKDIR /app
 
-COPY microservices/audio-transcription/code/openai_whisper_service.py /app/openai_whisper_service.py
-COPY microservices/audio-transcription/code/openai_whisper_adapter.py /app/openai_whisper_adapter.py
-COPY microservices/audio-transcription/code/writers.py /app/writers.py
+COPY microservices/audio-transcription/code /app
+RUN python3 -m pip install --no-cache-dir -r /app/requirements.txt
 
 ENV PYTHONPATH=/app
 

@@ -1,4 +1,4 @@
-FROM tarunaws/ai:translate
+FROM tarunaws/ai:translate-squashed
 
 USER root
 

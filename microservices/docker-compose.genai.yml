@@ -1,0 +1,5 @@
+version: "3.9"
+
+# GenAI is hosted externally at LOCAL_LLM_URL.
+# This compose file is intentionally empty to avoid running genai here.
+services: {}

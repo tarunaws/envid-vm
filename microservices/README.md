@@ -20,7 +20,6 @@ Split the pipeline into discrete services aligned with existing steps in [CODEBA
 ## Phase 1 (start implementation)
 - Treat [microservices/](microservices) as the single home for service Dockerfiles/config.
 - Use [microservices/start-services.sh](microservices/start-services.sh) and [microservices/stop-services.sh](microservices/stop-services.sh) to run [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml).
-- Keep existing sidecars functional while services are extracted from the monolith.
 - Uploads can be offloaded to the ingest service by setting `ENVID_INGEST_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
 - Transcode normalization can be offloaded to the transcoder service via `ENVID_FFMPEG_SERVICE_URL` (wired in [microservices/docker-compose.app.yml](microservices/docker-compose.app.yml)).
 - Label detection is handled inside the backend via Google Video Intelligence.

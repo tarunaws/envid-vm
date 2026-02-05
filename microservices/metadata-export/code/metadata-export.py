@@ -24,6 +24,43 @@ def _normalize_artifact_lang(lang: str | None) -> str:
     return lang_norm
 
 
+_LANG_CODE_TO_NAME = {
+    "ar": "arabic",
+    "bn": "bengali",
+    "de": "german",
+    "en": "english",
+    "es": "spanish",
+    "fr": "french",
+    "gu": "gujarati",
+    "hi": "hindi",
+    "id": "indonesian",
+    "it": "italian",
+    "ja": "japanese",
+    "ko": "korean",
+    "mr": "marathi",
+    "pt": "portuguese",
+    "ru": "russian",
+    "ta": "tamil",
+    "te": "telugu",
+    "th": "thai",
+    "tr": "turkish",
+    "ur": "urdu",
+    "vi": "vietnamese",
+    "zh": "chinese",
+}
+
+
+def _artifact_lang_dir(lang: str | None) -> str:
+    lang_norm = (lang or "").strip().lower()
+    if not lang_norm or lang_norm in {"original", "orig"}:
+        name = "original"
+    else:
+        base = re.split(r"[-_]", lang_norm, maxsplit=1)[0]
+        name = _LANG_CODE_TO_NAME.get(base) or lang_norm
+    safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(name).strip().lower())
+    return safe or "unknown"
+
+
 def _collect_artifact_languages(
     *,
     payload_languages: list[str] | None = None,
@@ -73,17 +110,18 @@ def _build_metadata_zip_bytes(
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for lang in languages:
             lang_norm = _normalize_artifact_lang(lang)
+            lang_dir = _artifact_lang_dir(lang)
             combined = combined_by_language.get(lang_norm) or combined_by_language.get("orig") or {}
 
             z.writestr(
-                f"metadata/{lang_norm}/metadata/combined.json",
+                f"{lang_dir}/metadata/combined.json",
                 json.dumps(combined, indent=2, ensure_ascii=False),
             )
 
             for name, cat_payload in (categories or {}).items():
                 safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(name or "category").strip()) or "category"
                 z.writestr(
-                    f"metadata/{lang_norm}/metadata/categories/{safe}.json",
+                    f"{lang_dir}/metadata/categories/{safe}.json",
                     json.dumps(cat_payload, indent=2, ensure_ascii=False),
                 )
 
@@ -96,7 +134,7 @@ def _build_metadata_zip_bytes(
                 if not isinstance(content, str) or not content.strip():
                     continue
                 z.writestr(
-                    f"metadata/{lang_norm}/subtitles/subtitles.{fmt}",
+                    f"{lang_dir}/subtitles/subtitles.{fmt}",
                     content,
                 )
     buf.seek(0)
@@ -155,7 +193,7 @@ def upload_artifacts() -> Any:
 
     artifacts_bucket = _gcs_artifacts_bucket(_gcs_bucket_name())
     artifacts_prefix = _gcs_artifacts_prefix()
-    base = f"{artifacts_prefix}/{job_id}/metadata".strip("/")
+    base = f"{artifacts_prefix}/{job_id}".strip("/")
 
     client = _gcs_client()
     bkt = client.bucket(artifacts_bucket)
@@ -191,8 +229,9 @@ def upload_artifacts() -> Any:
 
     for lang in languages:
         lang_norm = _normalize_artifact_lang(lang)
+        lang_dir = _artifact_lang_dir(lang)
         combined_lang = combined_by_language.get(lang_norm) or combined_by_language.get("orig") or {}
-        combined_obj = f"{base}/{lang_norm}/metadata/combined.json"
+        combined_obj = f"{base}/{lang_dir}/metadata/combined.json"
         bkt.blob(combined_obj).upload_from_string(
             json.dumps(combined_lang, indent=2, ensure_ascii=False),
             content_type="application/json; charset=utf-8",
@@ -202,7 +241,7 @@ def upload_artifacts() -> Any:
 
         for name, cat_payload in (cats or {}).items():
             safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(name or "category").strip()) or "category"
-            obj = f"{base}/{lang_norm}/metadata/categories/{safe}.json"
+            obj = f"{base}/{lang_dir}/metadata/categories/{safe}.json"
             bkt.blob(obj).upload_from_string(
                 json.dumps(cat_payload, indent=2, ensure_ascii=False),
                 content_type="application/json; charset=utf-8",
@@ -221,10 +260,11 @@ def upload_artifacts() -> Any:
         if len(parts) < 2:
             continue
         lang_norm = _normalize_artifact_lang(parts[0])
+        lang_dir = _artifact_lang_dir(parts[0])
         fmt = parts[1].strip().lower()
         if fmt not in {"srt", "vtt"}:
             continue
-        obj = f"{base}/{lang_norm}/subtitles/subtitles.{fmt}"
+        obj = f"{base}/{lang_dir}/subtitles/subtitles.{fmt}"
         bkt.blob(obj).upload_from_string(content, content_type=content_type)
         out["subtitles"][f"{lang_norm}.{fmt}"] = {"object": obj, "uri": f"gs://{artifacts_bucket}/{obj}"}
 
@@ -235,7 +275,7 @@ def upload_artifacts() -> Any:
         subtitles_payload=subtitles,
         languages=languages,
     )
-    zip_obj = f"{base}/metadata_json.zip"
+    zip_obj = f"{base}/{job_id}.zip"
     bkt.blob(zip_obj).upload_from_string(zip_bytes, content_type="application/zip")
     out["zip"] = {"object": zip_obj, "uri": f"gs://{artifacts_bucket}/{zip_obj}"}
 

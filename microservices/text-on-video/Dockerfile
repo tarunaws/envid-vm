@@ -18,8 +18,7 @@ RUN apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngrad
 WORKDIR /app
 
 COPY microservices/text-on-video/code/requirements.txt /app/requirements.txt
-RUN python3 -m pip install --upgrade pip \
-    && python3 -m pip install -r /app/requirements.txt
+RUN python3 -m pip install -r /app/requirements.txt
 
 COPY microservices/text-on-video/code/text-on-video.py /app/text-on-video.py
 

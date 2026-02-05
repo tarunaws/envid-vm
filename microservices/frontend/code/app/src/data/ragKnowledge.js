@@ -33,7 +33,7 @@ const ragKnowledgeBase = [
     id: 'ai-subtitling-language-options',
     title: 'Language packs for transcription and translation',
     summary:
-      'Subtitle Lab exposes extensive transcription (Transcribe) and translation language dropdowns including auto-detect.',
+      'Subtitle Lab exposes extensive transcription (Transcribe) and translation language dropdowns.',
     detail:
       'Two arrays – `TRANSCRIBE_LANGUAGE_OPTIONS` and `TRANSLATE_LANGUAGE_OPTIONS` – enumerate 40+ locales and feed the `<select>` inputs in the upload workflow, letting reviewers mix capture and translation languages.',
     source: 'frontend/src/AISubtitling.js',

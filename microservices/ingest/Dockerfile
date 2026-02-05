@@ -12,8 +12,7 @@ RUN apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngrad
 WORKDIR /app
 
 COPY microservices/ingest/code/requirements.txt /app/requirements.txt
-RUN python -m pip install --upgrade pip \
-    && python -m pip install -r /app/requirements.txt
+RUN python -m pip install -r /app/requirements.txt
 
 COPY microservices/ingest/code/ingest.py /app/ingest.py
 

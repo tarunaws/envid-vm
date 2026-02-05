@@ -9,11 +9,10 @@ services:
     image: tarunaws/ai:dns
     restart: always
     env_file:
-      - ./dns/.env
+      - ./.env
     networks:
       envid-net:
         ipv4_address: 172.28.0.2
-
 
   backend:
     container_name: backend
@@ -25,7 +24,6 @@ services:
     runtime: nvidia
     env_file:
       - ./.env
-      - ./backend/.env
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -35,38 +33,27 @@ services:
       - ENVID_SCENE_FALLBACK_TARGET=12
       - ENVID_METADATA_KEY_SCENE_TOP_K=12
       - ENVID_METADATA_KEY_SCENE_MIN_GAP_SECONDS=4
+      - ENVID_SUMMARIZER_SERVICE_URL=http://genai:5099
+      - ENVID_LLM_MODEL=${ENVID_GENAI_MODEL:-Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf}
+      - ENVID_LLM_TRANSCRIPT_MODEL=${ENVID_GENAI_MODEL:-Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf}
+      - ENVID_SYNOPSIS_DEBUG_LOG=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/gcs:/mnt/gcs
-      - /mnt/processing:/tmp
-      - /home/tarun-envid/envid-local:/tmp/envid-metadata-local
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - /mnt/gcs/processing:/tmp
+      - /mnt/gcs/envid-local:/tmp/envid-metadata-local
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
     depends_on:
       - db
+      - translate-international
+      - translate-indian
     dns:
       - 172.28.0.2
     networks:
       envid-net:
         ipv4_address: 172.28.0.4
-
-  genai:
-    container_name: genai
-    build:
-      context: ..
-      dockerfile: microservices/llama-cpp/Dockerfile
-    image: tarunaws/ai:llama-cpp
-    restart: always
-    environment:
-      - MODEL=/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
-      - HOST=0.0.0.0
-      - PORT=8000
-      - N_CTX=4096
-      - N_THREADS=8
-    volumes:
-      - /mnt/data/llama_models:/models:ro
-    networks:
-      envid-net:
-        ipv4_address: 172.28.0.19
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   ingest:
     container_name: ingest
@@ -77,7 +64,6 @@ services:
     restart: always
     env_file:
       - ./.env
-      - ./ingest/.env
     volumes:
       - /mnt/gcs:/mnt/gcs
     ports:
@@ -96,10 +82,10 @@ services:
     image: tarunaws/ai:frontend
     restart: always
     env_file:
-      - ./frontend/.env
+      - ./.env
     volumes:
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
     dns:
       - 172.28.0.2
     networks:
@@ -116,16 +102,21 @@ services:
     runtime: nvidia
     env_file:
       - ./.env
-      - ./audio-transcription/.env
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - ENVID_OPENAI_WHISPER_DEVICE=cuda
       - ENVID_OPENAI_WHISPER_COMPUTE_TYPE=float16
+      - ENVID_OPENAI_WHISPER_MODEL=large-v3
       - ENVID_PUNCTUATION_ENABLED=false
+      - HF_HOME=/root/.cache/huggingface
     volumes:
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
+      - /mnt/gcs/hf-cache:/root/.cache/huggingface
+      - ./audio-transcription/code/openai_whisper_service.py:/app/openai_whisper_service.py:ro
+      - ./audio-transcription/code/openai_whisper_adapter.py:/app/openai_whisper_adapter.py:ro
+      - ./audio-transcription/code/writers.py:/app/writers.py:ro
     ports:
       - "5088:5088"
     networks:
@@ -143,11 +134,11 @@ services:
       dockerfile: microservices/moderation/Dockerfile
     image: tarunaws/ai:moderation
     restart: always
-    runtime: nvidia
+    runtime: ${DOCKER_RUNTIME:-runc}
     volumes:
-      - /mnt/processing:/tmp
+      - /mnt/gcs/processing:/tmp
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
     ports:
       - "5081:5081"
     networks:
@@ -163,7 +154,7 @@ services:
       dockerfile: microservices/keyscene/Dockerfile
     image: tarunaws/ai:keyscene
     restart: always
-    runtime: nvidia
+    runtime: ${DOCKER_RUNTIME:-runc}
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -173,7 +164,7 @@ services:
       - ENVID_METADATA_KEY_SCENE_MIN_GAP_SECONDS=4
     volumes:
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
       - ./keyscene/transnetv2-weights:/models/transnetv2-weights:ro
     ports:
       - "5085:5085"
@@ -192,13 +183,13 @@ services:
     restart: always
     runtime: nvidia
     env_file:
-      - ./transcoder/.env
+      - ./.env
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
     volumes:
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
       - ./transcoder/code/ffmpeg.py:/app/ffmpeg.py
     ports:
       - "5091:5091"
@@ -214,9 +205,9 @@ services:
     image: tarunaws/ai:scene-detect
     restart: always
     volumes:
-      - /mnt/processing:/tmp
+      - /mnt/gcs/processing:/tmp
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
     ports:
       - "5094:5094"
     dns:
@@ -235,10 +226,9 @@ services:
     restart: always
     env_file:
       - ./.env
-      - ./metadata-export/.env
     volumes:
-      - /tmp:/tmp
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - /mnt/gcs/processing/tmp:/tmp
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
     ports:
       - "5096:5096"
     dns:
@@ -247,8 +237,45 @@ services:
       envid-net:
         ipv4_address: 172.28.0.23
 
-  translate:
-    container_name: translate
+  translate-international:
+    container_name: translate-international
+    image: tarunaws/ai:translate
+    restart: always
+    env_file:
+      - ./.env
+    environment:
+      - ENVID_LANGUAGETOOL_URL=http://localhost:8010
+    volumes:
+      - /mnt/gcs/translate/models:/home/libretranslate/.local/share/argos-translate
+      - /mnt/gcs/translate/cache:/home/libretranslate/.local/cache
+      - /mnt/gcs:/mnt/gcs
+      - ./translate/code/supervisord.international.conf:/etc/supervisor/supervisord.conf:ro
+    ports:
+      - "5000:5000"
+      - "8010:8010"
+      - "5098:5098"
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 6G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    dns:
+      - 172.28.0.2
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.14
+        aliases:
+          - translate-international
+          - translate
+          - translategrammer
+
+  translate-indian:
+    container_name: translate-indian
     build:
       context: ..
       dockerfile: microservices/translate/Dockerfile
@@ -256,7 +283,6 @@ services:
     restart: always
     env_file:
       - ./.env
-      - ./translate/.env
     environment:
       - HF_TOKEN=${HF_TOKEN}
       - HUGGINGFACE_HUB_TOKEN=${HF_TOKEN}
@@ -268,23 +294,34 @@ services:
       - TEMP=/mnt/gcs/translate/tmp
       - TMP=/mnt/gcs/translate/tmp
       - TORCHINDUCTOR_CACHE_DIR=/mnt/gcs/translate/torchinductor
-    ports:
-      - "5000:5000"
-      - "8010:8010"
-      - "5098:5098"
+      - INDIC_TRANS_BATCH_SIZE=8
+      - INDIC_TRANS_MAX_CONCURRENT=1
+      - INDIC_TRANS_MEMORY_LIMIT_PCT=85.0
+      - INDIC_TRANS_TIMEOUT_SECONDS=300
     volumes:
-      - /mnt/gcs/translate/models:/home/libretranslate/.local/share/argos-translate
       - /mnt/gcs/translate/cache:/home/libretranslate/.local/cache
       - /mnt/gcs:/mnt/gcs
+      - ./translate/code/supervisord.indian.conf:/etc/supervisor/supervisord.conf:ro
+    ports:
+      - "5102:5102"
     tmpfs:
       - /tmp
+    mem_limit: 4g
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
     dns:
       - 172.28.0.2
     networks:
       envid-net:
-        ipv4_address: 172.28.0.14
+        ipv4_address: 172.28.0.26
         aliases:
-          - translategrammer
+          - translate-indian
 
   text-on-video:
     container_name: text-on-video
@@ -293,7 +330,7 @@ services:
       dockerfile: microservices/text-on-video/Dockerfile
     image: tarunaws/ai:text-on-video
     restart: always
-    runtime: nvidia
+    runtime: ${DOCKER_RUNTIME:-runc}
     env_file:
       - ./.env
     environment:
@@ -303,12 +340,13 @@ services:
       - ENVID_METADATA_OCR_MIN_CONF=0.35
       - ENVID_METADATA_OCR_ENABLE_TOP_THIRD=true
       - ENVID_METADATA_OCR_ENABLE_MIDDLE_BAND=true
-      - ENVID_METADATA_OCR_MIDDLE_BAND_HEIGHT=0.4
+      - ENVID_METADATA_OCR_ENABLE_LOWER_THIRD=true
+      - ENVID_METADATA_OCR_MIDDLE_BAND_HEIGHT=1.0
       - ENVID_METADATA_OCR_DEDUPE_WINDOW_SECONDS=0.75
     volumes:
-      - /mnt/processing:/tmp
+      - /mnt/gcs/processing:/tmp
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
     ports:
       - "5083:5083"
     dns:
@@ -371,7 +409,7 @@ services:
       - "80:80"
     volumes:
       - /mnt/gcs:/mnt/gcs
-      - ${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:${GCP_CREDENTIALS_PATH:-/home/tarun-envid/gcp.json}:ro
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
     networks:
       envid-net:
         ipv4_address: 172.28.0.13

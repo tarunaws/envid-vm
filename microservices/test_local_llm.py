@@ -64,7 +64,8 @@ def main() -> int:
     parser.add_argument("--mode", choices=["verify", "synopsis", "raw"], default="verify")
     parser.add_argument("--lang", default="hi")
     parser.add_argument("--model", default=os.getenv("ENVID_LLM_MODEL", "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"))
-    parser.add_argument("--base-url", default=os.getenv("ENVID_LLM_BASE_URL", "http://localhost:8000/v1").rstrip("/"))
+    default_base = "http://genai:5099/v1"
+    parser.add_argument("--base-url", default=default_base.rstrip("/"))
     parser.add_argument("--max-tokens", type=int, default=600)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("prompt", nargs=argparse.REMAINDER)

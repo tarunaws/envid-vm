@@ -7,8 +7,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY microservices/metadata-export/code/requirements.txt /app/requirements.txt
-RUN python -m pip install --upgrade pip \
-    && python -m pip install -r /app/requirements.txt
+RUN python -m pip install -r /app/requirements.txt
 
 COPY microservices/metadata-export/code/metadata-export.py /app/metadata-export.py
 

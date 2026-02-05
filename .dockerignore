@@ -13,3 +13,6 @@ nltk_data
 TransNetV2
 snap
 envid-metadata
+microservices/audio-translation
+microservices/keyscene/weights
+microservices/keyscene/weights/**
