@@ -8860,11 +8860,15 @@ def _process_gcs_video_job_cloud_only(
             parallel_futures["local_moderation"] = _ensure_parallel_executor().submit(_run_local_moderation_task)
 
         transcribe_ready = _ensure_transcribe_service_ready() if enable_transcribe and (transcribe_effective_mode == "openai-whisper") else False
-        if enable_transcribe and (transcribe_effective_mode == "openai-whisper") and not transcribe_ready:
-            _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Audio transcription service not available")
-        elif enable_transcribe and (transcribe_effective_mode == "openai-whisper") and transcribe_ready:
-            whisper_started = True
-            parallel_futures["whisper"] = _ensure_parallel_executor().submit(_run_whisper_transcription)
+        if enable_transcribe and (transcribe_effective_mode == "openai-whisper"):
+            if not transcribe_ready:
+                # Late retry to avoid races during service startup.
+                transcribe_ready = _ensure_transcribe_service_ready()
+            if transcribe_ready:
+                whisper_started = True
+                parallel_futures["whisper"] = _ensure_parallel_executor().submit(_run_whisper_transcription)
+            else:
+                _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Audio transcription service not available")
 
         if enable_text_on_screen and not use_local_ocr:
             _job_step_update(job_id, "text_on_screen", status="skipped", percent=100, message="Requires local OCR")
@@ -9196,11 +9200,7 @@ def _process_gcs_video_job_cloud_only(
                                 )
                                 transcribe_completed = True
                         else:
-                            msg = (
-                                "Audio transcription service not available"
-                                if not _ensure_transcribe_service_ready()
-                                else "Disabled"
-                            )
+                            msg = "Audio transcription service not available"
                             _job_step_update(job_id, "transcribe", status="skipped", percent=100, message=msg)
                     else:
                         msg = "Disabled" if not enable_speech else "Library not installed"
