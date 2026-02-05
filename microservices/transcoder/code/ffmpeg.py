@@ -15,8 +15,23 @@ from flask import Flask, jsonify, request, send_file
 app = Flask(__name__)
 
 
+def _ffmpeg_loglevel() -> str:
+    level = (os.getenv("ENVID_FFMPEG_LOGLEVEL") or "info").strip().lower()
+    return level or "info"
+
+
+def _ffmpeg_log_stderr() -> bool:
+    return _env_truthy(os.getenv("ENVID_FFMPEG_LOG_STDERR"), default=False)
+
+
 def _run_ffmpeg(cmd: list[str]) -> None:
+    loglevel = _ffmpeg_loglevel()
+    if cmd and cmd[0] == "ffmpeg":
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", loglevel] + cmd[1:]
+    app.logger.info("ffmpeg cmd: %s", " ".join(cmd))
     res = subprocess.run(cmd, capture_output=True, text=True)
+    if _ffmpeg_log_stderr() and res.stderr:
+        app.logger.info("ffmpeg stderr: %s", (res.stderr or "").strip())
     if res.returncode != 0:
         raise RuntimeError((res.stderr or res.stdout or "ffmpeg failed").strip())
 

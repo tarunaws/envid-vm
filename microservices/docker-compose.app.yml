@@ -187,6 +187,8 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+      - ENVID_FFMPEG_LOGLEVEL=verbose
+      - ENVID_FFMPEG_LOG_STDERR=true
     volumes:
       - /mnt/gcs:/mnt/gcs
       - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
