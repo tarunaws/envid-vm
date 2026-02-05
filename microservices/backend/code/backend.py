@@ -5175,6 +5175,59 @@ def _cleanup_job_artifacts(job_id: str, job_row: dict[str, Any] | None = None) -
         pass
 
 
+def _gcs_mount_root() -> Path:
+    raw = (os.getenv("ENVID_GCS_MOUNT_PATH") or "/mnt/gcs").strip() or "/mnt/gcs"
+    return Path(raw).resolve()
+
+
+def _path_is_under(parent: Path, child: Path) -> bool:
+    try:
+        parent_resolved = parent.resolve()
+        child_resolved = child.resolve()
+    except Exception:
+        return False
+    parent_str = parent_resolved.as_posix().rstrip("/") + "/"
+    child_str = child_resolved.as_posix()
+    return child_str.startswith(parent_str)
+
+
+def _should_cleanup_local_path(path: Path) -> bool:
+    if not path.exists():
+        return False
+    return not _path_is_under(_gcs_mount_root(), path)
+
+
+def _cleanup_local_job_artifacts(*, job_id: str, temp_dir: Path | None) -> None:
+    if temp_dir and _should_cleanup_local_path(temp_dir):
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    try:
+        raw_dir = _gcs_job_raw_dir(job_id)
+        if _should_cleanup_local_path(raw_dir):
+            shutil.rmtree(raw_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+    try:
+        job_root = _local_artifacts_job_root(job_id)
+        if _should_cleanup_local_path(job_root):
+            shutil.rmtree(job_root, ignore_errors=True)
+    except Exception:
+        pass
+
+
+def _upload_and_cleanup_local_artifacts(job_id: str) -> None:
+    try:
+        job_root = _local_artifacts_job_root(job_id)
+        cleanup_after_upload = _should_cleanup_local_path(job_root)
+        _zip_local_artifacts_and_upload(job_id=job_id, cleanup_after_upload=cleanup_after_upload)
+    except Exception:
+        pass
+
+
 def _cleanup_job_artifacts_gcs(job_id: str) -> None:
     try:
         artifacts_bucket = _gcs_artifacts_bucket(_gcs_bucket_name())
@@ -10904,9 +10957,8 @@ def _process_gcs_video_job_cloud_only(
         app.logger.error("GCS job %s failed: %s", job_id, exc)
         _job_update(job_id, status="failed", message="Failed", error=str(exc))
     finally:
-        keep_temp = _env_truthy(os.getenv("ENVID_METADATA_KEEP_TEMP_DIR"), default=True)
-        if not keep_temp:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        _upload_and_cleanup_local_artifacts(job_id)
+        _cleanup_local_job_artifacts(job_id=job_id, temp_dir=temp_dir)
 
 
 def _gcp_auth_status() -> dict[str, Any]:

@@ -16,6 +16,7 @@ import requests
 import torch
 
 from openai_whisper_adapter import transcribe as whisper_transcribe
+from openai_whisper_adapter import warmup as whisper_warmup
 from writers import _format_timestamp
 
 LOGGER = logging.getLogger("audio-transcription")
@@ -24,6 +25,25 @@ app = FastAPI(title="OpenAI Whisper Service", version="1.0")
 
 _PUNCTUATION_MODEL = None
 _PUNCTUATION_MODEL_NAME = None
+
+
+def _warmup_enabled() -> bool:
+    return _bool_param(os.getenv("ENVID_OPENAI_WHISPER_WARMUP"), default=True)
+
+
+@app.on_event("startup")
+def _warmup_models() -> None:
+    if not _warmup_enabled():
+        LOGGER.info("warmup: disabled")
+        return
+    try:
+        model_name = _transcribe_model(None)
+        device = _transcribe_device()
+        LOGGER.info("warmup: loading whisper model=%s device=%s", model_name, device)
+        whisper_warmup(model_size=model_name, device=device)
+        LOGGER.info("warmup: completed")
+    except Exception as exc:
+        LOGGER.warning("warmup: failed: %s", exc)
 
 
 def _bool_param(value: str | None, default: bool = False) -> bool:

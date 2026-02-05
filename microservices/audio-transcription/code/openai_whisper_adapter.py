@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -133,6 +134,19 @@ def _segments_to_api(segments: list[dict[str, Any]], offset: float = 0.0) -> lis
     return output
 
 
+@lru_cache(maxsize=4)
+def _load_model_cached(model_name: str, device: str) -> Any:
+    LOGGER.info("openai-whisper loading model=%s device=%s", model_name, device)
+    return whisper.load_model(model_name, device=device)
+
+
+def warmup(*, model_size: str, device: str | None = None) -> None:
+    _require_whisper()
+    resolved_device = _resolve_device(device)
+    model_name = _normalize_model_name(model_size)
+    _load_model_cached(model_name, resolved_device)
+
+
 def transcribe(*, input_path: str, **kwargs: Any) -> dict[str, Any]:
     _require_whisper()
     opts = WhisperOptions(**kwargs)
@@ -141,7 +155,7 @@ def transcribe(*, input_path: str, **kwargs: Any) -> dict[str, Any]:
     fp16 = device == "cuda" and (opts.compute_type or "float16") != "float32"
 
     LOGGER.info("openai-whisper device=%s model=%s fp16=%s", device, model_name, fp16)
-    model = whisper.load_model(model_name, device=device)
+    model = _load_model_cached(model_name, device)
 
     audio = _load_audio(Path(input_path))
     chunk_seconds = opts.chunk_seconds or 0
