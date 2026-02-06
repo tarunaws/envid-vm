@@ -140,13 +140,6 @@ def _load_model_cached(model_name: str, device: str) -> Any:
     return whisper.load_model(model_name, device=device)
 
 
-def warmup(*, model_size: str, device: str | None = None) -> None:
-    _require_whisper()
-    resolved_device = _resolve_device(device)
-    model_name = _normalize_model_name(model_size)
-    _load_model_cached(model_name, resolved_device)
-
-
 def transcribe(*, input_path: str, **kwargs: Any) -> dict[str, Any]:
     _require_whisper()
     opts = WhisperOptions(**kwargs)

@@ -23,7 +23,8 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -3061,6 +3062,8 @@ def _upload_via_ingest_service(
             self._sent = 0
 
         def read(self, amt: int | None = None):
+            if _job_stop_requested(job_id):
+                raise StopJob("Stop requested")
             data = self._fp.read(amt)
             if data:
                 self._sent += len(data)
@@ -3327,6 +3330,8 @@ def _upload_gcs_with_progress(*, bucket: str, obj: str, video_path: Path, job_id
     sent = 0
     with video_path.open("rb") as handle, blob.open("wb") as writer:
         while True:
+            if _job_stop_requested(job_id):
+                raise StopJob("Stop requested")
             chunk = handle.read(8 * 1024 * 1024)
             if not chunk:
                 break
@@ -3337,15 +3342,41 @@ def _upload_gcs_with_progress(*, bucket: str, obj: str, video_path: Path, job_id
 
 def _probe_via_ffmpeg_service(*, service_url: str, video_path: Path, filename: str) -> dict[str, Any]:
     endpoint = f"{service_url}/probe"
-    with video_path.open("rb") as handle:
-        files = {"video": (filename, handle, "application/octet-stream")}
-        resp = requests.post(endpoint, files=files, timeout=300)
-    if resp.status_code >= 400:
-        raise RuntimeError(f"FFmpeg probe failed ({resp.status_code}): {resp.text}")
-    data = resp.json()
-    if not isinstance(data, dict):
-        raise RuntimeError("Invalid ffprobe response")
-    return data
+    max_retries = 2
+    retry_delay_s = 1.0
+    for attempt in range(max_retries + 1):
+        try:
+            with video_path.open("rb") as handle:
+                files = {"video": (filename, handle, "application/octet-stream")}
+                resp = requests.post(endpoint, files=files, timeout=300)
+            if resp.status_code >= 400:
+                text = resp.text or ""
+                if "moov atom not found" in text.lower() and attempt < max_retries:
+                    app.logger.warning(
+                        "FFmpeg probe moov atom not found; retry %s/%s in %.1fs",
+                        attempt + 1,
+                        max_retries,
+                        retry_delay_s * (attempt + 1),
+                    )
+                    time.sleep(retry_delay_s * (attempt + 1))
+                    continue
+                raise RuntimeError(f"FFmpeg probe failed ({resp.status_code}): {text}")
+            data = resp.json()
+            if not isinstance(data, dict):
+                raise RuntimeError("Invalid ffprobe response")
+            return data
+        except requests.RequestException as exc:
+            if attempt < max_retries:
+                app.logger.warning(
+                    "FFmpeg probe request error; retry %s/%s in %.1fs: %s",
+                    attempt + 1,
+                    max_retries,
+                    retry_delay_s * (attempt + 1),
+                    exc,
+                )
+                time.sleep(retry_delay_s * (attempt + 1))
+                continue
+            raise
 
 
 def _normalize_via_ffmpeg_service(
@@ -4014,16 +4045,38 @@ JOBS: Dict[str, Dict[str, Any]] = {}
 JOB_PROCESS_LOCK = threading.Lock()
 
 
+def _stopping_job_is_stale(job: dict[str, Any]) -> bool:
+    status = str(job.get("status") or "").strip().lower()
+    if status != "stopping":
+        return False
+    if not job.get("stop_requested"):
+        return False
+    updated_at = _parse_iso_ts(job.get("updated_at"))
+    if not updated_at:
+        return False
+    stale_s = _safe_float(os.getenv("ENVID_STALE_STOPPING_SECONDS"), 600.0)
+    if stale_s <= 0:
+        return False
+    age_s = (datetime.utcnow() - updated_at).total_seconds()
+    return age_s >= stale_s
+
+
 def _queue_has_active_job() -> bool:
     active_statuses = {"processing", "running", "preflight", "stopping"}
     if _db_enabled():
         try:
-            jobs = _db_list_jobs(statuses=list(active_statuses), limit=5)
-            return bool(jobs)
+            jobs = _db_list_jobs(statuses=list(active_statuses), limit=10)
+            return any(
+                str(j.get("status") or "").lower() in active_statuses and not _stopping_job_is_stale(j)
+                for j in (jobs or [])
+            )
         except Exception:
             return False
     with JOBS_LOCK:
-        return any(str(j.get("status") or "").lower() in active_statuses for j in JOBS.values())
+        return any(
+            str(j.get("status") or "").lower() in active_statuses and not _stopping_job_is_stale(j)
+            for j in JOBS.values()
+        )
 
 
 def _queue_has_other_active_job(job_id: str) -> bool:
@@ -4032,13 +4085,19 @@ def _queue_has_other_active_job(job_id: str) -> bool:
     if _db_enabled():
         try:
             jobs = _db_list_jobs(statuses=list(active_statuses), limit=10)
-            return any(str(j.get("id") or "").strip() != job_id for j in (jobs or []))
+            return any(
+                str(j.get("id") or "").strip() != job_id
+                and str(j.get("status") or "").lower() in active_statuses
+                and not _stopping_job_is_stale(j)
+                for j in (jobs or [])
+            )
         except Exception:
             return False
     with JOBS_LOCK:
         return any(
             str(j.get("status") or "").lower() in active_statuses
             and str(j.get("id") or "").strip() != job_id
+            and not _stopping_job_is_stale(j)
             for j in JOBS.values()
         )
 
@@ -4046,6 +4105,8 @@ def _queue_has_other_active_job(job_id: str) -> bool:
 def _acquire_job_slot(job_id: str) -> None:
     _job_update(job_id, status="queued", progress=0, message="Queued (waiting for previous job)")
     while True:
+        if JOB_PROCESS_LOCK.locked() and not _queue_has_active_job():
+            _release_job_slot()
         if not JOB_PROCESS_LOCK.locked() and not _queue_has_other_active_job(job_id):
             JOB_PROCESS_LOCK.acquire()
             break
@@ -4587,7 +4648,7 @@ def _build_selection(inputs: OrchestratorInputs) -> Selection:
     enable_label_detection = _orchestrator_bool(sel.get("enable_label_detection"), False)
     enable_text_on_screen = _orchestrator_bool(sel.get("enable_text_on_screen"), False)
     enable_moderation = _orchestrator_bool(sel.get("enable_moderation"), False)
-    enable_transcribe = _orchestrator_bool(sel.get("enable_transcribe"), False)
+    enable_transcribe = _orchestrator_bool(sel.get("enable_transcribe"), True)
     enable_translate_output = _orchestrator_bool(sel.get("enable_translate_output"), False)
     enable_famous_locations = _orchestrator_bool(sel.get("enable_famous_locations"), False)
     enable_scene_by_scene = _orchestrator_bool(sel.get("enable_scene_by_scene"), False)
@@ -4607,6 +4668,9 @@ def _build_selection(inputs: OrchestratorInputs) -> Selection:
         enable_scene_by_scene = True
         enable_high_point = True
         enable_translate_output = True
+
+    # Transcription is always enabled; the UI does not expose a toggle.
+    enable_transcribe = True
 
     requested_label_model_raw = _orchestrator_str(
         requested.get("label_detection_model") or sel.get("label_detection_model"), "auto"
@@ -5436,7 +5500,13 @@ def _parse_iso_ts(value: Any) -> datetime | None:
             raw = raw[:-1] + "+00:00"
         return datetime.fromisoformat(raw)
     except Exception:
-        return None
+        try:
+            parsed = parsedate_to_datetime(raw)
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+            return parsed
+        except Exception:
+            return None
 
 
 def _job_step_durations(job_id: str) -> tuple[dict[str, float], float]:
@@ -6689,6 +6759,8 @@ def _download_gcs_object_to_file(*, bucket: str, obj: str, dest_path: Path, job_
     src_uri = f"gs://{bucket}/{obj}"
     dest_path = dest_path.resolve()
     gcs_root = Path("/mnt/gcs").resolve()
+    if _job_stop_requested(job_id):
+        raise StopJob("Stop requested")
     try:
         rel = dest_path.relative_to(gcs_root)
     except ValueError:
@@ -6717,6 +6789,8 @@ def _download_gcs_object_to_file(*, bucket: str, obj: str, dest_path: Path, job_
         copy_timeout_s = _safe_float(os.getenv("ENVID_GCS_COPY_TIMEOUT_SECONDS"), 900.0)
         copy_start = time.monotonic()
         while True:
+            if _job_stop_requested(job_id):
+                raise StopJob("Stop requested")
             token, bytes_rewritten, total_bytes = dst_blob.rewrite(src_blob, token=token)
             if total_bytes:
                 pct = int((bytes_rewritten * 100) / total_bytes)
@@ -6744,6 +6818,8 @@ def _download_gcs_object_to_file(*, bucket: str, obj: str, dest_path: Path, job_
             time.sleep(0.5)
         if not dest_path.exists():
             # Fallback: download into the mounted path to ensure availability
+            if _job_stop_requested(job_id):
+                raise StopJob("Stop requested")
             src_bucket.blob(obj).download_to_filename(str(dest_path))
         _job_step_update(job_id, "upload_to_cloud_storage", status="completed", percent=100, message="Copied")
         _db_file_upsert(job_id, kind="local_video", path=str(dest_path), gcs_uri=dest_uri)
@@ -6769,8 +6845,12 @@ def _download_gcs_object_to_file(*, bucket: str, obj: str, dest_path: Path, job_
             resp.raise_for_status()
             with open(dest_path, "wb") as handle:
                 for chunk in resp.iter_content(chunk_size=1024 * 1024):
+                    if _job_stop_requested(job_id):
+                        raise StopJob("Stop requested")
                     if chunk:
                         handle.write(chunk)
+    except StopJob:
+        raise
     except Exception:
         blob.download_to_filename(str(dest_path))
     _job_step_update(job_id, "upload_to_cloud_storage", status="completed", percent=100, message="Downloaded")
@@ -7870,6 +7950,7 @@ def _process_gcs_video_job_cloud_only(
         original_dir.mkdir(parents=True, exist_ok=True)
         local_path = original_dir / f"{job_id}{ext}"
         _download_gcs_object_to_file(bucket=gcs_bucket, obj=gcs_object, dest_path=local_path, job_id=job_id)
+        original_path = local_path
         _db_file_upsert(job_id, kind="transcode_original", path=str(local_path), gcs_uri=gcs_uri)
 
         _job_step_update(job_id, "technical_metadata", status="running", percent=0, message="Probing")
@@ -8267,6 +8348,7 @@ def _process_gcs_video_job_cloud_only(
         def _run_whisper_transcription() -> None:
             nonlocal transcript, transcript_language_code, languages_detected, transcript_words, transcript_segments, transcript_meta, effective_models
             nonlocal transcript_raw, transcript_raw_segments, transcribe_completed, transcribe_failed, duration_seconds, transcript_segment_texts
+            transcribe_source_path = original_path
             service_url = _transcribe_service_url()
             if not service_url:
                 _job_step_update(job_id, "transcribe", status="skipped", percent=100, message="Audio transcription service not available")
@@ -8347,7 +8429,7 @@ def _process_gcs_video_job_cloud_only(
                                 if not out_path.exists() or out_path.stat().st_size == 0:
                                     _segment_via_ffmpeg_service(
                                         service_url=ffmpeg_service_url,
-                                        video_path=local_path,
+                                        video_path=transcribe_source_path,
                                         start_seconds=start,
                                         duration_seconds=dur,
                                         output_path=out_path,
@@ -8434,14 +8516,14 @@ def _process_gcs_video_job_cloud_only(
                     segmented_used = False
 
                 if not segmented_used:
-                    data = _call_transcribe_service_for_path(local_path, whisper_language)
+                    data = _call_transcribe_service_for_path(transcribe_source_path, whisper_language)
                     segments_probe = data.get("segments") if isinstance(data, dict) else None
                     if (
                         fallback_auto
                         and whisper_language
                         and (not isinstance(segments_probe, list) or not segments_probe)
                     ):
-                        data = _call_transcribe_service_for_path(local_path, None)
+                        data = _call_transcribe_service_for_path(transcribe_source_path, None)
                         transcript_meta["openai_whisper"]["language_fallback"] = "auto"
 
                     segments = data.get("segments") if isinstance(data, dict) else None
@@ -11555,11 +11637,22 @@ def get_job(job_id: str) -> Any:
             return jsonify({"ok": True, "deleted": job_id, "cleanup": "scheduled"}), 202
 
         db_row = _db_get_job(job_id)
+        job_status = ""
         with JOBS_LOCK:
             removed = JOBS.pop(job_id, None)
+            if isinstance(removed, dict):
+                job_status = str(removed.get("status") or "").strip().lower()
+        if not job_status and isinstance(db_row, dict):
+            job_status = str(db_row.get("status") or "").strip().lower()
 
         if not removed and not db_row:
             return jsonify({"error": "Job not found"}), 404
+
+        if job_status in {"queued", "processing", "running", "preflight", "stopping"}:
+            try:
+                _job_update(job_id, stop_requested=True, status="stopping", message="Delete requested by user")
+            except Exception:
+                pass
 
         _mark_job_deleted(job_id)
 
@@ -11571,6 +11664,9 @@ def get_job(job_id: str) -> Any:
 
         if _db_enabled():
             _db_delete_job(job_id)
+
+        if JOB_PROCESS_LOCK.locked() and not _queue_has_other_active_job(job_id):
+            _release_job_slot()
 
         _dequeue_next_job_once()
 
@@ -12234,6 +12330,17 @@ def delete_video(video_id: str) -> Any:
     deleted_gcs_objects: List[str] = []
     warnings: List[str] = []
     kept_gcs_objects: List[str] = []
+    job_status = ""
+    with JOBS_LOCK:
+        removed_job = JOBS.pop(str(video_id), None)
+        if isinstance(removed_job, dict):
+            job_status = str(removed_job.get("status") or "").strip().lower()
+    if job_status in {"queued", "processing", "running", "preflight", "stopping"}:
+        try:
+            _job_update(str(video_id), stop_requested=True, status="stopping", message="Delete requested by user")
+        except Exception:
+            pass
+    _mark_job_deleted(str(video_id))
     with VIDEO_INDEX_LOCK:
         v = next((x for x in VIDEO_INDEX if str(x.get("id")) == str(video_id)), None)
     if not v:
@@ -12294,6 +12401,9 @@ def delete_video(video_id: str) -> Any:
             VIDEO_INDEX[:] = [x for x in VIDEO_INDEX if str(x.get("id")) != str(video_id)]
         _save_video_index()
         _db_delete_job(video_id)
+        if JOB_PROCESS_LOCK.locked() and not _queue_has_other_active_job(str(video_id)):
+            _release_job_slot()
+        _dequeue_next_job_once()
         return jsonify({"ok": True, "message": f"Deleted video {video_id}", "deleted_gcs_objects": deleted_gcs_objects, "kept_gcs_objects": kept_gcs_objects, "gcs_warnings": warnings}), 200
     except Exception as exc:
         return jsonify({"error": str(exc), "deleted_gcs_objects": deleted_gcs_objects, "kept_gcs_objects": kept_gcs_objects, "gcs_warnings": warnings}), 500

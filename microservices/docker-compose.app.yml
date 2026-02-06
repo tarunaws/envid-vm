@@ -92,6 +92,43 @@ services:
       envid-net:
         ipv4_address: 172.28.0.5
 
+  genai:
+    container_name: genai
+    image: vllm/vllm-openai:latest
+    restart: always
+    runtime: nvidia
+    env_file:
+      - ./.env
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HF_HOME=/root/.cache/huggingface
+      - TRANSFORMERS_CACHE=/root/.cache/huggingface
+    volumes:
+      - /mnt/gcs/hf-cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    command:
+      - ${ENVID_LLM_MODEL}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --dtype
+      - ${ENVID_LLM_DTYPE:-float16}
+      - --gpu-memory-utilization
+      - ${ENVID_LLM_GPU_MEMORY_UTILIZATION:-0.4}
+      - --max-model-len
+      - ${ENVID_LLM_MAX_MODEL_LEN:-8192}
+    networks:
+      envid-net:
+        ipv4_address: 172.28.0.19
+        aliases:
+          - genai
+    dns:
+      - 172.28.0.2
+
   audio-transcription:
     container_name: audio-transcription
     build:
@@ -99,15 +136,13 @@ services:
       dockerfile: microservices/audio-transcription/Dockerfile
     image: tarunaws/ai:audio-transcription
     restart: always
-    runtime: nvidia
+    runtime: ${DOCKER_RUNTIME:-runc}
     env_file:
       - ./.env
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - ENVID_OPENAI_WHISPER_DEVICE=cuda
-      - ENVID_OPENAI_WHISPER_COMPUTE_TYPE=float16
-      - ENVID_OPENAI_WHISPER_MODEL=large-v3
+      - ENVID_WHISPERX_DEVICE=cpu
+      - ENVID_WHISPERX_COMPUTE_TYPE=float32
+      - ENVID_WHISPERX_MODEL=large-v3
       - ENVID_PUNCTUATION_ENABLED=false
       - HF_HOME=/root/.cache/huggingface
     volumes:
@@ -115,7 +150,7 @@ services:
       - ${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:${GOOGLE_APPLICATION_CREDENTIALS:-/home/tarun-envid/gcp.json}:ro
       - /mnt/gcs/hf-cache:/root/.cache/huggingface
       - ./audio-transcription/code/openai_whisper_service.py:/app/openai_whisper_service.py:ro
-      - ./audio-transcription/code/openai_whisper_adapter.py:/app/openai_whisper_adapter.py:ro
+      - ./audio-transcription/code/whisperx_adapter.py:/app/whisperx_adapter.py:ro
       - ./audio-transcription/code/writers.py:/app/writers.py:ro
     ports:
       - "5088:5088"

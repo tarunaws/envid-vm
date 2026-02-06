@@ -15,35 +15,15 @@ from fastapi.responses import JSONResponse
 import requests
 import torch
 
-from openai_whisper_adapter import transcribe as whisper_transcribe
-from openai_whisper_adapter import warmup as whisper_warmup
+from whisperx_adapter import transcribe as whisper_transcribe
 from writers import _format_timestamp
 
 LOGGER = logging.getLogger("audio-transcription")
 
-app = FastAPI(title="OpenAI Whisper Service", version="1.0")
+app = FastAPI(title="WhisperX Service", version="1.0")
 
 _PUNCTUATION_MODEL = None
 _PUNCTUATION_MODEL_NAME = None
-
-
-def _warmup_enabled() -> bool:
-    return _bool_param(os.getenv("ENVID_OPENAI_WHISPER_WARMUP"), default=True)
-
-
-@app.on_event("startup")
-def _warmup_models() -> None:
-    if not _warmup_enabled():
-        LOGGER.info("warmup: disabled")
-        return
-    try:
-        model_name = _transcribe_model(None)
-        device = _transcribe_device()
-        LOGGER.info("warmup: loading whisper model=%s device=%s", model_name, device)
-        whisper_warmup(model_size=model_name, device=device)
-        LOGGER.info("warmup: completed")
-    except Exception as exc:
-        LOGGER.warning("warmup: failed: %s", exc)
 
 
 def _bool_param(value: str | None, default: bool = False) -> bool:
@@ -52,8 +32,20 @@ def _bool_param(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_first(*names: str, default: str = "") -> str:
+    for name in names:
+        raw = (os.getenv(name) or "").strip()
+        if raw:
+            return raw
+    return default
+
+
 def _transcribe_device() -> str:
-    device_env = (os.getenv("ENVID_OPENAI_WHISPER_DEVICE") or "auto").strip().lower()
+    device_env = _env_first(
+        "ENVID_WHISPERX_DEVICE",
+        "ENVID_OPENAI_WHISPER_DEVICE",
+        default="auto",
+    ).strip().lower()
     if device_env in {"", "auto"}:
         return "cuda" if torch.cuda.is_available() else "cpu"
     if device_env in {"cuda", "gpu"}:
@@ -62,14 +54,22 @@ def _transcribe_device() -> str:
 
 
 def _transcribe_compute_type() -> str | None:
-    raw = (os.getenv("ENVID_OPENAI_WHISPER_COMPUTE_TYPE") or "").strip()
+    raw = _env_first(
+        "ENVID_WHISPERX_COMPUTE_TYPE",
+        "ENVID_OPENAI_WHISPER_COMPUTE_TYPE",
+        default="",
+    ).strip()
     return raw or None
 
 
 def _transcribe_model(override: str | None) -> str:
     if override and override.strip():
         return override.strip()
-    return (os.getenv("ENVID_OPENAI_WHISPER_MODEL") or "large-v3").strip() or "large-v3"
+    return _env_first(
+        "ENVID_WHISPERX_MODEL",
+        "ENVID_OPENAI_WHISPER_MODEL",
+        default="large-v3",
+    ).strip() or "large-v3"
 
 
 def _ffmpeg_service_url() -> str:
@@ -381,7 +381,14 @@ def _rtfx_and_memory(start_t: float, audio_seconds: float) -> dict[str, Any]:
 
 
 def _retry_on_empty_enabled() -> bool:
-    return _bool_param(os.getenv("ENVID_OPENAI_WHISPER_RETRY_ON_EMPTY"), default=True)
+    return _bool_param(
+        _env_first(
+            "ENVID_WHISPERX_RETRY_ON_EMPTY",
+            "ENVID_OPENAI_WHISPER_RETRY_ON_EMPTY",
+            default="",
+        ),
+        default=True,
+    )
 
 
 @app.get("/health")
