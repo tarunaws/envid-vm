@@ -1,0 +1,146 @@
+
+
+# backend: Select 1 for local LLM as primary. Select 2 for Gemini as primary.
+LLM_PRIMARY=1
+#meta-llama/Meta-Llama-3.1-8B-Instruct
+ENVID_GENAI_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct
+ENVID_DISABLE_LOCAL_LLM=false
+ENVID_DISABLE_SUMMARIZER=false
+ENVID_STRICT_TASK_SELECTION=true
+
+# genai: local vLLM settings
+ENVID_LLM_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct
+ENVID_LLM_DTYPE=float16
+ENVID_LLM_HOST=0.0.0.0
+ENVID_LLM_PORT=8000
+ENVID_LLM_GPU_MEMORY_UTILIZATION=0.4
+ENVID_LLM_MAX_MODEL_LEN=8192
+ENVID_LLM_PROVIDER=local
+ENVID_LLM_BASE_URL=http://genai:8000/v1
+ENVID_SYNOPSIS_MAX_TOKENS=512
+ENVID_LLM_TIMEOUT_SECONDS=120
+OPENROUTER_TIMEOUT_SECONDS=120
+
+# transcription/LLM coordination
+ENVID_TRANSCRIPT_VERIFY_AFTER_TRANSCRIBE=true
+ENVID_TRANSCRIBE_GPU_COOLDOWN_SECONDS=2
+ENVID_LLM_STARTUP_DELAY_SECONDS=0
+ENVID_LLM_READY_TIMEOUT_SECONDS=40
+ENVID_LLM_READY_POLL_SECONDS=5
+ENVID_SYNOPSIS_ALLOW_RAW_FALLBACK=true
+ENVID_TRANSCRIPT_VERIFY_REQUIRED=true
+
+# subtitle verification (LLM)
+ENVID_SUBTITLE_VERIFY_ENABLED=true
+
+# backend, ingest, metadata-export, and volume mounts: GCP credentials file path
+GOOGLE_APPLICATION_CREDENTIALS=<Path to google access>
+# backend, ingest, metadata-export: GCS bucket for metadata
+ENVID_METADATA_GCS_BUCKET=envid-metadata-tarun
+# backend: audio-transcription service URL
+ENVID_TRANSCRIBE_SERVICE_URL=http://audio-transcription:5088
+ENVID_TRANSCRIBE_ENGINE=whisperx
+ENVID_WHISPERX_MODEL=large-v3
+ENVID_TRANSCRIBE_AUTO_START=true
+ENVID_TRANSCRIBE_READY_TIMEOUT_SECONDS=180
+ENVID_TRANSCRIBE_READY_POLL_SECONDS=5
+ENVID_TRANSCRIBE_CHUNK_SECONDS=900
+ENVID_TRANSCRIBE_GPU_MEMORY_FRACTION=0.6
+# backend: summarizer (genai) service URL (optional override)
+ENVID_SUMMARIZER_SERVICE_URL=
+
+# transcoder: whisper audio atempo
+ENVID_WHISPER_AUDIO_ATEMPO=0.9
+# transcoder: whisper audio filter
+ENVID_WHISPER_AUDIO_FILTER=default
+# backend: transcription backend selector
+# (fixed to OpenAI Whisper large-v3 in code)
+
+# backend: local storage for indices/artifacts (mounted to host via /mnt/processing)
+ENVID_STORAGE_BASE_DIR=/mnt/gcs/envid-metadata-local
+
+# backend: translation concurrency
+ENVID_METADATA_TRANSLATE_CONCURRENCY=1
+# backend: metadata upload concurrency
+ENVID_METADATA_UPLOAD_CONCURRENCY=2
+ENVID_GCS_ARTIFACTS_VERIFY_RETRIES=12
+ENVID_GCS_ARTIFACTS_VERIFY_WAIT_SECONDS=10
+ENVID_GCS_ARTIFACTS_VERIFY_STRICT=false
+ENVID_STALE_STOPPING_SECONDS=120
+
+# backend: GCP Video Intelligence min label confidence
+ENVID_METADATA_GCP_VI_MIN_LABEL_CONFIDENCE=0.85
+
+# moderation: moderation sampling interval seconds
+ENVID_METADATA_MODERATION_INTERVAL_SECONDS=1
+# moderation: moderation max frames
+ENVID_METADATA_MODERATION_MAX_FRAMES=20000
+
+# backend, text-on-video: OCR interval seconds
+ENVID_METADATA_OCR_INTERVAL_SECONDS=5
+# backend, text-on-video: OCR max frames
+ENVID_METADATA_OCR_MAX_FRAMES=6000
+# backend: text-on-video service timeout seconds
+ENVID_METADATA_TEXT_ON_VIDEO_TIMEOUT_SECONDS=1200
+# backend, text-on-video: OCR chunk size
+ENVID_METADATA_OCR_CHUNK_SIZE=300
+# backend, text-on-video: OCR min confidence
+ENVID_METADATA_OCR_MIN_CONF=0.5
+# backend, text-on-video: OCR min token length
+ENVID_METADATA_OCR_MIN_TOKEN_LEN=3
+# backend, text-on-video: OCR min text length
+ENVID_METADATA_OCR_MIN_TEXT_LEN=4
+# backend, text-on-video: OCR min letter count
+ENVID_METADATA_OCR_MIN_LETTER_COUNT=2
+# backend, text-on-video: OCR min alpha ratio
+ENVID_METADATA_OCR_MIN_ALPHA_RATIO=0.5
+# backend, text-on-video: OCR enable top third
+ENVID_METADATA_OCR_ENABLE_TOP_THIRD=true
+# backend, text-on-video: OCR enable middle band
+ENVID_METADATA_OCR_ENABLE_MIDDLE_BAND=true
+# backend, text-on-video: OCR enable lower third
+ENVID_METADATA_OCR_ENABLE_LOWER_THIRD=true
+# backend, text-on-video: OCR middle band height
+ENVID_METADATA_OCR_MIDDLE_BAND_HEIGHT=1.0
+# backend, text-on-video: OCR upscale
+ENVID_METADATA_OCR_UPSCALE=2.0
+# backend, text-on-video: OCR contrast
+ENVID_METADATA_OCR_CONTRAST=1.6
+# backend, text-on-video: OCR sharpen
+ENVID_METADATA_OCR_SHARPEN=1.3
+# backend, text-on-video: OCR threshold
+ENVID_METADATA_OCR_THRESHOLD=160
+# backend, text-on-video: Tesseract languages
+ENVID_METADATA_OCR_TESSERACT_LANG=eng+hin
+# backend, text-on-video: Tesseract PSM
+ENVID_METADATA_OCR_TESSERACT_PSM=6
+
+# backend: enable large file segmentation
+ENVID_METADATA_SEGMENT_ENABLE=true
+# backend: segment length seconds
+ENVID_METADATA_SEGMENT_SECONDS=300
+# backend: segment concurrency
+ENVID_METADATA_SEGMENT_CONCURRENCY=1
+# backend: segment timeout seconds
+ENVID_METADATA_SEGMENT_TIMEOUT_SECONDS=300
+
+# backend: scene fallback enabled
+ENVID_SCENE_FALLBACK_ENABLED=true
+# backend: scene fallback minimum seconds
+ENVID_SCENE_FALLBACK_MIN_SECONDS=8
+# backend: scene fallback target count
+ENVID_SCENE_FALLBACK_TARGET=6
+# backend: scene-by-scene LLM
+ENVID_SCENE_BY_SCENE_LLM=true
+# backend: force uniform scenes
+ENVID_SCENE_FORCE_UNIFORM=true
+
+# backend, text-normalizer, genai: Gemini API key
+GEMINI_API_KEY=
+
+# translate-indian, genai: Hugging Face token (optional)
+HF_TOKEN=
+
+# translation: target languages (all IndicTrans2 supported languages)
+ENVID_METADATA_TRANSLATE_LANGS=hi,bn,gu,kn,ml,mr,or,pa,ta,te,ur,as,ne,ks,kok,doi,sd,sa,mai
+ENVID_INDIC_TRANS_TIMEOUT_SECONDS=300
